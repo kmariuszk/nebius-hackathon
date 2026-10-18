@@ -3,6 +3,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { RUN_ID_PATTERN } from '../shared/ids.ts'
 import { canvasTools, ToolError, type ToolContext } from './canvasTools.ts'
+import { clusterTools } from './clusterTools.ts'
 import { papersClient, type PapersClient } from './papersClient.ts'
 
 // The canvas MCP at /api/mcp/canvas/:boardId (T02): every shared board change an agent makes goes
@@ -35,9 +36,9 @@ function jsonRpcError(res: ServerResponse, status: number, message: string, head
 	res.end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message }, id: null }))
 }
 
-export function buildCanvasServer(ctx: ToolContext) {
+export function buildCanvasServer(ctx: ToolContext, tools = canvasTools) {
 	const server = new McpServer({ name: 'canvas', version: '0.1.0' }, { instructions: INSTRUCTIONS })
-	for (const tool of canvasTools) {
+	for (const tool of tools) {
 		server.registerTool(tool.name, { description: tool.description, inputSchema: tool.input }, async (input: unknown) => {
 			try {
 				const result = await tool.run(ctx, input)
@@ -73,7 +74,9 @@ export async function handleCanvasMcp(
 		model: header(req, 'x-model')?.slice(0, 200) ?? null,
 		papers,
 	}
-	const server = buildCanvasServer(ctx)
+	// tools that need a planned discovery tool are listed only once the papers MCP has it (I5)
+	const clusters = (await papers.hasTool?.('cluster_papers')) === true
+	const server = buildCanvasServer(ctx, clusters ? [...canvasTools, ...clusterTools] : canvasTools)
 	const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true })
 	res.on('close', () => server.close().catch(() => {}))
 	try {

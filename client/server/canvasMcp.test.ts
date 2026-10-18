@@ -23,13 +23,23 @@ const papers: PapersClient = {
 	getPaper: async (paperId) => ({ paperId, title: 'T', abstract: 'Malignant cells showed two programs.', url: null }),
 }
 
+// a papers MCP that has cluster_papers (I5), for boards whose ID starts with "clusters"
+const clustering: PapersClient = {
+	...papers,
+	hasTool: async (name) => name === 'cluster_papers',
+	clusterPapers: async (paperIds) => ({
+		clusters: [{ clusterId: 'c1', paperIds, label: 'Melanoma atlas' }],
+		similarities: [],
+	}),
+}
+
 let http: Server
 let url: string
 
 before(async () => {
 	http = createServer((req, res) => {
 		const boardId = req.url?.match(/^\/api\/mcp\/canvas\/([^/]+)$/)?.[1]
-		if (boardId) handleCanvasMcp(req, res, boardId, papers)
+		if (boardId) handleCanvasMcp(req, res, boardId, boardId.startsWith('clusters') ? clustering : papers)
 		else res.writeHead(404).end()
 	})
 	await new Promise<void>((resolve) => http.listen(0, '127.0.0.1', resolve))
@@ -66,6 +76,28 @@ test('lists the eight tools and the board rules', async () => {
 	assert.ok(tools.every((t) => (t.description?.length ?? 0) > 100))
 	assert.equal(client.getInstructions(), INSTRUCTIONS)
 	await client.close()
+})
+
+test('apply_clusters and label_cluster are listed only when the papers MCP has cluster_papers', async () => {
+	const client = await connect('clusters1')
+	const names = (await client.listTools()).tools.map((t) => t.name)
+	assert.equal(names.length, 10)
+	assert.ok(names.includes('apply_clusters') && names.includes('label_cluster'))
+	json(await client.callTool({ name: 'add_papers', arguments: { papers: [{ paperId: 'pmid:1', title: 'One' }, { paperId: 'pmid:2', title: 'Two', near: 'pmid:1' }] } }))
+	const applied = json(await client.callTool({ name: 'apply_clusters', arguments: {} }))
+	assert.deepEqual(applied, { clusters: [{ clusterId: 'c1', label: 'Melanoma atlas', paperIds: ['pmid:1', 'pmid:2'] }], skipped: [] })
+	assert.deepEqual(json(await client.callTool({ name: 'label_cluster', arguments: { clusterId: 'c1', label: 'Atlas' } })), { ok: true })
+	const board = json(await client.callTool({ name: 'get_board', arguments: {} }))
+	assert.deepEqual(board.clusters, [{ clusterId: 'c1', label: 'Atlas', labelGenerated: true, humanTouched: false }])
+	assert.deepEqual(board.papers.map((p: { cluster: string }) => p.cluster), ['c1', 'c1'])
+	await client.close()
+
+	const plain = await connect('plain')
+	const tools = (await plain.listTools()).tools.map((t) => t.name)
+	assert.ok(!tools.includes('apply_clusters') && !tools.includes('label_cluster'))
+	const hidden = await plain.callTool({ name: 'apply_clusters', arguments: {} })
+	assert.equal(hidden.isError, true)
+	await plain.close()
 })
 
 test('tool calls write to the room with attribution from the headers', async () => {

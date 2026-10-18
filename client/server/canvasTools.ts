@@ -3,7 +3,9 @@ import {
 	toRichText,
 	type TLArrowShape,
 	type TLBinding,
+	type TLFrameShape,
 	type TLNoteShape,
+	type TLParentId,
 	type TLRecord,
 	type TLShape,
 	type TLShapeId,
@@ -12,11 +14,11 @@ import type { JsonObject } from '@tldraw/utils'
 import { z } from 'zod'
 import { NOTE_PIN_TYPE } from '../shared/bindings.ts'
 import { nodeLabel, normaliseType } from '../shared/display.ts'
-import { agentShapeId, linkShapeId, paperShapeId, slug, type LinkKind } from '../shared/ids.ts'
+import { agentShapeId, clusterShapeId, linkShapeId, paperShapeId, slug, type LinkKind } from '../shared/ids.ts'
 import { isAgentShape, isHumanTouched } from '../shared/meta.ts'
 import type { PaperCardProps, PaperQuote } from '../shared/paperCard.ts'
 import { defaultPaperCardProps, NODE_SIZE, type PaperCardShape } from '../shared/shapes.ts'
-import { centre, isFree, placeNear, shapeBoxes, type Vec } from './layout.ts'
+import { centre, isFree, MARGIN, placeInside, placeNear, shapeBoxes, type Vec } from './layout.ts'
 import type { PapersClient } from './papersClient.ts'
 import { readRoom, writeRoom, writer, type Txn } from './rooms.ts'
 
@@ -72,23 +74,23 @@ export interface BoardEvent {
 /** T08 stores these and broadcasts them over SSE; a no-op until then. */
 export function recordEvent(_event: BoardEvent) {}
 
-function changed(ctx: ToolContext, type: string, payload: unknown) {
+export function changed(ctx: ToolContext, type: string, payload: unknown) {
 	recordEvent({ boardId: ctx.boardId, actor: 'agent', onBehalfOf: ctx.onBehalfOf, runId: ctx.runId, type, payload })
 }
 
-const agentMeta = (ctx: ToolContext, extra: JsonObject = {}): JsonObject => ({
+export const agentMeta = (ctx: ToolContext, extra: JsonObject = {}): JsonObject => ({
 	createdBy: 'agent',
 	onBehalfOf: ctx.onBehalfOf,
 	runId: ctx.runId,
 	...extra,
 })
 
-const isShape = (r: TLRecord | undefined): r is TLShape => r?.typeName === 'shape'
-const isCard = (r: TLRecord | undefined): r is PaperCardShape => isShape(r) && r.type === 'paper-card'
+export const isShape = (r: TLRecord | undefined): r is TLShape => r?.typeName === 'shape'
+export const isCard = (r: TLRecord | undefined): r is PaperCardShape => isShape(r) && r.type === 'paper-card'
 const isBinding = (r: TLRecord): r is TLBinding => r.typeName === 'binding'
 
 // slugs are lossy, so two paper IDs can share a shape ID; the card's own paperId decides
-function findCard(txn: Txn, paperId: string): PaperCardShape | undefined {
+export function findCard(txn: Txn, paperId: string): PaperCardShape | undefined {
 	const r = txn.get(paperShapeId(paperId))
 	return isCard(r) && r.props.paperId === paperId ? r : undefined
 }
@@ -100,7 +102,7 @@ function needCard(txn: Txn, paperId: string): PaperCardShape {
 }
 
 /** Why the agent may not change this shape's props, or null if it may. */
-function propsLocked(shape: TLShape): string | null {
+export function propsLocked(shape: TLShape): string | null {
 	if (!isAgentShape(shape.meta)) return 'made by a person'
 	if (shape.meta.editedByHuman === true) return 'edited by a person'
 	return null
@@ -201,6 +203,16 @@ export function getBoard(ctx: ToolContext) {
 				pinnedTo: pinnedTo.get(n.id) ?? null,
 			}))
 
+		// a cluster's papers are the cards inside its frame (`cluster` on each paper)
+		const clusters = shapes
+			.filter((s): s is TLFrameShape => clusterIdOf(s) !== null)
+			.map((f) => ({
+				clusterId: f.meta.clusterId as string,
+				label: f.props.name,
+				labelGenerated: f.meta.labelGenerated === true,
+				humanTouched: isHumanTouched(f.meta) || f.meta.renamedByHuman === true,
+			}))
+
 		const discarded = cards.filter((c) => c.props.status === 'discarded').map((c) => c.props.paperId)
 		const bySlug = new Map(cards.map((c) => [slug(c.props.paperId), c.props.paperId]))
 		const removed = [...deletedLinkIds(txn)].map((id) => parseLinkId(id, bySlug)).filter((l) => l !== null)
@@ -212,6 +224,7 @@ export function getBoard(ctx: ToolContext) {
 			...(cards.length > PAPER_CAP ? { truncated: cards.length - PAPER_CAP } : {}),
 			links: links.slice(0, LINK_CAP),
 			notes,
+			clusters,
 			discardedIds: [...new Set([...info.discardedIds, ...discarded])],
 			removedLinks: [...info.removedLinks, ...removed],
 		}
@@ -232,7 +245,7 @@ function parseLinkId(id: string, bySlug: Map<string, string>): RemovedLink | nul
 
 // ---- add_papers
 
-const paperIdInput = z.string().min(1).max(200)
+export const paperIdInput = z.string().min(1).max(200)
 const httpUrl = z.string().max(2000).regex(/^https?:\/\//, 'must be an http(s) URL')
 
 const paperInput = z.object({
@@ -280,6 +293,65 @@ function anchorFor(records: TLRecord[], txn: Txn, near: string | null | undefine
 	return latest && boxes.has(latest.id) ? centre(boxes.get(latest.id)!) : null
 }
 
+// ---- cluster frames: built-in frames with meta.clusterId (apply_clusters and label_cluster are in clusterTools.ts)
+
+const clusterIdOf = (r: TLRecord | undefined) =>
+	isShape(r) && r.type === 'frame' && typeof r.meta.clusterId === 'string' ? r.meta.clusterId : null
+
+/** The frame that holds cluster `clusterId`: ours by its ID, else one a person made (T14). */
+export function findClusterFrame(txn: Txn, clusterId: string): TLFrameShape | undefined {
+	const own = txn.get(clusterShapeId(clusterId))
+	if (clusterIdOf(own) === clusterId) return own as TLFrameShape
+	for (const r of txn.values()) if (clusterIdOf(r) === clusterId) return r as TLFrameShape
+	return undefined
+}
+
+/**
+ * A free spot for a box of `size` inside `frame`, in the frame's own coordinates, nearest the
+ * anchor (page space). If the frame is full and is the agent's, untouched by people, it grows
+ * downwards when the space below it is free. Null if there is no room.
+ */
+export function spotInFrame(txn: Txn, frameId: TLShapeId, size: { w: number; h: number }, anchor: Vec | null) {
+	const frame = txn.get(frameId) as TLFrameShape
+	const records = [...txn.values()]
+	const box = shapeBoxes(records).get(frame.id)!
+	const local = (at: Vec) => ({ x: at.x - box.x, y: at.y - box.y })
+	const at = placeInside(records, size, anchor, frame.id)
+	if (at) return local(at)
+	if (propsLocked(frame)) return null
+	const grow = Math.max(size.w, size.h) + 2 * MARGIN
+	const inFrame = new Set<string>([frame.id])
+	for (const r of records) if (isShape(r) && inFrame.has(r.parentId)) inFrame.add(r.id)
+	const outside = [...shapeBoxes(records)].filter(([id]) => !inFrame.has(id)).map(([, b]) => b)
+	if (!isFree(outside, { x: box.x, y: box.y + box.h, w: box.w, h: grow })) return null
+	const grown = { ...frame, props: { ...frame.props, h: frame.props.h + grow } }
+	const below = placeInside(records.map((r) => (r.id === frame.id ? grown : r)), size, anchor, frame.id)
+	if (!below) return null
+	writer(txn).patchShape({ id: frame.id, props: { h: grown.props.h } })
+	return local(below)
+}
+
+// A new card goes beside its `near` card, inside that card's cluster frame while it has room;
+// `near` may also name a cluster. Otherwise on the page, as placeNear does.
+function placeCard(
+	txn: Txn,
+	size: { w: number; h: number },
+	near: string | null | undefined,
+	runId: string | null
+): Vec & { parentId?: TLParentId } {
+	const records = [...txn.values()]
+	const nearCard = near ? findCard(txn, near) : undefined
+	const container = nearCard ? txn.get(nearCard.parentId) : near ? findClusterFrame(txn, near) : undefined
+	const frame = clusterIdOf(container) !== null ? (container as TLFrameShape) : undefined
+	const anchor =
+		frame && !nearCard ? centre(shapeBoxes(records).get(frame.id)!) : anchorFor(records, txn, near, runId)
+	if (frame) {
+		const spot = spotInFrame(txn, frame.id, size, anchor)
+		if (spot) return { ...spot, parentId: frame.id }
+	}
+	return placeNear([...txn.values()], size, anchor)
+}
+
 export function addPapers(ctx: ToolContext, { papers }: z.infer<z.ZodObject<typeof addPapersInput>>) {
 	const result = writeRoom(ctx.boardId, (txn) => {
 		const w = writer(txn)
@@ -311,14 +383,11 @@ export function addPapers(ctx: ToolContext, { papers }: z.infer<z.ZodObject<type
 				}
 				continue
 			}
-			const records = [...txn.values()]
 			const size = { w: NEW_CARD_SIZE, h: NEW_CARD_SIZE }
-			const { x, y } = placeNear(records, size, anchorFor(records, txn, p.near, ctx.runId))
 			w.createShape({
 				id,
 				type: 'paper-card',
-				x,
-				y,
+				...placeCard(txn, size, p.near, ctx.runId),
 				props: defaultPaperCardProps(p.paperId, {
 					...cardFields(p),
 					...size,
@@ -726,7 +795,7 @@ export function addNote(ctx: ToolContext, { text, paperId }: z.infer<z.ZodObject
 
 // ---- the tool list the MCP registers
 
-function tool<S extends z.ZodRawShape>(
+export function tool<S extends z.ZodRawShape>(
 	name: string,
 	description: string,
 	input: S,
@@ -741,7 +810,8 @@ export const canvasTools = [
 		'Read the shared board as compact JSON: the research question and "Looking for" goals; every paper card ' +
 			'(paperId, label, title, year, type, kind seed/kept/suggestion, status new/kept/contested/discarded, ' +
 			'scores per goal, working, cluster, humanTouched, pinnedNotes); links between papers (from, to, kind, ' +
-			'label, by, hidden); notes (text, author, pinnedTo); discarded paper IDs; and links people removed. ' +
+			'label, by, hidden); notes (text, author, pinnedTo); clusters (clusterId, label, labelGenerated, ' +
+			'humanTouched); discarded paper IDs; and links people removed. ' +
 			'At most 500 papers (seeds and kept first; `truncated` counts the rest), 1000 links and 200 notes. ' +
 			'Changes nothing.',
 		{},
@@ -755,10 +825,11 @@ export const canvasTools = [
 			'peerReviewed, citedBy, retracted, foundBy (how it was found, e.g. "pubmed"); null means unknown and ' +
 			'never overwrites a known value. kind (seed, kept or suggestion; default suggestion) applies to new cards ' +
 			'only. Never give coordinates: put the most similar paper already on the board in `near` and the card is ' +
-			'placed beside it without overlapping anything; without `near` it goes next to the latest card of this ' +
-			'turn. New cards start with status new and the "Agent is reading…" ring on (turn it off with ' +
-			'mark_working). Skipped with a reason: retracted papers, seeds already on the board, and cards a person ' +
-			'made, moved or edited. Returns {added, updated, skipped: [{paperId, reason}]} with paper IDs.',
+			'placed beside it without overlapping anything, inside that paper\'s cluster if it is in one (`near` may ' +
+			'also be a clusterId from get_board); without `near` it goes next to the latest card of this turn. New ' +
+			'cards start with status new and the "Agent is reading…" ring on (turn it off with mark_working). ' +
+			'Skipped with a reason: retracted papers, seeds already on the board, and cards a person made, moved ' +
+			'or edited. Returns {added, updated, skipped: [{paperId, reason}]} with paper IDs.',
 		addPapersInput,
 		addPapers
 	),

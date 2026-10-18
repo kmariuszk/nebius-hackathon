@@ -21,6 +21,14 @@ function papersServer() {
 		const record = { paperId: paper_id, title: 'Atlas', abstract: 'We profiled cells.', url: 'https://example.org/p' }
 		return { structuredContent: record, content: [{ type: 'text', text: JSON.stringify(record) }] }
 	})
+	// numeric cluster IDs and Concept.md's `score` are read as the board expects them
+	server.registerTool('cluster_papers', { inputSchema: { paper_ids: z.array(z.string()) } }, async ({ paper_ids }) => {
+		const result = {
+			clusters: [{ clusterId: 1, paperIds: paper_ids, label: 'Atlas' }],
+			similarities: [{ a: paper_ids[0], b: paper_ids[1], score: 0.8 }],
+		}
+		return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] }
+	})
 	return server
 }
 
@@ -51,5 +59,25 @@ test('get_paper returns the record and caches it', async () => {
 test('an unreachable papers MCP is an error that says so', async () => {
 	const papers = createPapersClient('http://127.0.0.1:9/mcp')
 	await assert.rejects(papers.getPaper('pmid:1'), /papers MCP at http:\/\/127\.0\.0\.1:9\/mcp is unreachable/)
+	await papers.close()
+})
+
+test('hasTool reads the tool list once; clusterPapers returns the clusters', async () => {
+	const papers = createPapersClient(url)
+	assert.equal(await papers.hasTool!('cluster_papers'), true)
+	assert.equal(await papers.hasTool!('get_figures'), false)
+	assert.deepEqual(await papers.clusterPapers!(['pmid:1', 'pmid:2']), {
+		clusters: [{ clusterId: '1', paperIds: ['pmid:1', 'pmid:2'], label: 'Atlas' }],
+		similarities: [{ a: 'pmid:1', b: 'pmid:2', similarity: 0.8 }],
+	})
+	await papers.close()
+})
+
+test('an unreachable papers MCP lists no tools, quickly', async () => {
+	const papers = createPapersClient('http://127.0.0.1:9/mcp')
+	const started = Date.now()
+	assert.equal(await papers.hasTool!('cluster_papers'), false)
+	assert.ok(Date.now() - started < 3500)
+	await assert.rejects(papers.clusterPapers!(['a', 'b']), /unreachable/)
 	await papers.close()
 })
