@@ -1,6 +1,6 @@
 # Hackathon brainstorm: picking a track (Granola transcript)
 
-- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 13:17
+- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:03
 - **Source:** Granola note "New note", https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd
 - **Recorded by:** Ralph van Spanje (microphone only; speakers are not separated, so every line is labelled "Microphone")
 - **Note:** Verbatim auto-transcript. It has transcription errors (e.g. "Nematron"/"Nimotron" = Nemotron, "Free Blue and Brown" = 3Blue1Brown).
@@ -557,3 +557,155 @@ Microphone: Which agent can use to generate?
 Microphone: Gotcha.
 
 Microphone: How do you— I think it's
+
+---
+
+*[Added in the 14:03 Granola sync]*
+
+---
+
+Microphone: Okay, I'm cloning the TL0. Yeah, I can do it.
+
+Microphone: I also post— I will put the transcript.
+
+Microphone: In there too, can be useful. I'm gonna send you a link in a moment.
+
+Microphone: I'm gonna send you a link to the repo so you can put it there. Oh yeah.
+
+Microphone: Come again? I'm using Potato Mode, but feel free to populate the code folder with your skills.
+
+Microphone: You guys want to cloud.md of the what the rules are for the challenge. Should I add it? Are there any rules? Yeah, just the description. I'd like to have that in my AI. I just put the transcript. I feel like then it becomes super focused on these things and it may, I don't know, I'm not a fan of this. Yeah, good. No, I'm putting it only the transcript. Maybe it makes sense to add context, but we also need to put the context of our plan. And then I guess we can just let it go. Yeah, that's the thing. And with the transcript and the plan with the challenge.
+
+Microphone: Do I need to do this one? Wait, you don't have it?
+
+Microphone: No, no, no, no, no. I'm gonna need to add you as a collaborator then. What's her name for this one? Is Ralph dot Miro. Do you really want to use your Miro account? I need to, yeah, or I need to send you it via something else, but this is my MCP of GitHub is fully, uh, oh no, oh yeah.
+
+Microphone: Yes.
+
+Microphone: Yeah, but I have a username too. Why is there an invite? Oh yeah, that's good. Yeah, yeah, I thought maybe find my profile, but it didn't. That's why I was confused. Igor, what's your GitHub name? It's Igor K.
+
+Microphone: Yes, I'm in.
+
+Microphone: I'm gonna invite that one.
+
+Microphone: I quickly get some food.
+
+Microphone: Did you pull my repo already? Okay, tell me when you do, okay?
+
+Microphone: Yeah, I added you as a collaborator. You need to— I think you need to open your Gmail to accept it.
+
+Microphone: The officer will be less busy, and they just started. Nothing missed.
+
+Microphone: Yes, but I had to add you as a collaborator so you can push to it.
+
+Microphone: The Chloris.
+
+Microphone: Trying to figure out the right setup.
+
+Microphone: With the clone of KeelDraw.
+
+Microphone: I'm sure that I have enough permission. You can open it. I can't clone it.
+
+Microphone: What the fuck?
+
+Microphone: Nice.
+
+Microphone: Oh my God. Oh really?
+
+Microphone: Yeah, we need to, I think. Do we? We need to deploy on Nebius. Okay.
+
+Microphone: Deploy a working app on Nebius. Return a ranks.
+
+Microphone: It says return a ranked list of newly discovered papers with useful metadata, source link, and relevance explanation.
+
+Microphone: Igor, can you try it again? I think now it should work for you.
+
+Microphone: But why return a ranked list? So
+
+Microphone: Yeah, what do they mean? Like, do we need to list? When somebody searches for something, yeah, we need to show a list of papers. I mean, it can be a list or we can just put it on the board. It's up to us. Yeah, we can probably think about both interfaces. It's a bit weird.
+
+Microphone: Are you building anything, Igor, already? No, no, no, I'm just learning.
+
+Microphone: But still, who is?
+
+Microphone: Chicken and falafel.
+
+Microphone: I'm quite hungry after just having this fucking pastry in the morning. License? You mean license for that? For developing, so it's— what?
+
+Microphone: Right, and I just cloned the TL-Draw repo.
+
+Microphone: Really? Okay, I don't know either, so I trust him.
+
+Microphone: Okay, Claude says you need it only for deployment.
+
+Microphone: It's given by them.
+
+Microphone: I put something on the board. Wait, this one. There is document parsing demo tool.
+
+Microphone: So you should use that.
+
+Microphone: Okay, I completely fucked up the TL-Draw setup. Sorry guys.
+
+Microphone: In the markdown file.
+
+Microphone: Do you want me to help you with that?
+
+Microphone: So I'm thinking that probably we do not really need the image.
+
+Microphone: Yeah, but we're going to use ADK, right? Which is the agent thing.
+
+Microphone: Maybe, I don't know. It's, it's some library.
+
+Microphone: Yeah, it's from Traffic Agency. There is coding team on the site. Because I think like everything that is board related, all the options, all the things that you add there, they should be available through any agent. So NCP platform with our custom widgets and everything, but for the— and yeah, not for this internal thing.
+
+Microphone: Yeah, we could use Harvest and then we have the agenting code from the get-go.
+
+Microphone: Yeah, I do.
+
+Microphone: And we should not cover feature.
+
+Microphone: I mean, I think the graph should be created programmatically.
+
+Microphone: Maybe partially, yes. Like you just say that you connect this paper to that paper and that paper, and then the UI is just calculating it.
+
+Microphone: Oh, so basically different ways of connections. Yeah, but I think this can also can be programmatically. So for example, here you have filters and you click on it, like structure by citation, structure by something else, structure by something else.
+
+Microphone: Maybe we shall— I think this is the gate to make sense, like you should research.
+
+Microphone: What do you want the main agent to run deep research?
+
+Microphone: Yeah, so what I put there, if you open it, I basically created the subagents for searching. So this agent is basically going to say, oh hey, I'm being asked to do research on this topic, and it's going to break it down into 3 queries, and it's going to spawn 3 agents that are going to run 3 queries, and then each of them is going to run deep research. Yeah, yeah, yeah.
+
+Microphone: You guys want chicken or falafel?
+
+Microphone: So like this agent calls the tool, most subagents are just tools, so you just call the tool, create subagent, and that is done. Yes, yeah, you can go back there, we will discuss it out. There's no chicken anymore and you guys need to go separately.
+
+Microphone: I'm also setting up all these partners things so that we can use them.
+
+Microphone: Yeah, true.
+
+Microphone: Maybe even for the demo.
+
+Microphone: Already a board that we have, and then not that the deep research can be done as last, maybe.
+
+Microphone: It's actually quite okay.
+
+Microphone: Yeah, the follow-up looks like— yeah, it's good. Yeah.
+
+Microphone: I'm not sure about this.
+
+Microphone: I mean, this external, right? We're just connecting to it. Yeah.
+
+Microphone: And we are using this model.
+
+Microphone: And if you could, so the external, all the external dependencies that we're going to have, right? Yeah, more or less.
+
+Microphone: Yeah, I'm not sure about this Hermes. Well, Hermes is agent, so we can drop it. We can use our agent.
+
+Microphone: Yeah, so that if I wonder why they didn't put Hermes there.
+
+Microphone: Are you still recording us, Ralph? Yes.
+
+Microphone: Maybe you would like to put the transcription for the conversation that we had. And also, are you just putting screenshots of Miro into the conversation? You can connect it fluency as well. So then you just post the link to the board and then it's pretty— whatever.
+
+Microphone: The transcript is in the GitHub, but I will refresh it one more time.
