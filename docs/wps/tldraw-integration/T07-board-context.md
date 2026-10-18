@@ -50,7 +50,7 @@ Two more session-bound tools in `BoardTools.viewer()`, alongside T06's:
 | `look_at_board` | `look_at_board(target: "viewport" \| "board" \| "papers", paper_ids: list[str] = [])` | The researcher's current view, the whole board, or just the named papers' cards and their neighbours |
 | `look_at_paper` | `look_at_paper(paper_id: str, page: int = 1)` | One rendered page of the paper's PDF |
 
-Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canvas/snapshot`), waits up to 10 seconds, and returns a short JSON result to the model: `{"ok": true, "image": "board view, 1600×980, 41 cards visible"}` or `{"ok": false, "reason": "…"}`. The docstrings say when looking helps: layout and cluster questions, "what am I looking at", anything about a figure, chart or drawing.
+Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canvas/snapshot`) with a target from the [shared contract](README.md#shared-contracts): `look_at_board("viewport")` and `look_at_board("board")` send those targets, `look_at_board("papers", paper_ids)` sends `target: "shapes"` with `paperIds`, and `look_at_paper` sends `target: "paper_page"`. It waits up to 10 seconds, and returns a short JSON result to the model: `{"ok": true, "image": "board view, 1600×980, 41 cards visible"}` or `{"ok": false, "reason": "…"}`. The docstrings say when looking helps: layout and cluster questions, "what am I looking at", anything about a figure, chart or drawing.
 
 **Getting the image in front of the model.** Token Factory's tool messages carry text only ([function calling](https://docs.tokenfactory.nebius.com/ai-models-inference/function-calling)), so the picture can't be the tool's result. Instead:
 
@@ -60,7 +60,7 @@ Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canv
 
 Because it's a plugin, it works for any agent in the runner, including the harness owner's `master`, with no change to their code (plugins reach `AgentTool` agents too, decision D8).
 
-**Prompt blocks.** `to_genai_content` (T04) maps text resources to tagged text parts (`<selected-shape uri="…">`, `<viewport>`, `<board-changes>`), and each `image` block to an `inline_data` part, keeping the preceding caption text. The harness drops images (and says so in a text part) only if the root agent's model isn't vision-capable ([I6](interfaces.md#i6-which-model-slots-take-images)); on Super VL that never happens.
+**Prompt blocks.** T04 owns the mapping and its tag names (`<selected-shape>`, `<viewport>`, `<board-changes>`, and `<board-context>` for anything else; see [T04](T04-acp-adapter.md)). This WP only builds the blocks in the browser and the image rules below. The harness drops images (and says so in a text part) only if the root agent's model isn't vision-capable ([I6](interfaces.md#i6-which-model-slots-take-images)); on Super VL that never happens.
 
 ### 3. Rendering snapshots (browser, `client/client/canvas/snapshot.ts`)
 
@@ -70,7 +70,7 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 | --- | --- |
 | `viewport` | `editor.toImage([...editor.getCurrentPageShapeIds()], { format: 'png', bounds: editor.getViewportPageBounds(), background: true, scale, pixelRatio: 1 })` |
 | `board` | Same, with `bounds: editor.getCurrentPageBounds()` |
-| `shapes` / `papers` | The named cards plus shapes bound to them by arrows, `bounds` = their union with a margin |
+| `shapes` (with `shapeIds` and/or `paperIds`) | The named shapes and paper cards plus shapes bound to them by arrows, `bounds` = their union with a margin |
 | `paper_page` | pdf.js renders the page from `GET /papers/:paperId/pdf` (T08) to an offscreen canvas; reuses the PDF reader's document if it has the same paper open (T10) |
 
 - Size: `scale` is chosen so the long side is at most 1,600 px (the measured cost of such an image is about 1,400 tokens); `maxSide` in the request can lower it.

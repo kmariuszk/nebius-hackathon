@@ -52,7 +52,7 @@ Only suggestions are listed (seeds and kept papers are the collection). Clicking
 | Section | Options | Predicate on the card |
 | --- | --- | --- |
 | Fit | High, Medium, Low (multi-select) | `scores[goal].fit` |
-| Type | Research, Review (multi-select) | `type` (`preprint` counts as research) |
+| Type | Research, Review (multi-select) | `type`: Research is `article`, `preprint` and `other`; Review is `review` (T01's normalised values) |
 | Quality | "Peer reviewed only (hides preprints)"; "Cited at least" Any, 10×, 50× | `peerReviewed`, `citedBy` |
 | Published | Any time, Since 2023, Since 2025 | `year` |
 | Discarded | "Show discarded papers" | `status === "discarded"` (T01's visibility rule) |
@@ -79,7 +79,7 @@ The panel footer shows "Showing 2 of 4 suggestions" and Clear. Under "Cited at l
 
 ## Tests
 
-- `client/client/ranked/filters.test.ts`: each predicate, combinations, preprints under "peer reviewed only", missing `citedBy`.
+- `client/client/ranked/filters.test.ts`: each predicate, combinations, preprints under "peer reviewed only", missing `citedBy`, and `type: "other"` (an OpenAlex book chapter) counting as Research.
 - `client/client/ranked/rankedRows.test.ts`: ranking per goal with ties and unscored papers, seeds excluded, counts.
 
 ## References

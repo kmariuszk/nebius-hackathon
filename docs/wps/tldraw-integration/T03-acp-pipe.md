@@ -4,7 +4,7 @@
 | --- | --- |
 | Lane | Board |
 | Size | S |
-| Depends on | T04 echo mode (or any stdio ACP agent) |
+| Depends on | T00 (the upgrade handler's try/catch), T04 echo mode (or any stdio ACP agent) |
 | Unblocks | T05 |
 | Milestone | M1 |
 | Status | Not started |
@@ -28,7 +28,7 @@ A browser opens `/api/acp?board=…&member=…` and is talking ACP to a fresh ha
 
 ## Design
 
-**Route.** `client/server/acpPipe.ts` exports `handleAcpUpgrade(req, socket, head)`. `server.ts`'s `upgrade` handler sends `/api/acp` there and keeps `/api/connect/:board` for sync. Query: `board` (required, same `safeId` rule as rooms) and `member` (required, `m_` prefix).
+**Route.** `client/server/acpPipe.ts` exports `handleAcpUpgrade(req, socket, head)`. `server.ts`'s `upgrade` handler sends `/api/acp` there and keeps `/api/connect/:board` for sync, inside the try/catch T00 adds: a bad request gets a 400 and a spawn or wiring error closes only that socket, never the process. Query: `board` (required, same `safeId` rule as rooms) and `member` (required, `m_` prefix).
 
 **Spawn.**
 

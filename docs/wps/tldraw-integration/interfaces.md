@@ -16,7 +16,7 @@ The tldraw integration group owns the board-facing half of `harness/` and nothin
 
 ## I1. Agent factory takes the board's tools
 
-Today each agent's `build()` reads `CANVAS_MCP_URL` and `BOARD_TOKEN` from the environment through `toolsets.canvas()`. That works for `adk web`, but one harness process serves one chat whose canvas URL, member and run arrive over ACP, not through the environment. The contract:
+Today `toolsets.canvas()` and `toolsets.papers()` read `CANVAS_MCP_URL`, `PAPERS_MCP_URL` and `BOARD_TOKEN` from the environment. The only agent so far, `search`, uses `toolsets.papers(...)`; no agent uses `toolsets.canvas()` yet. Reading the environment works for `adk web`, but one harness process serves one chat whose canvas URL, member and run arrive over ACP, so agents that touch the board (starting with the future `master`) need the session's values instead. The contract:
 
 ```python
 # harness/harness/board/tools.py  (ours)
@@ -65,7 +65,7 @@ These rules are enforced by the canvas MCP (T02), but agents that follow them ge
 - Use the viewer tools (`focus`, `highlight`, `open_paper`, `tour`, `look_at_board`, `look_at_paper`) to point at, walk through or look at things for the person you are talking to; they never change the shared board.
 - Mention papers in answers as `[Title](paper:<paperId>)` so the chat panel can make them clickable.
 
-What the v4 board ([mockup](../../mockups/README.md)) needs from agents, through T02's tools:
+What the v4 board ([mockup](../../mockups/README.md)) needs from agents. Most of it goes through T02's canvas MCP tools, which any agent can call; `tour` is a session-bound viewer tool from T06 that only our harness has (external agents can't call it):
 
 | v4 element | Tool | Notes |
 | --- | --- | --- |
@@ -75,7 +75,7 @@ What the v4 board ([mockup](../../mockups/README.md)) needs from agents, through
 | "Agent is reading…" | `mark_working` | On when reading starts, off when the card is filled |
 | Links | `link_papers` with `kind: "cites"` (from PubMed) or `"similar"` (your judgement) | Never relabel, unhide or redraw links people changed; skipped ones come back in `skipped` |
 | Notes | `add_note` with `paperId` | Pinned to the paper, shown in its card |
-| Catch me up | `tour` | Ordered steps, one line per paper (strongest first), sent once; the card runs it |
+| Catch me up | `tour` (viewer tool, T06; not on the canvas MCP) | Ordered steps, one line per paper (strongest first), sent once; the card runs it |
 | "Update suggestions" | — | The prompt carries `<board-changes>`; treat each change as the researcher's decision: re-rank and search around changed papers, and never undo a change |
 
 ## I5. What the board service needs from the papers MCP
@@ -128,7 +128,7 @@ v4's "What the UI needs from the backend" lists fields the discovery service sup
 | --- | --- | --- |
 | `scores` per goal | Node colour, ranked list, card fit line | `score_candidates` per board goal (Concept), written with `set_scores` |
 | `citedBy` | Card byline, quality filter | Semantic Scholar counts (v4 used them), on the paper record and in `add_papers` |
-| `type`, `peerReviewed` | Ranked list status, type and quality filters | OpenAlex type; preprint servers mean not peer reviewed |
+| `type`, `peerReviewed` | Ranked list status, type and quality filters | As discovery emits it today (`article`, `review`, `preprint`, or OpenAlex's raw `work.type`); T02 normalises to `article`, `review`, `preprint` or `other` (T01). Preprints mean not peer reviewed |
 | `retracted` | Never shown | PubMed marks retractions; `add_papers` skips them |
 | `figures[]` with the figure picked per goal | Card figure, ranked list thumbnail | PMC figures (v4: `efetch db=pmc` captions, images from the article page); written with `set_card` |
 | `facets` | "Compared with your seeds" | The reader or context agent, with supporting quotes |

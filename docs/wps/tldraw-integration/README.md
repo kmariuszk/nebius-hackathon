@@ -56,9 +56,10 @@ Two things the probes showed that matter to the harness owner are in [I8](interf
 
 | WP | Title | Lane | Size | Depends on | Milestone |
 | --- | --- | --- | --- | --- | --- |
+| [T00](T00-sync-server-hardening.md) | Harden the sync server and agent permissions (PR #6 review) | Board + repo config | S | — | Before M1 |
 | [T01](T01-shared-board-model.md) | Shared board model: custom shapes, IDs, attribution, human-touched flags | Board + Browser | M | — | M2 |
-| [T02](T02-canvas-mcp.md) | Canvas MCP and layout service | Board | M | T01 | M2 |
-| [T03](T03-acp-pipe.md) | ACP pipe: WebSocket to harness stdio | Board | S | T04 echo mode | M1 |
+| [T02](T02-canvas-mcp.md) | Canvas MCP and layout service | Board | M | T00, T01 | M2 |
+| [T03](T03-acp-pipe.md) | ACP pipe: WebSocket to harness stdio | Board | S | T00, T04 echo mode | M1 |
 | [T04](T04-acp-adapter.md) | ACP adapter: `python -m harness` | Harness (board half) | M | I1 | M1 |
 | [T05](T05-chat-panel.md) | Chat panel: browser ACP client | Browser | M | T03 | M1 |
 | [T06](T06-viewer-actions.md) | Per-viewer canvas actions: focus, highlight, open paper, catch-up tour | Harness + Browser | S | T04, T05 | M3 |
@@ -73,6 +74,8 @@ Two things the probes showed that matter to the harness owner are in [I8](interf
 
 ```mermaid
 flowchart LR
+  T00["T00 Server hardening"] --> T02
+  T00 --> T03
   T01["T01 Shared board model"] --> T02["T02 Canvas MCP"]
   T01 --> T08["T08 REST + SSE"]
   T04["T04 ACP adapter"] --> T03["T03 ACP pipe"]
@@ -100,7 +103,7 @@ flowchart LR
   T14 --> T12
 ```
 
-**Suggested order for one person:** T04 echo mode, T03, T05 (M1: chat works), then T01, T02 (M2: the agent writes to the board), then T06, T07 (M3), then T08, T13, T10, T09, T14 (M4: the v4 board), then T11, T12 (M5). With a second person, the Board lane (T01, T02, T08) and the Browser lane (T05, T13, T10, T09, T14) run in parallel from the start, meeting at the contracts below.
+**Suggested order for one person:** T00 first (it fixes crashes in code everything else builds on), then T04 echo mode, T03, T05 (M1: chat works), then T01, T02 (M2: the agent writes to the board), then T06, T07 (M3), then T08, T13, T10, T09, T14 (M4: the v4 board), then T11, T12 (M5). With a second person, the Board lane (T01, T02, T08) and the Browser lane (T05, T13, T10, T09, T14) run in parallel from the start, meeting at the contracts below.
 
 ## Visual spec: the v4 mockup
 
@@ -120,6 +123,23 @@ Ralph's [v4 mockup](../../mockups/README.md) (`docs/mockups/flashcard-v4.html`, 
 | Top bar with the agent in the face pile; Note and help buttons | T13 |
 
 v4 doesn't show the PDF reader with shared highlights from Concept's flow 5, so T10 keeps it as Phase B pending a decision (open question below).
+
+## PR #6 review
+
+kmariuszk's review of [PR #6](https://github.com/kmariuszk/nebius-hackathon/pull/6) (Oct 18, critical issues only) and where each point is handled:
+
+| # | Finding | Handled in |
+| --- | --- | --- |
+| 1 | A malformed WebSocket upgrade crashes the sync server | [T00](T00-sync-server-hardening.md) |
+| 2 | A room that fails to open crash-loops the server and leaks its DB handle | [T00](T00-sync-server-hardening.md) |
+| 3 | `.claude/settings.json` auto-approves destructive git | [T00](T00-sync-server-hardening.md) |
+| 4 | `cat`, `head` and `tail` auto-approve reading `.env` and `~/.ssh` | [T00](T00-sync-server-hardening.md) |
+| 5 | Contracts contradict each other or the code | Fixed in the WPs: paper `type` follows what discovery emits and is normalised (T01, T02, T09, I9); T04 owns the prompt tags (T04, T07); `look_at_board("papers")` maps to snapshot target `shapes` (T07, contracts below); I1 no longer claims agents use `toolsets.canvas()`; `tour` is marked as a viewer tool, not a canvas MCP tool (I4) |
+| 6 | "Give it your own ID to update it" in the README is false: `putShapes` replaces the record | T00 (insert-only `putShapes`, merging `patchShapes`, README fix) and T02 (every update patches; decision D20) |
+
+The reviewer offered non-critical findings too. T00 takes the unfurl SSRF, 500 vs 400 and stuck uploads; T02's idle close covers REST-only rooms; the `.claude/` template cleanup and the "ordering conflicts between the work packages" are open below until the list is posted.
+
+The same merge from `main` brought Ralph's latest brainstorm transcript. Two points from it are in the plan: papers appear one at a time as they're found (T01, arrival animation), and "widgets around the paper" when it's opened is a stretch idea in T10.
 
 ## How the pieces fit
 
@@ -200,7 +220,8 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | Route | Kind | WP | Purpose |
 | --- | --- | --- | --- |
 | `/api/connect/:boardId?sessionId=…` | WebSocket | exists | tldraw sync |
-| `POST /api/rooms/:boardId/shapes` | HTTP | exists | Raw shape writes; T02 reuses its transaction code |
+| `POST /api/rooms/:boardId/shapes` | HTTP | exists (T00 makes it insert-only) | Raw shape creates; T02 reuses its transaction code |
+| `PATCH /api/rooms/:boardId/shapes` | HTTP | T00 | Merge updates that keep position, stacking and `meta` |
 | `/api/uploads/:id`, `/api/unfurl` | HTTP | exists | Assets and bookmark previews |
 | `/api/mcp/canvas/:boardId` | Streamable HTTP MCP | T02 | Every shared board change by an agent |
 | `/api/acp?board=:boardId&member=:memberId` | WebSocket | T03 | One ACP connection, one harness process |
@@ -233,7 +254,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 
 | Method | Params | Result |
 | --- | --- | --- |
-| `_canvas/snapshot` | `{sessionId, target: "viewport" \| "shapes" \| "board" \| "paper_page", shapeIds?, paperIds?, paperId?, page?, maxSide?}` | `{mimeType: "image/png", data: <base64>, width, height, caption}`, or a JSON-RPC error if the browser can't take it (hidden tab, no PDF, timeout after 10 s) |
+| `_canvas/snapshot` | `{sessionId, target: "viewport" \| "board" \| "shapes" \| "paper_page", shapeIds?, paperIds?, paperId?, page?, maxSide?}`: `shapes` takes `shapeIds` and/or `paperIds`; `paper_page` takes `paperId` and `page`. These four targets are the only ones; T07's `look_at_board("papers", …)` sends `shapes` with `paperIds` | `{mimeType: "image/png", data: <base64>, width, height, caption}`, or a JSON-RPC error if the browser can't take it (hidden tab, no PDF, timeout after 10 s) |
 
 **Prompt content (client to agent, T07).** A text block first, then one `resource` block per selected shape (`uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json`, `text`: compact shape JSON), then one `resource` block for the viewport (`uri: tldraw://<boardId>/viewport`), then `image` blocks: the viewport, and a PDF page or region when the researcher asks from the PDF reader (T10). "Update suggestions" (T13) adds a `resource` block `tldraw://<boardId>/changes` with the researcher's edits. Each image is preceded by a text line saying what it is.
 
@@ -311,6 +332,8 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | D17 | Quotes, figures, claims and facets live on the `paper-card` (shown in its card), not as separate board shapes | v4 shows quotes on hover inside the card and figures in the card; keeping them on the shape means every section fills in live through sync |
 | D18 | Catch-up is one `_canvas/tour` notification that the card runs locally | v4 puts the tour inside the card with Keep or Discard moving on; stepping through costs no model calls |
 | D19 | Per-viewer views (goal, filters, open card fade) are local atoms, never room state | Two people can look at the same board for different goals; the room only holds shared facts |
+| D20 | Creates and updates are separate writes: `putShapes` only inserts, `patchShapes` merges and keeps position, stacking and `meta` | PR #6 review, finding 6: replacing a record on update would wipe a person's layout, the exact thing the human-touched rules prevent |
+| D21 | Prompt context tags are defined once, in T04 | PR #6 review, finding 5: T04, T07 and I4 had drifted apart |
 
 ## Risks
 
@@ -333,6 +356,8 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 
 ## Open questions
 
+- [ ] Ask kmariuszk to post the non-critical review findings, especially the "ordering conflicts between the work packages", and fix the order here.
+- [ ] Should the project-level `claude-mem` plugin stay enabled, given it records session content (T00)?
 - [ ] Does the PDF reader with shared highlights (Concept flow 5) stay in scope? v4 doesn't show it; T10 keeps it as Phase B after the card.
 - [ ] Ralph made v4: does he build parts of T10, T13 and T14 (the visual parts), with this group owning the data and sync underneath?
 - [ ] Which actions ask permission (`session/request_permission`) in the demo? Proposal: none in v0, since every v0 canvas tool only adds or updates the agent's own shapes.

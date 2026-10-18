@@ -44,13 +44,15 @@ The board knows what a paper is and draws it the way the [v4 mockup](../../mocku
 
 | Group | Props |
 | --- | --- |
-| Identity | `paperId`, `title`, `authors` (list of display names), `year`, `venue`, `url`, `type` (`research`, `review` or `preprint`), `peerReviewed` (boolean), `citedBy` (number or null) |
+| Identity | `paperId`, `title`, `authors` (list of display names), `year`, `venue`, `url`, `type` (`article`, `review`, `preprint` or `other`; normalised by T02 from what discovery emits, see below), `typeRaw` (the source's own value, for display), `peerReviewed` (boolean), `citedBy` (number or null) |
 | Board state | `w`, `h`, `kind` (`seed`, `kept` or `suggestion`), `status` (`new`, `kept`, `contested`, `discarded`), `working` (boolean), `keepBy`, `discardBy` (member IDs; written only by the board service from votes, T08) |
 | Fit per goal | `scores`: `{ [goal]: { score, fit: "low" \| "medium" \| "high", why } }`, one entry per "Looking for" goal (for example `new-findings`, `methods`) |
 | Card first view | `figure` (`{imageUrl, caption, label}` or null; real figures only), `oneLine` (one sentence), `claims` (`[{text, evidence: [quoteId or "seeds"]}]`, the underlined phrases), `quotes` (`[{id, text, source, verified, url}]`), `facets` (`[{facet: "disease" \| "cells" \| "method", value, relation: "same" \| "adds" \| "other" \| "unclear", quoteId}]`) |
 | Card details | `tldr`, `summary`, `gaps` (what couldn't be checked) |
 
 Retracted papers are never written (T02 rejects them), so there is no `retracted` prop.
+
+**Paper type values** (PR #6 review). Discovery emits `article` and `review` (PubMed, Semantic Scholar), `preprint` (arXiv, PubMed preprints) and OpenAlex's raw `work.type` (`article`, `review`, `preprint`, `book-chapter`, `dataset`, `letter`, `editorial` and more). `normaliseType(raw)` in `client/shared/display.ts` maps `article`, `review` and `preprint` to themselves and everything else to `other`, keeping the raw value in `typeRaw`. The validator accepts only the four normalised values; T02 normalises before writing. The UI's "Research" label (v4) means `article`.
 
 **Rendering the node** (`PaperCardShapeUtil`, from v4):
 
@@ -63,6 +65,7 @@ Retracted papers are never written (T02 rejects them), so there is no `retracted
 | `status: contested` | Small split-vote mark |
 | Size | Grows with the number of links (`w = h`, 40 to 72 px for circles, 48 to 80 px for squares) |
 | Label | `nodeLabel(authors, year)` under the node; the title shows only in the card and the ranked list, in sentence case |
+| Arrival | A new node fades and scales in, so papers visibly appear one at a time as the agent finds them (brainstorm, Oct 18) |
 
 `currentGoal` and the active filters are per-viewer atoms (below), so two people can look at the same board for different goals.
 
@@ -116,7 +119,7 @@ Each shape and binding gets an empty migration sequence now (`createShapePropsMi
 ## Tests
 
 - `client/shared/ids.test.ts`: every fixture pair; Python mirrors it in `harness/tests/test_board_ids.py` (T04) against the same file.
-- `client/shared/display.test.ts`: `nodeLabel` (one author, "et al.", accents) and `sentenceCase`.
+- `client/shared/display.test.ts`: `nodeLabel` (one author, "et al.", accents), `sentenceCase`, and `normaliseType` for every value the discovery sources emit plus an unknown OpenAlex type.
 - `client/server/schema.test.ts`: the server schema validates one sample of each custom shape and binding and rejects a `paper-card` with a bad `fit`.
 - `client/client/sideEffects.test.ts`: the flag rules as pure functions (`nextMeta(prev, next, source)`), so no DOM is needed.
 

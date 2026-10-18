@@ -75,6 +75,8 @@ A part whose data hasn't arrived shows a quiet loading line ("Agent is readingâ€
 - Agent highlights (`add_highlight`, T02) are placed by searching their text in the page's text content; misses are listed as not placed.
 - "Ask about this page" and "Ask about this area" (drag a box over a figure or table) attach the page or the crop as an image for Super VL, with a caption (T07). The agent can also open pages itself with `look_at_paper` (T07), reusing this reader's loaded document when it's the same paper.
 
+**Stretch: widgets around the paper** (brainstorm, Oct 18). Instead of one card, opening a paper could place its artifacts (figure, summary, quotes, source) as separate widgets around the node, "like you go deeper into it". The team wasn't sure there's time; build the v4 card first and revisit only if it's done.
+
 ## Tasks
 
 - [ ] Phase A: `client/client/card/` components; `onClick` in `PaperCardShapeUtil`; `fade.ts` (related-shape set and the style rule); connector; Undo on votes; tour header wired to T06.

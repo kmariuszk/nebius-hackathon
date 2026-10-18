@@ -4,7 +4,7 @@
 | --- | --- |
 | Lane | Board |
 | Size | M |
-| Depends on | T01 |
+| Depends on | T00, T01 |
 | Unblocks | T12, T11, the harness owner's agents |
 | Milestone | M2 |
 | Status | Not started |
@@ -54,7 +54,7 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | Tool | Input | Output | Rules |
 | --- | --- | --- | --- |
 | `get_board` | none | `{boardId, question, goals, papers: [{paperId, label, title, year, type, kind, status, scores, working, cluster, humanTouched, pinnedNotes}], links: [{from, to, kind, label, by}], notes: [{shapeId, text, author, pinnedTo}], discardedIds, removedLinks}` | Compact, never raw records; `question`, `goals`, `discardedIds` and `removedLinks` come from T08's board DB and are empty before it exists; capped at 500 papers |
-| `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, type?, peerReviewed?, citedBy?, retracted?, kind?, near?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; retracted papers and seeds already on the board are skipped; an existing card is updated in place unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
+| `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, type?, peerReviewed?, citedBy?, retracted?, kind?, near?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; retracted papers and seeds already on the board are skipped; `type` accepts whatever discovery emits and is stored through T01's `normaliseType` (raw value in `typeRaw`); an existing card is patched (never replaced) unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
 | `set_scores` | `{paperId, scores: {[goal]: {score, fit, why}}}` | `{ok, skipped}` | `score` 0 to 1; `goal` must be one of the board's goals; the node colour and ranked list follow it |
 | `set_card` | `{paperId, oneLine?, claims?, facets?, figure?, tldr?, summary?, gaps?}` | `{ok, skipped}` | Fills the card's first view and Details (T10); each field can arrive on its own, so the card fills in section by section; `claims[].evidence` must name quote IDs that exist on the card (or `seeds`); `figure` needs an `imageUrl` from the paper (no generated images) |
 | `add_quote` | `{paperId, text, source?}` | `{quoteId}` or an MCP tool error | Adds to the card's `quotes`; rejected unless `text` appears verbatim (whitespace-normalised) in the paper's abstract, or full text once `get_fulltext` exists; the stored `url` gets a `#:~:text=` fragment |
@@ -62,6 +62,8 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | `mark_working` | `{paperIds, on}` | `{ok}` | The "Agent is reading…" ring |
 | `add_note` | `{text, paperId?}` | `{shapeId}` | Built-in note, authored as the agent; with `paperId` it is pinned to that card with a `note-pin` binding (T01) and appears in the card's Notes |
 | `add_highlight` | `{paperId, text, page?, category?, note?}` | `{shapeId}` | Only if T10's PDF reading is in scope: `highlight` shape beside its card; no `rects` (the PDF view anchors it by text) |
+
+**Creates and updates are different writes** (PR #6 review, finding 6). New shapes go through T00's insert-only `putShapes`; every update goes through T00's `patchShapes`, which merges props and keeps `x`, `y`, `rotation`, `index`, `parentId` and `meta` unless the tool is allowed to change them. A tool never re-creates an existing record, so an update can't reset a person's layout or move a card to the top of the stack.
 
 Every write sets the meta from the [shared contracts](README.md#shared-contracts). Tool descriptions are self-contained (an external agent reads only them) and name their limits.
 

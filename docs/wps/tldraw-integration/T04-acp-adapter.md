@@ -103,7 +103,17 @@ Time is the tool's wall-clock duration. Tokens and cost come from the plugin's `
 
 `kind`: canvas writes are `edit`; `get_*` tools are `read`; `search` and `find_candidates` are `search`; Tavily extract is `fetch`; sub-agents called as tools are `think`; anything else is `other`. Viewer tools and `update_plan` get no card. The `model` label comes from a name-to-model map built by walking the agent tree, including agents inside `AgentTool`, so each card names the Nemotron model that actually ran (Super VL or Lightning), which is what the Best use of Nemotron judging wants to see.
 
-**Prompt blocks to `genai`** (`to_genai_content`): text becomes a text part; an embedded `resource` becomes a text part `<board-context uri="…">…</board-context>`; an `image` becomes `inline_data` (T07 finishes the image rules, [I6](interfaces.md#i6-which-model-slots-take-images)); a `resource_link` becomes a text part with the URI.
+**Prompt blocks to `genai`** (`to_genai_content`). T04 owns this mapping and its tag names; T07, the instruction paragraph and [I4](interfaces.md#i4-how-agents-use-the-canvas) only refer to it (PR #6 review, finding 5):
+
+| ACP block | `genai` part |
+| --- | --- |
+| `text` | `Part(text=…)` |
+| `resource`, `mimeType: application/vnd.tldraw.shape+json` | `<selected-shape uri="tldraw://…">{json}</selected-shape>` |
+| `resource`, `uri: tldraw://<boardId>/viewport` | `<viewport>{json}</viewport>` |
+| `resource`, `uri: tldraw://<boardId>/changes` | `<board-changes>{json}</board-changes>` |
+| any other `resource` | `<board-context uri="…">{text}</board-context>` |
+| `resource_link` | A text part with the URI |
+| `image` | `Part(inline_data=Blob(…))` after its caption text; dropped with a text note if the model can't take images ([I6](interfaces.md#i6-which-model-slots-take-images)) |
 
 **Stdout guard** (`__main__.py`). Before anything else imports: duplicate fd 1 for ACP, then point fd 1 and `sys.stdout` at stderr, so a stray `print` or a library banner can't corrupt the stream. Build the ACP writer on the duplicate the same way `acp.stdio.stdio_streams` builds its pair in 0.12.1, and pass the pair to `run_agent(agent, input_stream=…, output_stream=…)`. Logging goes to stderr at `INFO`, with `LOG_LEVEL` to change it.
 
