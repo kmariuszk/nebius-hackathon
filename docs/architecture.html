@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Discovery Architecture</title>
+<style>
+  :root { --bg:#f5f4ef; --surface:#fff; --ink:#1c1c1e; --muted:#5d6066; --line:#e2e0d8; --accent:#2f55d4; --accent-soft:#e9eefc; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --bg:#131315; --surface:#1c1c20; --ink:#ececef; --muted:#a2a3ab; --line:#2d2d33; --accent:#84a0ff; --accent-soft:#222a45; }
+  }
+  :root[data-theme="dark"] { --bg:#131315; --surface:#1c1c20; --ink:#ececef; --muted:#a2a3ab; --line:#2d2d33; --accent:#84a0ff; --accent-soft:#222a45; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .page { max-width:1160px; margin:0 auto; padding:48px 24px 64px; }
+  .eyebrow { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  h1 { font:600 40px/1.1 ui-serif, Georgia, serif; margin:0 0 14px; }
+  .lede { font-size:18px; max-width:780px; margin:0 0 26px; }
+  nav ol { list-style:none; padding:0; margin:0 0 30px; display:flex; flex-wrap:wrap; gap:8px; }
+  nav a { display:block; text-decoration:none; color:var(--ink); background:var(--accent-soft); padding:8px 12px; border-radius:10px; font-size:14px; }
+  nav a b { color:var(--accent); margin-right:6px; }
+  section.card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:24px; margin-bottom:24px; scroll-margin-top:16px; }
+  section.card h2 { font-size:22px; margin:0 0 4px; }
+  .kind { font-size:12px; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); font-weight:600; margin:0 0 10px; }
+  .card > p { max-width:820px; margin:0 0 12px; }
+  .diagram { overflow-x:auto; border:1px solid var(--line); border-radius:10px; background:var(--bg); padding:16px; margin:14px 0; }
+  .diagram .mermaid { margin:0; width:max-content; min-width:100%; display:flex; justify-content:center; }
+  .diagram .mermaid svg { flex:none; max-width:none; }
+  .diagram.fit .mermaid { width:auto; }
+  .diagram.fit .mermaid svg { width:100%; height:auto; flex:1 1 auto; }
+  .diagram.wide::before { content:"Wide diagram: scroll sideways →"; display:block; font-size:12px; color:var(--muted); margin:0 0 8px; position:sticky; left:0; }
+  .reading { display:grid; grid-template-columns:repeat(auto-fit, minmax(240px, 1fr)); gap:10px 22px; margin:6px 0 0; padding:0; list-style:none; }
+  .reading li { font-size:14px; padding-left:14px; border-left:3px solid var(--accent-soft); }
+  table { border-collapse:collapse; width:100%; font-size:14px; margin-top:8px; }
+  th, td { text-align:left; padding:8px 10px; border-top:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+  code { font-size:13px; background:var(--accent-soft); padding:1px 5px; border-radius:5px; }
+  .fallback { color:var(--muted); font-size:13px; }
+  footer { font-size:12.5px; color:var(--muted); margin-top:10px; }
+  @media (max-width:560px) { .page { padding:28px 16px 48px; } h1 { font-size:30px; } .lede { font-size:16px; } section.card { padding:18px 16px; } .tablewrap { overflow-x:auto; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <p class="eyebrow">Paper Discovery Canvas · System design</p>
+  <h1>How the system fits together</h1>
+  <p class="lede">Four UML-style views of the architecture in <code>docs/Concept.md</code>: what the parts are, what happens during a discovery run, what happens when a researcher comes back, and what data the system keeps.</p>
+
+  <nav aria-label="Diagrams"><ol>
+    <li><a href="#components"><b>1</b>Components</a></li>
+    <li><a href="#run"><b>2</b>A discovery run</a></li>
+    <li><a href="#catchup"><b>3</b>Catch me up</a></li>
+    <li><a href="#model"><b>4</b>Data model</a></li>
+    <li><a href="#protocols"><b>5</b>Protocols cheat sheet</a></li>
+  </ol></nav>
+
+  <section class="card" id="components">
+    <p class="kind">Component diagram</p>
+    <h2>1. The parts and how they talk</h2>
+    <p>Five parts: the researcher's browser, a <strong>board service</strong> that owns each shared board, an <strong>agent harness</strong> (our AI agents), a <strong>discovery service</strong> that finds and scores papers, and external model and data APIs. The two services are separate deployments on Nebius; the models stay on Token Factory, as the brief requires.</p>
+    <div class="diagram fit"><pre class="mermaid">
+flowchart TB
+  subgraph BR["Researcher's browser: web app, React + tldraw"]
+    CV["&lt;b&gt;Canvas&lt;/b&gt;&lt;br/&gt;tldraw + useSync"]
+    CH["&lt;b&gt;Chat panel&lt;/b&gt;&lt;br/&gt;ACP client"]
+    UI["&lt;b&gt;Ranked list + paper overlay&lt;/b&gt;&lt;br/&gt;pdf.js, highlights"]
+  end
+
+  EA["&lt;b&gt;External agents&lt;/b&gt;&lt;br/&gt;Claude, Cursor"]
+
+  subgraph BS["Board service: Node, Nebius Endpoint 1"]
+    SR[("&lt;b&gt;Sync rooms&lt;/b&gt;&lt;br/&gt;one TLSocketRoom per board")]
+    CM["&lt;b&gt;Canvas MCP&lt;/b&gt;&lt;br/&gt;+ layout service"]
+    AP["&lt;b&gt;ACP pipe&lt;/b&gt;"]
+    RE["&lt;b&gt;REST + SSE API&lt;/b&gt;&lt;br/&gt;board DB: members, votes, runs, events"]
+  end
+
+  AH["&lt;b&gt;Agent harness&lt;/b&gt; · Python, one per chat session&lt;br/&gt;master (Super VL) → search ×3 (Lightning),&lt;br/&gt;reader (Super VL), context (Lightning)"]
+
+  subgraph DS["Discovery service: Python, Nebius Endpoint 2"]
+    PM["&lt;b&gt;Papers MCP&lt;/b&gt;"]
+    PL[("&lt;b&gt;Pipeline + store&lt;/b&gt;&lt;br/&gt;candidates, scoring, rerank,&lt;br/&gt;full text, figures · LanceDB + SQLite")]
+  end
+
+  subgraph EX["External services"]
+    TF["&lt;b&gt;Nebius Token Factory&lt;/b&gt;&lt;br/&gt;Super VL, Lightning, embeddings"]
+    NV["&lt;b&gt;NVIDIA hosted API&lt;/b&gt;&lt;br/&gt;Parse, Rerank VL"]
+    SRC["&lt;b&gt;Paper sources&lt;/b&gt;&lt;br/&gt;OpenAlex, Semantic Scholar,&lt;br/&gt;PubMed MCP, Tavily"]
+  end
+
+  CV <-->|"tldraw sync · WebSocket"| SR
+  CH <-->|"ACP · WebSocket"| AP
+  UI -->|"REST"| RE
+  AP <-->|"stdio"| AH
+  AH -->|"MCP"| CM
+  AH -->|"MCP"| PM
+  AH -->|"LLM calls"| TF
+  EA -.->|"MCP"| CM
+  EA -.->|"MCP"| PM
+  CM -->|"writes"| SR
+  RE -->|"status updates"| SR
+  PM --> PL
+  PL --> TF
+  PL --> NV
+  PL --> SRC
+</pre></div>
+    <ul class="reading">
+      <li><strong>The sync room is the source of truth for the canvas.</strong> Every change, from a person or an agent, lands there and is broadcast to every open browser.</li>
+      <li><strong>Agents never touch the browser.</strong> They change the board only through the canvas MCP, so they work even when nobody has the board open.</li>
+      <li><strong>Every capability is an MCP tool.</strong> Our harness and an external agent (Claude, Cursor) use exactly the same two MCP servers.</li>
+      <li><strong>Per-viewer actions go over ACP</strong> (zoom to a card, light up cards), so they move only the asking researcher's view.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="run">
+    <p class="kind">Sequence diagram</p>
+    <h2>2. A discovery run, from question to filled board</h2>
+    <p>Ana creates a board with a question and seed papers, then asks the agent to find related work. Cards appear as soon as the agent is confident and fill in while reader agents work in the background.</p>
+    <div class="diagram wide"><pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor R as Ana (browser)
+  participant B as Board service
+  participant H as Harness: master
+  participant S as search agents
+  participant D as Discovery service
+  participant M as Token Factory
+  participant X as Paper sources
+
+  R->>B: Create board, upload seeds (REST)
+  R->>B: Open sync room and chat (WebSockets)
+  B->>H: Spawn harness, pipe ACP to it
+  R->>H: session/prompt: find related work
+  H->>D: resolve_seed (papers MCP)
+  D->>X: OpenAlex lookup, Parse reads PDFs
+  H->>M: Plan, split question into ~3 sub-queries
+  loop each sub-query, in parallel
+    H->>S: search(sub-query)
+    S->>D: search, find_candidates
+    D->>X: PubMed MCP, OpenAlex, Semantic Scholar, Tavily
+  end
+  H->>D: score_candidates
+  D->>M: One Lightning verdict + quote per paper, in parallel
+  loop each confident paper
+    H->>B: add_papers, link_papers, mark_working (canvas MCP)
+    B-->>R: Card appears with "working" badge (sync, all browsers)
+  end
+  H->>D: rerank top ~100 (Super VL)
+  H->>B: set_rating
+  B-->>R: Card colours settle, ranked list updates
+  H-)H: process_papers: reader + context in background
+  H->>D: get_fulltext, get_figures (Parse)
+  H->>B: set_summary, add_highlight, add_quote, add_figure, link_papers
+  B-->>R: Card fills in, badge clears
+  H-->>R: Streamed plan, tool cards and messages (ACP)
+</pre></div>
+    <ul class="reading">
+      <li><strong>Steps 8 to 10</strong> fan out: one search agent per sub-query.</li>
+      <li><strong>Scoring is a tool, not an agent:</strong> the discovery service fires hundreds of Lightning calls in parallel and returns only the best.</li>
+      <li><strong>Early placement</strong> means Ana sees cards within seconds, before ranking and summaries finish.</li>
+      <li><strong>Solid arrows</strong> are calls, <strong>dashed arrows</strong> are replies or broadcasts, and the open arrow is work started in the background.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="catchup">
+    <p class="kind">Sequence diagram</p>
+    <h2>3. Coming back: "Catch me up"</h2>
+    <p>Overnight, a daily run placed new papers on the board. Ana opens it and asks to be caught up; the agent tours the new papers and Ana triages them on the spot.</p>
+    <div class="diagram fit"><pre class="mermaid">
+sequenceDiagram
+  actor R as Ana (browser)
+  participant B as Board service
+  participant H as Harness: master
+  participant T as Teammates' browsers
+
+  R->>B: Open board (sync)
+  B-->>R: New papers already in their clusters
+  R->>H: "Catch me up" (ACP prompt)
+  H->>B: Activity since Ana's last visit, get_board
+  loop each new paper
+    H-->>R: _canvas/focus: zoom in (Ana's view only)
+    H-->>R: Explanation, streamed into chat
+    R->>B: Keep or Discard (REST vote)
+    B-->>R: Card status updates (sync)
+    B-->>T: Same update for everyone, with Ana's avatar on the vote
+  end
+  H-->>R: _canvas/focus: zoom back out
+</pre></div>
+    <ul class="reading">
+      <li><strong>The tour is per viewer:</strong> only Ana's view moves; teammates keep theirs.</li>
+      <li><strong>Votes are shared:</strong> everyone sees Ana's Keep or Discard live, and the agent never votes itself.</li>
+      <li><strong>Keep</strong> makes the paper a seed for the next run; <strong>Discard</strong> keeps it out of all later runs.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="model">
+    <p class="kind">Class diagram</p>
+    <h2>4. What the system stores</h2>
+    <p>The board service owns everything about the board and its people; the discovery service owns everything about papers. They share no database: a paper card on a board points at a paper record by ID.</p>
+    <div class="diagram"><pre class="mermaid">
+classDiagram
+  direction LR
+  class Board {
+    id
+    title
+    question
+    context
+  }
+  class Member {
+    memberId
+    displayName
+    role
+    lastSeenSeq
+  }
+  class Invite {
+    token
+    role
+    expiresAt
+  }
+  class PaperCard {
+    paperId
+    status: new, kept, contested
+    rating
+    cluster
+    addedBy
+    pinnedByHuman
+  }
+  class Vote {
+    decision: keep or discard
+    at
+  }
+  class Highlight {
+    text
+    page
+    category
+    author
+  }
+  class Quote {
+    text
+    section
+    verified
+  }
+  class Note {
+    text
+    author
+  }
+  class Run {
+    id
+    requestedBy
+    kind
+    status
+    tokensUsed
+  }
+  class Event {
+    seq
+    actor
+    type
+  }
+  class Paper {
+    paperId
+    doi, pmid
+    title, authors, year
+    abstract
+    openAccessPdf
+  }
+  class Verdict {
+    score
+    verdict
+    reason
+    quote
+    quoteVerified
+    model
+  }
+  class FullText {
+    section
+    page
+    text
+  }
+  class Figure {
+    figureId
+    caption
+    page, bbox
+  }
+  Board "1" *-- "many" Member
+  Board "1" *-- "many" Invite
+  Board "1" *-- "many" PaperCard
+  Board "1" *-- "many" Note
+  Board "1" *-- "many" Run
+  Board "1" *-- "many" Event
+  Member "1" --> "many" Vote : casts
+  PaperCard "1" *-- "many" Vote
+  PaperCard "1" *-- "many" Highlight
+  PaperCard "1" *-- "many" Quote
+  Run "1" --> "many" PaperCard : added
+  PaperCard ..> Paper : paperId
+  Paper "1" *-- "many" Verdict : one per board
+  Paper "1" *-- "many" FullText
+  Paper "1" *-- "many" Figure
+</pre></div>
+    <ul class="reading">
+      <li><strong>Cards, notes, highlights and quotes</strong> live as shapes in the sync room; votes, runs and events live in the board DB.</li>
+      <li><strong>A verdict is per board:</strong> the same paper can be highly relevant to one project and irrelevant to another.</li>
+      <li><strong>Every agent-made item</strong> carries who asked for it and which run made it, so a whole run can be reviewed or undone.</li>
+    </ul>
+  </section>
+
+  <section class="card" id="protocols">
+    <p class="kind">Cheat sheet</p>
+    <h2>5. Which protocol does what</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Protocol</th><th>Between</th><th>Carries</th></tr></thead>
+      <tbody>
+        <tr><td><strong>tldraw sync</strong> (WebSocket)</td><td>Browsers and the board service</td><td>The shared canvas: cards, links, notes, highlights, cursors</td></tr>
+        <tr><td><strong>ACP</strong> (WebSocket, piped to stdio)</td><td>One researcher's chat and their harness</td><td>Prompts, streamed plan and tool cards, approvals, cancel, per-viewer zoom and highlight</td></tr>
+        <tr><td><strong>MCP</strong> (HTTP)</td><td>Any agent and the two MCP servers</td><td>Every capability: search, scoring, reading, placing and linking papers</td></tr>
+        <tr><td><strong>REST + SSE</strong></td><td>Browser and the board service</td><td>Boards, invites, votes, paper records, PDFs, ranked list, activity feed</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+
+  <p class="fallback" id="fallback" hidden>Diagrams need an internet connection to load the Mermaid library from jsDelivr; the diagram sources above are still readable as text.</p>
+  <footer>Built from <code>docs/Concept.md</code>. Diagrams render with Mermaid.</footer>
+</div>
+
+<script type="module">
+  const dark = matchMedia("(prefers-color-scheme: dark)").matches && document.documentElement.dataset.theme !== "light";
+  try {
+    const { default: mermaid } = await import("https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs");
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: dark ? "dark" : "neutral",
+      securityLevel: "loose",
+      fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+      flowchart: { curve: "basis", padding: 12, useMaxWidth: false },
+      class: { useMaxWidth: true },
+      sequence: { mirrorActors: false, showSequenceNumbers: true, useMaxWidth: false },
+    });
+    const nodes = [...document.querySelectorAll(".mermaid")];
+    for (const [i, node] of nodes.entries()) {
+      const { svg } = await mermaid.render(`diagram-${i + 1}`, node.textContent);
+      node.innerHTML = svg;
+    }
+    document.title = document.title + " ";
+  } catch (e) {
+    document.getElementById("fallback").hidden = false;
+    console.error(e);
+  }
+</script>
+</body>
+</html>
