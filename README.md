@@ -74,6 +74,14 @@ pnpm dev
 
 To run it the way it's deployed, run `pnpm build` and then `pnpm start`. This serves the app and the API together at http://localhost:5858.
 
+To fill a board with the v5 mockup's real papers, links and notes, run `node server/seedDemo.ts demo` from `client/` while the server runs, then open http://localhost:5173/demo and click a paper to open its widgets. Running it again updates the same shapes.
+
+## Chat with the agent
+
+Open a board and click **Chat** on the right edge. The first time you open it, the board service starts one harness (`python -m harness`) for your chat; the server log shows `[harness <board>/<member> <pid>] started`. Answers stream in with the agent's dimmed thoughts, its plan and one card per tool call, each showing model, time and cost. Enter sends, Shift+Enter adds a new line, and Stop cancels the turn. Papers the agent names are links that move your view, and only yours, to the paper. If the chat closes (harness crash, 10 idle minutes, server restart), a banner offers Reconnect, which starts a fresh conversation.
+
+The chat runs `board_assistant` on Nemotron 3.5 Super VL, so it needs `TF_API_KEY` in `.env`. To try it without a model or keys, start the server with `HARNESS_AGENT=echo`. `HARNESS_CMD`, `HARNESS_IDLE_MINUTES` and `MAX_HARNESSES` are in `.env.example`; [harness/README.md](harness/README.md) covers the adapter and its tests.
+
 ## Run in Docker
 
 ```zsh
@@ -85,7 +93,11 @@ The app is then at http://localhost:5858. Rooms and uploads are saved in the `bo
 
 ## Write to a board from another service
 
-Send `POST /api/rooms/<room>/shapes` with a JSON array of shapes, and everyone in the room sees them right away. Each shape needs a `type` and its full `props`. The server fills in the id, the page and the stacking order, and replies with `{ "ids": [...] }`. Give a shape your own id, like `shape:paper-2401-12345`, if you want to change it later; posting an id that already exists is refused with 409, so a create never wipes a shape someone has moved or edited.
+Agents and other services change a board through the canvas MCP at `http://localhost:5858/api/mcp/canvas/<boardId>` (streamable HTTP, stateless). Send `Authorization: Bearer <memberId>` (an `m_…` ID) and optionally `X-Run-Id: run_<12 hex>` and `X-Model: <model>`. The tools are `get_board`, `add_papers`, `set_scores`, `set_card`, `add_quote`, `link_papers`, `mark_working` and `add_note`. Agents never give coordinates (each new paper is placed beside its neighbour), nothing is deleted, and shapes people moved or edited come back in `skipped`.
+
+The low-level option is the REST route below.
+
+Send `POST /api/rooms/<room>/shapes` with a JSON array of shapes, and everyone in the room sees them right away. Each shape needs a `type` and its full `props`. The server fills in the id, the page and the stacking order, and replies with `{ "ids": [...] }`. Give a shape your own id, like `shape:paper-2401-12345`, if you want to change it later; posting an id that already exists is refused with 409, so a create never wipes a shape someone has moved or edited. Items with `"typeName": "binding"` (full binding records) are created in the same transaction, after the shapes.
 
 To change shapes, send `PATCH /api/rooms/<room>/shapes` with a JSON array of patches, each with the shape's `id` and only the fields to change. `props` and `meta` are merged key by key, and position, rotation, page and stacking order stay as they were unless the patch sets them. An unknown id gets 404.
 
@@ -98,6 +110,7 @@ This route has no auth, just like the websocket: anyone who can reach the server
 ```zsh
 cd client
 node server/addShape.ts <room> "Hello from the server"
+node server/addShape.ts <room> --paper pmid:34290406 "Some title"
 ```
 
 ## Working with tldraw
