@@ -1,3 +1,4 @@
+import { toRichText as richText } from 'tldraw'
 import { defaultPaperCardProps, NODE_SIZE } from '../shared/shapes.ts'
 import { linkShapeId, paperShapeId } from '../shared/ids.ts'
 import { normaliseType } from '../shared/display.ts'
@@ -599,7 +600,6 @@ for (const [k, raw] of Object.entries(P as Record<string, Raw>)) {
 	shapes.push({ id: paperShapeId(paperId), type: 'paper-card', x, y, props: defaultPaperCardProps(paperId, props), meta: meta(paperId) })
 }
 
-const richText = (text: string) => ({ type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] })
 for (const [a, b, kind] of EDGES as [string, string, 'cites' | 'similar'][]) {
 	const id = linkShapeId(pid(a), pid(b), kind)
 	const A = box[a]
