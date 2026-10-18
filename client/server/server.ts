@@ -5,19 +5,22 @@ import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { unfurl } from 'unfurl.js'
 import { WebSocketServer } from 'ws'
-import { handleAcpUpgrade } from './acpPipe.ts'
+import { handleAcpUpgrade, onAgentPresence } from './acpPipe.ts'
+import { handleApi } from './api.ts'
 import { handleCanvasMcp } from './canvasMcp.ts'
+import { recordAgentPresence } from './events.ts'
 import { publicFetch } from './netGuard.ts'
 import { getRoom, HttpError, patchShapes, putShapes, safeId } from './rooms.ts'
 
 // The sync server: one TLSocketRoom per room (rooms.ts), each saved to its own SQLite file under
-// DATA_DIR, plus the canvas MCP, asset uploads on local disk, bookmark unfurling, and the built
-// frontend from dist/.
+// DATA_DIR, plus the canvas MCP, the REST and SSE API with its board DB (api.ts), asset uploads on
+// local disk, bookmark unfurling, and the built frontend from dist/.
 const PORT = Number(process.env.PORT ?? 5858)
 const DATA_DIR = resolve(process.env.DATA_DIR ?? '.data')
 const UPLOADS_DIR = join(DATA_DIR, 'uploads')
 const DIST_DIR = resolve('dist')
 mkdirSync(UPLOADS_DIR, { recursive: true })
+onAgentPresence(recordAgentPresence)
 
 function send(res: ServerResponse, status: number, body: string) {
 	if (!res.headersSent) res.writeHead(status, { 'content-type': 'text/plain' })
@@ -154,6 +157,7 @@ const server = createServer(async (req, res) => {
 			return await handleShapes(m[1], req, res)
 		}
 		if ((m = path.match(/^\/api\/mcp\/canvas\/([^/]+)$/))) return await handleCanvasMcp(req, res, m[1])
+		if (path.startsWith('/api/v1/')) return await handleApi(req, res, url)
 		if (path.startsWith('/api/')) return send(res, 404, 'Not found')
 		await handleStatic(path, res)
 	} catch (e) {

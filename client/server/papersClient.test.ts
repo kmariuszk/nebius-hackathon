@@ -6,7 +6,7 @@ import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { after, before, test } from 'node:test'
 import { z } from 'zod'
-import { createPapersClient } from './papersClient.ts'
+import { createPapersClient, type PapersError } from './papersClient.ts'
 
 let calls = 0
 let http: Server
@@ -28,6 +28,12 @@ function papersServer() {
 			similarities: [{ a: paper_ids[0], b: paper_ids[1], score: 0.8 }],
 		}
 		return { structuredContent: result, content: [{ type: 'text', text: JSON.stringify(result) }] }
+	})
+	server.registerTool('resolve_seed', { inputSchema: { doi: z.string().optional(), pmid: z.string().optional() } }, async ({ doi, pmid }) => {
+		calls++
+		if (pmid === '0') return { isError: true, content: [{ type: 'text', text: 'No paper with PMID 0' }] }
+		const record = { paperId: doi ? `doi:${doi}` : `pmid:${pmid}`, title: 'Seed', ids: { doi: doi ?? '', pmid: pmid ?? '' } }
+		return { structuredContent: record, content: [{ type: 'text', text: JSON.stringify(record) }] }
 	})
 	return server
 }
@@ -56,9 +62,24 @@ test('get_paper returns the record and caches it', async () => {
 	await papers.close()
 })
 
+test('resolve_seed looks a seed up by DOI or PMID, and caches it under its paper ID', async () => {
+	const papers = createPapersClient(url)
+	assert.equal((await papers.resolveSeed!({ doi: '10.1/x' })).paperId, 'doi:10.1/x')
+	const seed = await papers.resolveSeed!({ pmid: '42' })
+	assert.equal(seed.paperId, 'pmid:42')
+	const before = calls
+	assert.equal(await papers.getPaper('pmid:42'), seed)
+	assert.equal(calls, before)
+	await assert.rejects(papers.resolveSeed!({ pmid: '0' }), (e: PapersError) => e.code === 'not_found' && /PMID 0/.test(e.message))
+	await papers.close()
+})
+
 test('an unreachable papers MCP is an error that says so', async () => {
 	const papers = createPapersClient('http://127.0.0.1:9/mcp')
-	await assert.rejects(papers.getPaper('pmid:1'), /papers MCP at http:\/\/127\.0\.0\.1:9\/mcp is unreachable/)
+	await assert.rejects(
+		papers.getPaper('pmid:1'),
+		(e: PapersError) => e.code === 'unreachable' && /papers MCP at http:\/\/127\.0\.0\.1:9\/mcp is unreachable/.test(e.message)
+	)
 	await papers.close()
 })
 
