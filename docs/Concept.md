@@ -19,11 +19,25 @@ We are building a paper discovery canvas for the Research Paper Discovery track:
 
 **Multiplayer is a supporting feature.** The client is already the tldraw Multiplayer starter, so a board can be shared by link and a team can work on it live. The team agreed it has no wow factor on its own, so the pitch mentions it rather than leads with it.
 
-**Track decision.** We are entering the Nebius Research Paper Discovery track (healthcare and life sciences), not the NVIDIA Britannica vs Wikipedia track, so Hermes and the self-hosted embedding and rerank containers are out. We still use NVIDIA's models wherever they do a real job (see NVIDIA model routing) and build our own harness on Google ADK.
+**What we are entering.** One tool for researchers, entered in two challenges. We use NVIDIA's Nemotron models wherever they do a real job (see NVIDIA model routing), store paper embeddings in LanceDB, and build our own harness on Google ADK.
 
-**Side awards.** Best use of Nemotron, which we target by giving each job its own Nemotron model; and a Hugging Face side challenge (most likes one week after the hackathon), which is not a focus.
+| | Research Paper Discovery (Pre-GTC HCLS hackathon) | Agentic Deep Research with Token Factory and Tavily |
+| --- | --- | --- |
+| Fit | The task itself | Its listed direction "literature or market scans that start from a seed set and find what's missing" |
+| Must use | Token Factory for embeddings and LLM inference; Tavily for agentic search | Token Factory for primary inference; Tavily for all web retrieval |
+| Deliver | A working app deployed on Nebius (the organisers' notebook says Nebius Serverless), hosted separately from the model endpoint; a ranked list of new papers with metadata, source links and relevance explanations | A public GitHub repo with a README a judge can run from; a 2-minute demo video on the hackathon platform by 18:30 |
+| Judged on | — | Originality, creativity, use of the tools and presentation. In practice: a judge clicks three citations at random and they hold up; the demo shows one complete run with no cuts around the hard part; the trace shows the agent making decisions, not following a script |
 
-**Track requirements:** Token Factory for LLM inference and embeddings; the app deployed on Nebius and hosted separately from the model endpoint; Tavily optional. Source board: [Miro mindmap and wireframes](https://miro.com/app/board/uXjVEY7-bbE=/).
+What the Tavily challenge's judging means for us:
+
+- **Every citation must survive a random click.** Quotes are checked by exact match, and each source link carries a text fragment (`…/PMC9187974/#:~:text=<quote>`), so the click lands on the highlighted sentence.
+- **One complete run fits in the video.** A discovery run has to place its first cards within a minute and finish within about 90 seconds; the Nebius cookbook's sample run made 6 model calls in under 90 seconds.
+- **The trace is part of the demo.** The chat panel shows the master's plan, each search and read, and its decision that the evidence is enough; this is why the design is agent-first.
+- **Tavily sits in the core loop**, not on the side: it finds papers and reads them (see Search sources).
+
+**Side awards.** Best use of Nemotron, which we target by giving each job its own Nemotron model; Reflection AI credits for projects that use Beam on Token Factory (optional, for example for a fact-checker that tries to break each explanation); and a Hugging Face side challenge (most likes one week after the hackathon), which is not a focus.
+
+**Source board:** [Miro mindmap and wireframes](https://miro.com/app/board/uXjVEY7-bbE=/).
 
 ## Product scope
 
@@ -33,9 +47,18 @@ The demo path is seed upload, a discovery run that fills the board live, the pap
 
 1. **Onboarding with seed papers (main path, Frames 13, 15, 14).** The researcher enters a question or a free-text topic, drops seed PDFs or DOIs with rough context, and the agent starts shaping the board.
 2. **Onboarding with a question only (Frames 4, 5).** A cold start: the app shows 8 to 10 search hits, the researcher picks 3 to 5 as seeds, and the main path continues.
-3. **New paper (Frames 1 to 3).** A "New" card appears linked into its cluster as soon as the agent is confident it is relevant, with a "working" badge while a reader agent summarises it. Clicking the card zooms in and opens the paper overlay on top of the canvas (not a split screen). The overlay is a small sub-board for that paper: a project-specific summary, verified quotes, link and abstract, why it matters, its connected nodes and cluster, its key figures, the PDF with highlights, room for the researcher's own notes, and Keep or Discard.
+3. **New paper (Frames 1 to 3; [clickable mockup](mockups/paper-panel.html)).** A "New" card appears linked into its cluster as soon as the agent is confident it is relevant, with a "working" badge while a reader agent summarises it. Clicking the card zooms in and opens the paper overlay on top of the canvas (not a split screen). The overlay follows the mockup's order, which follows the keep-or-discard decision:
+   1. **What it is:** title, authors, venue, year, DOI, PubMed and PDF links, paper type.
+   2. **Why it matters:** one or two AI-written sentences, each claim numbered to its evidence, plus a relation tag such as "Same disease · adds a spatial method".
+   3. **Evidence from the paper:** verbatim quotes marked "exact match" or "not found", each opening its source with the quote highlighted; the seeds it cites; a real figure, or its links on the board when there is no open-access PDF.
+   4. **Couldn't check:** what the agent couldn't assess.
+   5. **On this board:** cluster, links, closest paper in the collection, and how it was found.
+   6. **The paper itself:** the PDF with everyone's highlights and annotations, the AI summary next to the original abstract, and notes.
+   7. **Pinned buttons:** Discard, Ask agent (opens chat with this paper as context), Dig deeper (a run around this paper) and Keep.
+
+   Text taken from the paper is set in serif and links to its source; AI-written text carries an "AI" tag with its model and time.
 4. **Recurring user (Frames 11, 12).** "Your projects" lists the boards with a count of new papers. On a board the new papers are already placed in context; "Catch me up" has the agent zoom in on each one in turn, explain it and zoom back out, and the researcher keeps or discards it on the spot.
-5. **Reading and highlighting.** The researcher reads the PDF in the overlay and highlights passages. The agent categorises each highlight (method, dataset, result and so on), the category sets its colour, and the highlight becomes a knowledge node on the board linked to its paper. Later agents work from these nodes, not from the whole paper.
+5. **Reading, highlighting and annotating together.** Clicking any paper node opens the paper in the overlay. The researcher highlights passages and annotates them with a note, and both appear live for every collaborator: in the PDF, colour-coded and labelled with the author's name, and on the board. The agent categorises each highlight (method, dataset, result and so on), the category sets its colour, and the highlight becomes a knowledge node on the board linked to its paper. Collaborators can reply to an annotation. Later agents work from these nodes, not from the whole paper.
 6. **Toggling chat (Frames 7, 8).** The chat panel slides in on the right with the agent's plan, tool cards and approval prompts. Papers the agent mentions are clickable and zoom the canvas to their card; when it answers a question, the cards behind the answer are highlighted on that researcher's screen.
 7. **Ranked list.** A list view beside the canvas shows the new papers ranked, with metadata, source link and relevance explanation, as the brief asks. Clicking a row zooms to the card.
 8. **Working together.** A researcher invites colleagues by link. Everyone sees cursors, notes and triage votes live, and anyone can ask the agent for a run.
@@ -48,15 +71,17 @@ The demo path is seed upload, a discovery run that fills the board live, the pap
 | --- | --- | --- |
 | Onboarding with seed papers (PDF, DOI or free-text topic) | Build | OpenAlex resolves DOIs; Nemotron Parse reads PDFs and their bibliographies |
 | Question-only onboarding | Build | Cold start: the user picks 3 to 5 seeds from search hits |
-| Candidate discovery | Build | The master agent splits the question into about 3 sub-queries and runs a search agent on each: PubMed MCP and OpenAlex keyword search, OpenAlex papers citing or sharing references with 2+ seeds, Semantic Scholar recommendations, Tavily for recent work |
+| Candidate discovery | Build | The master agent splits the question into about 3 sub-queries and runs a search agent on each: Tavily search over PubMed, PMC, preprint servers and journals; PubMed keyword search and its similar, citing and reference links; OpenAlex papers citing or sharing references with 2+ seeds; Semantic Scholar recommendations; alphaXiv for computational work (see Search sources) |
 | Ranking + explanations | Build | Embedding and citation-overlap score, Lightning verdicts, Super VL listwise rerank, quote checked by exact match |
 | Early placement | Build | A card goes on the board once its Lightning verdict clears a threshold; the rerank and the summaries update it in place |
-| Canvas graph | Build | Node size = link count, colour = rating; distance on the canvas = paper similarity (see Clustering and layout) |
+| Canvas graph | Build | Seeds and kept papers are squares, suggestions are circles; node size = link count, colour = fit; distance on the canvas = paper similarity (see Clustering and layout); a legend explains the board |
 | Clusters | Build | Leiden communities on a similarity graph of embeddings plus citations; Lightning names each cluster |
+| "Rank for" goal | Build | A switch in the top bar between the researcher's goals, for example evidence on the disease or a reusable method; colours, ranking and "why" text change with it, as in the organisers' notebook exercise and the mockup |
 | Filters and "structure by" | Build | Per-viewer filters dim cards by rating, status, year or source; "Structure by" citation, cluster or year re-runs the layout for unpinned cards |
 | Ranked list view | Build | The brief's ranked list, kept in step with the canvas |
-| Paper overlay with summary, quotes and figures | Build | A reader agent summarises the paper on its own, then a context agent relates it to the board; Parse crops figures, Super VL picks the key ones |
+| Paper overlay with summary, quotes and figures | Build | A reader agent summarises the paper on its own, then a context agent relates it to the board; Tavily Extract reads PMC and arXiv pages, Parse reads PDFs and crops figures, Super VL picks the key ones |
 | PDF highlights as knowledge nodes | Build | pdf.js text layer in the overlay; each highlight becomes a `highlight` shape linked to its paper, categorised by the agent |
+| Shared annotations | Build | A note and replies on each highlight, stored on the `highlight` shape, so collaborators see them live through tldraw sync; the overlay renders every member's highlights with their name |
 | Quotes and figures on the board | Build | `quote` and `figure` shapes next to their paper; quotes are verbatim or rejected |
 | Agent-made tables and diagrams | Build | `add_table` and `add_diagram` canvas tools; diagrams use built-in geo shapes and arrows |
 | Catch-me-up tour | Build | The agent reads the activity feed since the member's last visit and steers their view with `_canvas/focus` |
@@ -111,7 +136,7 @@ Every change to a board, from a person or an agent, lands in the board's sync ro
 | Agent harness | Python process per researcher session, spawned by the board service | Reasoning loop: master agent, search sub-agents, background reader and context passes | Google ADK, `LiteLlm` to Token Factory, ACP Python SDK |
 | Discovery service | Python, second Endpoint | Papers MCP, discovery pipeline, parallel scoring, full text, figures, daily runs | MCP Python SDK, LanceDB, SQLite |
 | Model APIs | External | LLMs, embeddings, PDF parsing | Token Factory, NVIDIA hosted API |
-| Scholarly sources | External | Metadata, citations, recommendations, keyword search, web pages | OpenAlex, Semantic Scholar, the organisers' PubMed MCP, Tavily |
+| Search and scholarly sources | External | Web search and page reading; metadata, citations, recommendations, keyword search | Tavily, PubMed E-utilities, OpenAlex, Semantic Scholar, alphaXiv |
 
 **Data flow, seeds to shared canvas:**
 
@@ -119,9 +144,9 @@ Every change to a board, from a person or an agent, lands in the board's sync ro
 2. The master agent resolves the seeds, splits the question into about 3 sub-queries and runs a search agent on each; they find candidates through the papers MCP.
 3. The discovery service scores candidates with Lightning in parallel, verifies quotes and stores the verdicts.
 4. As soon as a candidate's verdict clears the threshold, the harness calls `add_papers` and `link_papers` on the canvas MCP, which writes into the board's sync room; every connected browser sees the card appear. When scoring finishes, Super VL reranks the top \~100 and `set_rating` updates the placed cards and the ranked list.
-5. For each placed paper a reader agent runs in the background: Parse extracts the full text and figures, and the reader writes a summary, highlights, verbatim quotes and key figures to the board. A context agent then explains why the paper matters for this board and links it in. The card shows a "working" badge until both finish.
+5. For each placed paper a reader agent runs in the background: Tavily Extract or Parse supplies the full text and figures, and the reader writes a summary, highlights, verbatim quotes and key figures to the board. A context agent then explains why the paper matters for this board and links it in. The card shows a "working" badge until both finish.
 6. Opening a paper fetches its full record over REST and shows the overlay with the PDF and its highlights.
-7. A researcher's highlight is saved as a `highlight` shape in the room, so every collaborator sees it and the agent reads it through `get_board`.
+7. A researcher's highlight and its annotation are saved as a `highlight` shape in the room, so every collaborator sees them live, in the PDF and on the board, and the agent reads them through `get_board`.
 8. Keep or Discard goes over REST, is recorded per researcher, and updates the card's status in the room.
 
 **Clustering and layout:**
@@ -137,7 +162,7 @@ Closeness on the canvas means similarity: two cards near each other are about re
 **Canvas layout rules:**
 
 - A layout service inside the board service places new cards next to their most similar neighbour, inside that neighbour's cluster, avoiding overlaps.
-- Node size = number of links; colour = rating; badges mark new, working, kept and contested papers.
+- Seeds and kept papers are squares; suggestions are circles. Node size = number of links; colour = fit to the current goal (low, medium, high); badges mark new, working, kept and contested papers. Discarded papers are hidden behind a "Show" link in the legend.
 - Highlights, quotes, figures and agent notes sit next to their paper card, linked to it.
 - Agents name a cluster or a neighbour (`near`), never coordinates.
 - A card a person has moved is pinned; the agent never moves it again. "Structure by" is a person's action and re-runs the layout for unpinned cards only.
@@ -163,13 +188,14 @@ A board is a shared workspace: everyone invited sees the same canvas live, every
 | Paper card | A paper on the canvas with its status (new, kept, contested) and who added it | Sync room shape + `board_papers` |
 | Vote | One researcher's Keep or Discard on one paper | `decisions` |
 | Note | A sticky or comment with its author | Sync room shape, author in shape meta |
-| Highlight | A categorised passage of a paper, linked to its card; a knowledge node agents work from | Sync room shape, author in shape meta |
+| Highlight | A categorised passage of a paper with an optional annotation and replies, linked to its card; a knowledge node agents work from | Sync room shape, author in shape meta |
 | Run | One agent job: who asked, scope, status, cost | `runs` |
 | Event | One line of the activity feed | `events` |
 
 **What researchers see together:**
 
 - Live cursors and names, plus cards, links and notes as they change ([tldraw sync](https://tldraw.dev/sdk-features/collaboration)).
+- Each other's highlights and annotations inside a paper: open a paper a colleague is reading and their highlights, notes and replies are already there, labelled with their name, and new ones appear as they are made.
 - The agent's work. Cards it is processing carry a "working" badge, and every run appears in the activity feed with who asked for it, e.g. "Agent added 12 papers, asked by Ana".
 - Attribution on every card and note: added by a person, or by the agent on behalf of a person, with the run ID.
 
@@ -264,13 +290,13 @@ def build_agent(canvas_url: str, papers_url: str, token: str) -> LlmAgent:
 
 1. **Resolve seeds** (`resolve_seed`). A DOI becomes an OpenAlex record; a PDF goes through Nemotron Parse for title, DOI and bibliography.
 2. **Split the question.** The master writes about 3 sub-queries (for example by method, population and outcome) and runs `search` on each.
-3. **Generate candidates** (`search`, `find_candidates`). Keyword search per sub-query through the organisers' PubMed MCP and OpenAlex; OpenAlex papers that cite 2+ seeds or share references with them; Semantic Scholar recommendations; Tavily for recent preprints. The PubMed MCP only matches keywords, so its hits are re-scored by embeddings in the scoring step.
+3. **Generate candidates** (`search`, `find_candidates`). Per sub-query: Tavily search over PubMed, PMC, preprint servers and journals, and PubMed keyword search. Around the seeds: PubMed's similar-article, citing and reference links, OpenAlex papers that cite 2+ seeds or share references with them, and Semantic Scholar recommendations. alphaXiv adds computational work from arXiv. Keyword and web hits only match words, so every candidate is re-scored by embeddings in the scoring step.
 4. **Deduplicate.** Drop seeds and the board's discarded papers, first by DOI, then by normalised title.
 5. **Score** (`score_candidates`). Embedding similarity to the question and seeds, citation overlap and recency, then a Lightning JSON verdict per candidate.
-6. **Verify.** The quote must appear verbatim in the abstract; otherwise the explanation is flagged "unverified".
+6. **Verify.** The quote must appear verbatim in the abstract; otherwise the explanation is flagged "unverified". Its source link gets a `#:~:text=` fragment so a click highlights the quote.
 7. **Place early** (`add_papers`, `link_papers`, `mark_working`). Each candidate whose verdict clears the threshold goes onto the canvas straight away with a "working" badge, and the layout service positions it.
 8. **Rerank** (`rerank`). Once scoring finishes, Super VL ranks the top \~100 listwise with all seed abstracts in context; `set_rating` updates the placed cards and the ranked list.
-9. **Read** (`process_papers` → `reader`). For each placed paper, Parse extracts the full text and figures of the open-access PDF, and the reader writes a summary, a rewritten abstract, highlights, quotes checked verbatim against the full text, and the key figures. Papers without an open-access PDF get an abstract-only summary, marked as such.
+9. **Read** (`process_papers` → `reader`). For each placed paper, Tavily Extract reads its PMC or arXiv page, and Parse reads the open-access PDF when there is no such page and crops the figures. The reader writes a summary, a rewritten abstract, highlights, quotes checked verbatim against the full text, and the key figures. Papers without an open-access PDF get an abstract-only summary, marked as such.
 10. **Relate** (`context`). The context agent explains why the paper matters for this board and links it to the seeds, notes and highlights it connects to; then the badge clears.
 11. **Cluster** (`cluster_papers`, `label_cluster`). After the first run, the discovery service clusters the board's papers by similarity and the layout service arranges them; Lightning names each cluster. Later runs add papers to existing clusters until someone re-structures the board.
 
@@ -531,8 +557,8 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
 | --- | --- | --- |
 | `resolve_seed` | `{doi, pdfUrl, title}` (any one) | `Paper` |
 | `find_candidates` | `{boardId, seedIds, excludeIds, strategies, since, limit}` | `{candidateIds, countsByStrategy}` |
-| `score_candidates` | `{boardId, candidateIds}` | `{top, scored, unverified}` |
-| `rerank` | `{boardId, paperIds, k}` | `{ranked}` |
+| `score_candidates` | `{boardId, candidateIds, goals}` | `{top, scored, unverified}` |
+| `rerank` | `{boardId, paperIds, k, goal}` | `{ranked, backend}` |
 | `cluster_papers` | `{boardId, paperIds}` | `{clusters: [{clusterId, paperIds}], similarities: [{a, b, score}]}`, the k nearest neighbours per paper |
 | `search` | `{query, limit}` | `[PaperSummary]` |
 | `get_paper` | `{paperId}` | `Paper` |
@@ -540,7 +566,7 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
 | `get_figures` | `{paperId}` | `[{figureId, caption, imageUrl, page, bbox}]` |
 | `pick_figure` | `{boardId, paperId}` | `{figureId, why}` |
 
-`strategies` is any of keyword (PubMed MCP and OpenAlex), citing, coupling, recommend and web, plus crossfield as a stretch. The harness passes `excludeIds` from `get_board`, so the discovery service never needs the board's votes directly.
+`score_candidates` scores every candidate once per board goal (for example evidence and method), so switching "Rank for" only re-sorts and recolours; `rerank` runs for the goal being viewed. `strategies` is any of keyword (PubMed and OpenAlex), pubmed_links (similar, citing and references), citing, coupling, recommend (Semantic Scholar), web (Tavily) and arxiv (alphaXiv), plus crossfield as a stretch. The harness passes `excludeIds` from `get_board`, so the discovery service never needs the board's votes directly.
 
 ### Paper record
 
@@ -555,22 +581,29 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
   "url": "https://doi.org/10.1038/s41586-021-03704-y",
   "abstract": "…",
   "openAccessPdf": "https://…",
+  "type": "article",
   "relevance": {
+    "goal": "evidence",
     "score": 0.82,
+    "fit": "high",
     "verdict": "relevant",
-    "reason": "…",
-    "quote": "…",
-    "quoteVerified": true,
-    "quoteSource": "fulltext",
-    "figure": { "figureId": "fig3", "caption": "…", "imageUrl": "…", "why": "…" },
+    "relation": "Same disease · adds a spatial method",
+    "claims": [{ "text": "Profiles the same exhausted CD8+ T-cell states as three of your seeds…", "evidence": ["q1", "c1"] }],
+    "quotes": [{ "id": "q1", "text": "…", "source": "abstract", "verified": true, "url": "https://pubmed.ncbi.nlm.nih.gov/…/#:~:text=…" }],
+    "citations": [{ "id": "c1", "citesSeeds": ["…"], "source": "openalex" }],
+    "gaps": ["Whether it supports or challenges your seeds' findings: not assessed"],
+    "figure": { "figureId": "fig3", "caption": "…", "imageUrl": "…", "why": "…", "model": "…", "seconds": 3.1 },
     "model": "nvidia/Nemotron-3_5-Lightning",
+    "seconds": 0.8,
     "runId": "run_…"
   },
   "reading": {
+    "tldr": "…",
     "summary": "…",
     "rewrittenAbstract": "…",
     "whyItMatters": "…",
     "fullText": true,
+    "sections": { "summary": "done", "quotes": "done", "figure": "reading" },
     "highlightIds": ["…"]
   },
   "connections": { "citesSeeds": ["…"], "citedBySeeds": [], "sharedReferences": 7, "cluster": "…" },
@@ -584,6 +617,8 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
 }
 ```
 
+The fields follow what the card mockup needs (`docs/mockups/README.md`): every claim in "why it matters" points to evidence IDs, and a claim with no evidence is dropped or flagged; several quotes, each verified on its own; `gaps` for "Couldn't check"; the `relation` tag and the `goal` the ranking used; `type` (article, review or preprint) from OpenAlex; per-section progress so each section fills in on its own; and the model and time for every AI-written label.
+
 ### Canvas shapes
 
 | Shape | Props | Meta |
@@ -592,7 +627,7 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
 | Arrow (built-in, bound to two cards) | Start and end bindings | `relation`, `createdBy` |
 | Note (built-in) | Rich text | `author` |
 | `cluster` (frame) | `label`, `labelGenerated` | `createdBy`, `renamedByHuman` |
-| `highlight` (custom) | `paperId`, `text`, `page`, `category` | `author` or `createdBy`, `runId` |
+| `highlight` (custom) | `paperId`, `text`, `page`, `category`, `note`, `replies` (`[{author, text, at}]`) | `author` or `createdBy`, `runId` |
 | `quote` (custom) | `paperId`, `text`, `section`, `verified` | `createdBy`, `runId` |
 | `figure` (custom) | `paperId`, `figureId`, `imageUrl`, `caption` | `createdBy`, `runId` |
 | `table` (custom) | `title`, `columns`, `rows` | `createdBy`, `runId`, `editedByHuman` |
@@ -627,8 +662,10 @@ Each job goes to the Nemotron model built for it, and the routing is visible in 
 | Reader agent: full text, figures and pages, highlights and quotes, picking figures; reading the canvas screenshot | Nemotron 3.5 Super VL | Token Factory |
 | Per-paper work on hundreds of candidates (verdict, TL;DR, quote, citation stance), search agents, context agent | Nemotron 3.5 Lightning (`nvidia/Nemotron-3_5-Lightning`) | Token Factory |
 | PDF parsing for seeds and placed papers, bibliography extraction, figure cropping | Nemotron Parse | NVIDIA hosted API |
-| Optional rerank by text plus first-page image | Llama Nemotron Rerank VL 1B v2 | NVIDIA hosted API |
+| Optional rerank by text plus first-page image | Llama Nemotron Rerank VL 1B v2, or a Nemotron reranker if Token Factory serves one | Token Factory if available, else NVIDIA hosted API |
 | Embeddings | A Nemotron embedding if Token Factory lists one, else Qwen3-Embedding-8B | Token Factory |
+
+**Embeddings and reranking are pluggable.** We host no embedding or rerank containers ourselves. The embedder is any OpenAI-compatible `/v1/embeddings` endpoint, chosen by configuration (`EMBED_BASE_URL`, `EMBED_MODEL`), with Token Factory as the default; changing the model means re-embedding the board's papers in LanceDB, which is cheap at a few hundred papers. The `rerank` tool has interchangeable backends, chosen by `RERANK_BACKEND`: Super VL listwise (the default), a rerank model on Token Factory, or NVIDIA's hosted Rerank VL. Token Factory's API docs list an embeddings endpoint but no rerank endpoint, so a Token Factory reranker would need a dedicated endpoint with custom weights; check that before relying on it.
 
 **Why these models:**
 
@@ -651,17 +688,42 @@ Each job goes to the Nemotron model built for it, and the routing is visible in 
 
 Show judges one results table from this, each trace step labelled with its model, time and cost ("Lightning: scored N candidates in T s"), and the routing table above in the README.
 
-**More models.** The team wants as many Nemotron models as do a real job, since that is what impresses for Best use of Nemotron. If time allows, add the Rerank VL step above and look for one more real job, such as Content Safety on agent-written notes. Not planned: self-deploying the Embed-VL and Rerank-VL containers (GPU work for a track we left) and Nano Omni voice input (voice was floated and dropped).
+**More models.** The team wants as many Nemotron models as do a real job, since that is what impresses for Best use of Nemotron. If time allows, add the Rerank VL step above and look for one more real job, such as Content Safety on agent-written notes. Not planned: self-hosting embedding or rerank containers on our own GPUs (the pluggable endpoints above cover them) and Nano Omni voice input (voice was floated and dropped).
+
+## Search sources
+
+Tavily finds and reads papers on the web; the scholarly APIs give identities and the citation graph. The organisers' notebook draws the same line: Tavily for web context and paper pages, scholarly sources for citation links. Every source is a tool call in the trace.
+
+| Source | Job | Checked on 18 October |
+| --- | --- | --- |
+| **Tavily Search** | The search agents' main tool: each sub-query restricted to PubMed, PMC, bioRxiv, medRxiv, arXiv and journals; recent work by date window; web context such as trials and guidelines | Restricted to PMC, a query from the notebook's melanoma example returned 5 on-topic papers, 2 of them seeds |
+| **Tavily Extract** | Reading: the full text the reader quotes from | PMC returned full text (no images); arXiv HTML returned text and figure images; bioRxiv failed, so bioRxiv papers go through their PDF |
+| **PubMed E-utilities** | Structured keyword search (ESearch), abstracts (EFetch), and per-paper links (ELink): similar articles, citing papers and references | For the 2021 CD8 seed (PMID 34290406): 100 similar, 374 citing, 37 references; no key needed |
+| **OpenAlex** | DOIs, open-access PDF links, citing papers across disciplines | Not checked |
+| **Semantic Scholar** | Recommendations that take positive and negative paper IDs, so Keep and Discard steer them | Not checked; needs a key for steady use |
+| **alphaXiv** | arXiv papers and their AI-generated summaries: computational and modelling work for the cross-field angle | The melanoma example returned modelling and q-bio papers, none of the experimental literature, so it adds an angle rather than replacing PubMed |
+
+**Rules:**
+
+- **A web hit isn't a paper yet.** Tavily URLs are resolved to a PMID, DOI or arXiv ID before scoring, and seeds are dropped; the PMC search above returned two seeds.
+- **Tavily runs through its remote MCP server** (`https://mcp.tavily.com/mcp/`, the integration Tavily documents for Google ADK) or the Python SDK inside the papers MCP, with the server's own key.
+- **Credits.** Search costs 1 credit (basic) or 2 (advanced); Extract costs 1 credit per 5 pages. A run with 3 advanced sub-queries and 50 extracted papers costs about 16 credits. Log usage per run with `include_usage=True`.
+- **PubMed limits.** 3 requests a second without an NCBI key, 10 with one.
+- **Is there an organisers' PubMed MCP?** The brainstorm mentioned one, but the notebook calls E-utilities directly. If there is none, ESearch, EFetch and ELink become tools in our papers MCP.
+- **Not used:** Tavily Research (4 to 250 credits and minutes per call), Crawl and Map.
 
 ## Requirements, risks and first-hour checklist
 
 The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool calling, the ACP pipe), PDF handling, a Build list that grew, and people and agents editing one board at once; each has a cheap first-hour check or a rule.
 
-**Hard requirements (Paper Discovery):**
+**Hard requirements (both challenges):**
 
-- LLM inference and embeddings on Nebius Token Factory.
-- A working app deployed on Nebius, hosted separately from the model endpoint.
+- LLM inference and embeddings on Nebius Token Factory (Nemotron models; Beam optional).
+- Web retrieval through Tavily.
+- A working app deployed on Nebius (Nebius Serverless, per the organisers' notebook), hosted separately from the model endpoint.
 - Output: a ranked list of new papers with metadata, source links and relevance explanations.
+- A public GitHub repo with a README a judge can run from.
+- A 2-minute demo video of one complete run, submitted on the hackathon platform by 18:30.
 
 | Risk | What breaks | Mitigation |
 | --- | --- | --- |
@@ -677,6 +739,8 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 | PDF highlighting in the overlay | Text selection fights canvas events; agent highlights land in the wrong place | Render pdf.js in the overlay outside tldraw's event handling; anchor agent highlights by searching the quote in the text layer; fallback is highlighting Parse's extracted text instead of the PDF |
 | Scope | The Build list no longer fits the time | Build in demo order: board filling live, overlay with quotes, catch-me-up, then highlights, then tables, diagrams and filters |
 | NVIDIA hosted API for Parse and rerank | Requirement dispute | Confirm with the organisers in one message |
+| Run too slow for the video | The 2-minute video can't show one uncut run | Place cards as soon as verdicts clear the threshold; Tavily Extract before Parse; time a full run on the demo seeds early |
+| Tavily credits | The free tier runs out mid-build | About 16 credits a run; ask the organisers for more, as the challenge offers; log usage per run |
 | Hallucinated explanations | A judge's click fails and trust is gone | Exact-match quote check against the abstract or full text; "unverified" flag; `add_quote` rejects anything not verbatim |
 
 **First-hour checklist:**
@@ -686,9 +750,12 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 - [ ] Run tool calling through ADK `LiteLlm` with Super VL and Lightning on Token Factory
 - [ ] Stand up one `TLSocketRoom` with two browsers and one server-side write
 - [ ] Confirm with the organisers that Parse and rerank via NVIDIA's hosted API are allowed
-- [ ] Check the Token Factory catalogue for a Nemotron embedding model
+- [ ] Check the Token Factory catalogue for a Nemotron embedding model, and whether a rerank model can run there (a dedicated endpoint with custom weights)
 - [ ] Run our seed papers through OpenAlex and check the candidate count
-- [ ] Try the organisers' PubMed MCP on one sub-query
+- [ ] Ask the organisers whether a PubMed MCP exists; otherwise wrap ESearch, EFetch and ELink as papers MCP tools
+- [ ] Connect Tavily's remote MCP server to the ADK harness and run one sub-query through it
+- [ ] Confirm alphaXiv access from our server (API or MCP) and its limits
+- [ ] Make the GitHub repo public and keep its README runnable from a clean checkout
 - [ ] Check how many of our candidates have an open-access PDF
 - [ ] Render a PDF with pdf.js in an overlay above tldraw and save one text highlight as a shape
 
@@ -715,7 +782,14 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 
 ## Sources
 
-- [Research Paper Discovery notebook and brief](https://gzvqcrohgpzewcnfecrk.supabase.co/storage/v1/object/public/techeurope-assets/track-media/04cf15c6a046.ipynb)
+- [Research Paper Discovery notebook and brief](https://gzvqcrohgpzewcnfecrk.supabase.co/storage/v1/object/public/techeurope-assets/track-media/04cf15c6a046.ipynb) (copy in `docs/research-paper-discovery.ipynb`)
+- [Nebius cookbook: deep research agent with Tavily](https://dev.nebius.com/cookbook/deep-research-agent-tavily)
+- [Nebius cookbook: Beam on Token Factory with Mirror and Tavily](https://dev.nebius.com/cookbook/beam-reflection-token-factory)
+- [Tavily with Google ADK (remote MCP server)](https://docs.tavily.com/documentation/integrations/google-adk)
+- [Tavily credits and pricing](https://docs.tavily.com/documentation/api-credits)
+- [PubMed E-utilities](https://www.ncbi.nlm.nih.gov/books/NBK25501/)
+- [Semantic Scholar recommendations API](https://api.semanticscholar.org/api-docs/recommendations)
+- [alphaXiv](https://www.alphaxiv.org)
 - [Team Miro board](https://miro.com/app/board/uXjVEY7-bbE=/)
 - [Granola transcript of the team brainstorm, 18 October](https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd)
 - [ACP session setup spec](https://agentclientprotocol.com/protocol/session-setup)
