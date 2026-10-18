@@ -1,0 +1,845 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Discovery · mockup v4</title>
+<style>
+:root{
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781; --hair:#ebe9e3; --axis:#c3c2b7; --page:#f4f3ef; --ring:rgba(11,11,11,.07);
+  --fit-low:#86b6ef; --fit-medium:#2a78d6; --fit-high:#104281;
+  --warn:#d99a00; --warn-ink:#7a5200; --warn-bg:#fff6df; --ok:#006300;
+  --ana:#eb6834; --igor:#1baf7a; --ralph:#6250d6;
+  --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Iowan Old Style",Charter,Georgia,serif;
+  --L:0px; --R:0px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:var(--sans);color:var(--ink);background:var(--page);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;overflow:hidden}
+button{font:inherit;color:inherit;cursor:pointer}
+[hidden]{display:none!important}
+a{color:inherit}
+
+/* top bar */
+.top{position:fixed;inset:0 0 auto 0;height:56px;background:#fff;border-bottom:1px solid var(--hair);display:flex;align-items:center;gap:14px;padding:0 12px 0 16px;z-index:30}
+.logo{width:26px;height:26px;border-radius:7px;background:var(--fit-high);display:grid;place-items:center;flex:none}
+.board{font-weight:650;white-space:nowrap}
+.question{color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.grow{flex:1}
+.avs{display:flex;padding-left:6px}
+.av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:11.5px;font-weight:650;border:2px solid #fff;margin-left:-6px;flex:none}
+.av.bot{background:var(--ink)}
+.btn{border:0;background:var(--page);border-radius:8px;padding:7px 13px;font-weight:550;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:#eae8e2}
+.btn.primary{background:var(--ink);color:#fff}
+.btn.primary:hover{background:#2a2a28}
+.btn.text{background:none;padding:7px 4px;color:var(--ink2)}
+.btn.text:hover{color:var(--ink)}
+.btn[aria-pressed=true]{background:var(--ink);color:#fff}
+.count{background:#fff;color:var(--ink);border-radius:999px;padding:0 7px;font-size:12px;font-weight:700}
+
+/* canvas */
+.canvas{user-select:none;-webkit-user-select:none;position:fixed;inset:56px 0 0 0;background-color:var(--page);background-image:radial-gradient(#dcdad3 1px,transparent 1px);background-size:22px 22px;touch-action:none}
+.canvas.panning{cursor:grabbing}
+.canvas.notemode,.canvas.notemode .node{cursor:copy}
+#svg{position:absolute;inset:0;width:100%;height:100%;display:block}
+.node{cursor:pointer;transition:opacity .25s}
+.dim{opacity:.16}
+.fdim{opacity:.1}
+.edge{stroke:#d3d1c9;stroke-width:1.2;fill:none;transition:opacity .25s}
+.edge.similar{stroke-dasharray:4 4}
+.edge.on{stroke:#3b3a37;stroke-width:1.8}
+.edge.faded{opacity:.12}
+.edge.coll{opacity:.4}
+.lbl{font-size:12px;font-weight:600;fill:var(--ink);paint-order:stroke;stroke:var(--page);stroke-width:4px;stroke-linejoin:round}
+.sub{font-size:11px;fill:var(--ink2);paint-order:stroke;stroke:var(--page);stroke-width:4px;stroke-linejoin:round}
+.elbl{font-size:10.5px;fill:var(--ink2);paint-order:stroke;stroke:var(--page);stroke-width:4px;stroke-linejoin:round}
+.cluster rect{fill:#ebe9e2;transition:opacity .25s}
+.cluster text{font-size:11px;fill:var(--muted);font-weight:650;letter-spacing:.06em;text-transform:uppercase}
+.pulse{fill:none;stroke:var(--fit-medium);stroke-width:3;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.sticky{position:relative;margin-top:8px;width:160px;min-height:84px;padding:10px 10px 8px;background:#fff1a8;box-shadow:0 1px 2px rgba(0,0,0,.07),0 4px 10px rgba(0,0,0,.05);font-size:12.5px;line-height:1.35;transition:opacity .25s,box-shadow .15s;cursor:grab}
+.sticky:hover{box-shadow:0 2px 4px rgba(0,0,0,.1),0 8px 18px rgba(0,0,0,.08)}
+.sticky .ntext{outline:none;min-height:18px;white-space:pre-wrap;word-wrap:break-word}
+.sticky .ntext[contenteditable=true]{cursor:text;user-select:text;-webkit-user-select:text}
+.card{user-select:text;-webkit-user-select:text}
+.sticky .ntext:empty::before{content:"Type a note…";color:#a39a6a}
+.sticky .who{margin-top:6px;font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:5px}
+.note-dim .sticky{opacity:.25}
+.sticky .pin{position:absolute;top:-7px;left:50%;width:13px;height:13px;margin-left:-6px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff7a6b,#c0392b);box-shadow:0 1px 2px rgba(0,0,0,.4)}
+.pinline{stroke:#c9b458;stroke-width:1.5;stroke-dasharray:2 3;fill:none}
+.pinline.faded{opacity:.2}
+.edge{pointer-events:none}
+.ehit{stroke:transparent;stroke-width:14;fill:none;cursor:pointer;pointer-events:stroke}
+.edge.mine{stroke:#8a8983;stroke-width:1.6}
+.edge.mine.on{stroke:#3b3a37}
+.elpill{cursor:pointer}
+.elpill rect{fill:#fff;stroke:#c3c2b7}
+.elpill text{font-size:11px;fill:var(--ink);font-weight:600}
+.elpill.faded{opacity:.25}
+.elbl{cursor:pointer}
+.handle{cursor:crosshair}
+.handle circle{fill:#fff;stroke:#0b0b0b;stroke-width:1.5}
+.handle path{stroke:#0b0b0b;stroke-width:1.6}
+#tmpLink{stroke:#3b3a37;stroke-width:1.8;stroke-dasharray:5 4;pointer-events:none}
+.led{position:fixed;z-index:70;width:300px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px var(--ring),0 12px 32px rgba(0,0,0,.16);padding:12px;font-size:13px}
+.led .le-h{font-weight:650;margin-bottom:8px}
+.led .le-h span{color:var(--muted);font-weight:400;margin:0 2px}
+.led input{width:100%;border:1px solid var(--hair);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px;margin-bottom:8px}
+.led input:focus{outline:2px solid var(--fit-medium);outline-offset:-1px}
+.led .le-note{font-size:12px;color:var(--muted);margin-top:8px}
+.led .le-f{display:flex;align-items:center;margin-top:10px}
+.lookfor{flex:none}
+.lf{border:1px solid var(--hair);background:var(--page);border-radius:999px;padding:5px 12px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.lf:hover{color:var(--ink)}
+.lf b{color:var(--ink);font-weight:650}
+.lf[aria-expanded=true]{border-color:var(--ink)}
+.popm.down{top:40px;bottom:auto;left:0;right:auto}
+.sub6{font-size:12px;color:var(--ink2);margin:10px 0 6px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:none}
+#leader{stroke:#3b3a37;stroke-width:1.2;stroke-dasharray:3 4;fill:none}
+.ghost{position:fixed;z-index:95;width:132px;height:84px;background:#fff1a8;box-shadow:0 6px 20px rgba(0,0,0,.18);pointer-events:none;transform:translate(-50%,-50%) rotate(-3deg);font-size:12px;padding:10px;color:#a39a6a}
+
+/* card */
+.card{position:absolute;width:380px;background:#fff;border-radius:16px;box-shadow:0 0 0 1px var(--ring),0 16px 40px rgba(0,0,0,.13);display:flex;flex-direction:column;z-index:20;
+  transition:left .5s cubic-bezier(.3,.7,.2,1),top .5s cubic-bezier(.3,.7,.2,1),opacity .2s;max-height:calc(100% - 48px)}
+.card.hide{opacity:0;pointer-events:none}
+.card::before{content:"";position:absolute;top:calc(var(--py,60px) - 8px);width:16px;height:16px;background:#fff;transform:rotate(45deg);box-shadow:0 0 0 1px var(--ring)}
+.card.right::before{left:-7px;clip-path:polygon(0 0,0 100%,100% 100%)}
+.card.left::before{right:-7px;clip-path:polygon(0 0,100% 0,100% 100%)}
+.x{position:absolute;top:10px;right:10px;width:28px;height:28px;border:0;background:rgba(255,255,255,.92);border-radius:50%;color:var(--ink2);font-size:18px;line-height:1;z-index:2;box-shadow:0 0 0 1px var(--ring)}
+.x:hover{background:#fff;color:var(--ink)}
+.cover{display:block;width:100%;height:150px;padding:0;border:0;border-bottom:1px solid var(--hair);border-radius:16px 16px 0 0;overflow:hidden;background:#fff;cursor:zoom-in;position:relative;flex:none}
+.cover img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block;transition:transform .4s}
+.cover:hover img{transform:scale(1.03)}
+.cover.pending{cursor:default;display:grid;place-items:center;background:linear-gradient(90deg,#f1f0eb 25%,#f8f7f3 50%,#f1f0eb 75%);background-size:200% 100%;animation:sh 1.4s infinite}
+.cover.pending .reading{margin:0}
+.card.touring .cover{border-radius:0}
+.card.dopen .cover{height:64px}
+.card.dopen .figtag{display:none}
+.figtag{position:absolute;left:10px;bottom:8px;background:rgba(255,255,255,.94);font-size:11px;padding:2px 8px;border-radius:999px;color:var(--ink2);font-weight:600;box-shadow:0 0 0 1px var(--ring)}
+.tour{background:var(--ink);color:#fff;border-radius:16px 16px 0 0;padding:10px 10px 12px 14px;flex:none}
+.tour .r1{display:flex;align-items:center;gap:8px;font-size:11.5px;color:#c3c2b7;font-weight:650;letter-spacing:.02em}
+.tour .r1 .av{width:22px;height:22px;margin:0;border:0;background:#2a2a28}
+.tour .say{font-size:14px;line-height:1.4;margin-top:6px}
+.tour .nav{display:flex;gap:4px;margin-left:auto}
+.tour .nav button{border:0;background:rgba(255,255,255,.14);color:#fff;border-radius:7px;padding:4px 10px;font-size:12.5px;font-weight:600}
+.tour .nav button:hover{background:rgba(255,255,255,.26)}
+.tour .nav button[disabled]{opacity:.35;cursor:default}
+.tour .dots{display:flex;gap:4px}
+.tour .dots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.3)}
+.tour .dots i.on{background:#fff}
+.chead{padding:16px 20px 0;position:relative}
+.kick{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--ink2);padding-right:28px}
+.kick .sep{color:var(--axis)}
+.kick .flag{color:var(--warn-ink);font-weight:600}
+.kick b{color:var(--ink);font-weight:650}
+.ttl{font-size:17px;line-height:1.3;font-weight:650;margin:8px 0 4px;letter-spacing:-.005em}
+.ttl a{text-decoration:none}
+.ttl a:hover{text-decoration:underline;text-underline-offset:3px}
+.meta{font-size:13px;color:var(--muted)}
+.cbody{padding:0 20px;overflow:auto;flex:1;min-height:0}
+.why{font-size:15.5px;line-height:1.5;margin:14px 0 0}
+.ev-u{text-decoration:underline dotted #9a988f 1.5px;text-underline-offset:4px;cursor:help;border-radius:3px;transition:background .15s}
+.ev-u:hover,.ev-u.on{background:#e6effc;text-decoration-color:var(--fit-medium)}
+.ev-u.unv{text-decoration-color:var(--warn)}
+.ev-u.unv:hover{background:var(--warn-bg)}
+.wmark{color:var(--warn);font-size:12px;margin-left:2px}
+.match{margin:16px 0 4px}
+.mlabel{font-size:11.5px;color:var(--muted);margin-bottom:6px}
+.mrow{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:baseline;padding:5px 6px;margin:0 -6px;border-radius:6px;font-size:13.5px;cursor:help}
+.mrow:hover{background:var(--page)}
+.mrow .k{color:var(--muted);font-size:12.5px}
+.mrow .s{font-size:12.5px;font-weight:600;white-space:nowrap}
+.s.same{color:var(--ink)} .s.adds{color:var(--fit-medium)} .s.other{color:var(--muted)} .s.unclear{color:var(--muted);font-weight:500}
+.mrow.primary .v{font-weight:600}
+.reading{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);margin-top:12px}
+.spin{width:12px;height:12px;border:2px solid var(--hair);border-top-color:var(--ink2);border-radius:50%;animation:rot .8s linear infinite;flex:none}
+@keyframes rot{to{transform:rotate(360deg)}}
+.votes{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-top:12px;flex-wrap:wrap}
+.votes .av{width:18px;height:18px;font-size:9.5px;margin:0;border:0}
+.split{color:var(--warn-ink);font-weight:600}
+.cfoot{display:flex;align-items:center;gap:6px;padding:14px 16px 16px 14px}
+.more{border:0;background:none;color:var(--ink2);font-weight:600;font-size:13px;padding:7px 8px;border-radius:8px;display:inline-flex;gap:6px;align-items:center}
+.more:hover{background:var(--page);color:var(--ink)}
+.chev{display:inline-block;transition:transform .2s}
+.open .chev{transform:rotate(180deg)}
+.details{border-top:1px solid var(--hair);margin-top:16px;padding-top:4px}
+.tabs{display:flex;gap:2px;margin:6px 0 12px}
+.tabs button{border:0;background:none;padding:6px 10px;border-radius:7px;font-size:13px;color:var(--ink2);font-weight:550}
+.tabs button[aria-selected=true]{background:var(--page);color:var(--ink);font-weight:650}
+.q{margin:0 0 14px}
+.q blockquote{margin:0;font-family:var(--serif);font-size:15px;line-height:1.5;padding-left:14px;border-left:2px solid var(--ink)}
+.q.unv blockquote{border-left-color:var(--warn)}
+.q .qm{font-size:12px;color:var(--ink2);margin:5px 0 0 16px}
+.q .qm a{color:var(--ink);cursor:pointer}
+.okt{color:var(--ok);font-weight:600}
+.bad{color:var(--warn-ink);font-weight:600}
+.h5{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:16px 0 6px;font-weight:650}
+.seedlinks{font-size:13.5px}
+.seedlinks a{color:var(--ink);text-decoration:underline;text-decoration-color:var(--axis);text-underline-offset:3px;cursor:pointer}
+.figrow{display:grid;grid-template-columns:96px 1fr;gap:12px;align-items:start}
+.thumb{width:96px;height:96px;object-fit:cover;object-position:top;border-radius:8px;box-shadow:0 0 0 1px var(--hair);cursor:zoom-in;background:#fff}
+.figrow .cap{font-size:12.5px;color:var(--ink2);line-height:1.45}
+.figrow .cap b{color:var(--ink)}
+.why2{font-size:12.5px;color:var(--ink2);margin-top:4px}
+.ai{display:inline-block;font-size:10.5px;font-weight:700;color:var(--ink2);background:#efeee9;border-radius:4px;padding:0 5px;margin-right:4px;letter-spacing:.02em}
+.gaps{margin:0;padding:0;list-style:none}
+.gaps li{display:flex;gap:8px;font-size:13px;color:var(--ink2);padding:2px 0}
+.gaps li::before{content:"?";flex:none;width:16px;height:16px;border-radius:50%;border:1.5px solid var(--axis);color:var(--muted);font-size:10px;font-weight:700;display:grid;place-items:center;margin-top:2px}
+.prov{font-size:12px;color:var(--muted);margin:12px 0 4px;line-height:1.6}
+.tldr{margin:0;padding-left:18px;font-size:13.5px}
+.tldr li{margin:3px 0}
+.abs{font-family:var(--serif);font-size:14px;line-height:1.55}
+.abs mark{background:#e6effc;color:inherit;padding:0 1px;border-radius:2px}
+.note{display:flex;gap:8px;align-items:flex-start;background:#fff8cc;border-radius:8px;padding:8px 10px;font-size:13px;margin-bottom:8px}
+.note .av{width:20px;height:20px;font-size:10px;margin:0;border:0}
+.addnote{width:100%;border:1px solid var(--hair);border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+.deeper{display:flex;gap:6px;margin:16px 0 4px}
+.skel{height:11px;border-radius:6px;background:linear-gradient(90deg,#eeede8 25%,#f8f7f3 50%,#eeede8 75%);background-size:200% 100%;animation:sh 1.4s infinite;margin:8px 0}
+@keyframes sh{to{background-position:-200% 0}}
+.linked{display:flex;align-items:center;gap:8px;padding:7px 6px;margin:0 -6px;border-radius:8px;cursor:pointer;font-size:13.5px}
+.linked:hover{background:var(--page)}
+.linked .r{color:var(--ink2);font-size:12.5px;margin-left:auto}
+.sq{width:11px;height:11px;border-radius:3px;border:2px solid var(--ink);display:inline-block;flex:none}
+.sw{width:11px;height:11px;border-radius:50%;display:inline-block;flex:none}
+
+/* side panels */
+.side{position:fixed;top:68px;bottom:12px;background:#fff;border-radius:14px;box-shadow:0 0 0 1px var(--ring),0 12px 32px rgba(0,0,0,.1);z-index:22;display:flex;flex-direction:column}
+.side header{padding:14px 14px 12px 16px;border-bottom:1px solid var(--hair);display:flex;gap:8px;align-items:flex-start}
+.side header .h{font-weight:650;font-size:14px}
+.side header small{display:block;color:var(--muted);font-size:12px;margin-top:2px;font-weight:400}
+.side .xs{margin-left:auto;border:0;background:none;width:28px;height:28px;border-radius:8px;color:var(--muted);font-size:18px;line-height:1;flex:none}
+.side .xs:hover{background:var(--page);color:var(--ink)}
+.list{left:12px;width:340px}
+.rows{overflow:auto;padding:6px 8px 12px;flex:1}
+.lrow{display:grid;grid-template-columns:20px 1fr 60px;gap:10px;padding:10px 8px;border-radius:10px;cursor:pointer;align-items:start}
+.lrow:hover{background:var(--page)}
+.lrow.sel{background:#eef3fb}
+.lrow .rk{font-weight:700;color:var(--muted);font-size:13px}
+.lkick{font-size:11.5px;color:var(--ink2);display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.lkick .flag{color:var(--warn-ink);font-weight:600}
+.lt{font-weight:650;font-size:13.5px;line-height:1.3;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:3px 0 2px}
+.lm{font-size:12px;color:var(--muted)}
+.lwhy{font-size:12.5px;color:var(--ink2);margin-top:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.lthumb{width:60px;height:60px;border-radius:8px;object-fit:cover;object-position:top;box-shadow:0 0 0 1px var(--hair);background:#fff}
+.lthumb.none{display:grid;place-items:center;color:var(--axis);font-size:11px;background:var(--page);box-shadow:none}
+.empty{padding:20px 12px;color:var(--muted);font-size:13px}
+.empty button{border:0;background:none;text-decoration:underline;color:var(--ink2);padding:0}
+.listtoggle{position:fixed;top:68px;left:12px;z-index:15;background:#fff;box-shadow:0 0 0 1px var(--ring),0 2px 8px rgba(0,0,0,.06)}
+.chat{right:12px;width:372px}
+.chat .body{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.msg-u{align-self:flex-end;background:var(--page);border-radius:10px 10px 2px 10px;padding:8px 10px;max-width:85%}
+.msg-a{line-height:1.5}
+.msg-a .canned{display:block;color:var(--muted);font-size:11.5px;margin-top:4px}
+.pmn{font-weight:650;text-decoration:underline;text-decoration-color:var(--axis);text-underline-offset:3px;cursor:pointer}
+.pmn:hover{text-decoration-color:var(--ink);background:#e6effc;border-radius:3px}
+.tool{border:1px solid var(--hair);border-radius:8px;padding:7px 10px;font-size:12.5px}
+.tool .h{display:flex;gap:6px;align-items:center;font-weight:600}
+.tool .d{color:var(--ink2);margin-top:2px}
+.tool .lbl2{color:var(--muted);font-size:11.5px;margin-top:3px}
+.chat .foot{border-top:1px solid var(--hair);padding:10px 12px}
+.ctx{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.ctxchip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--hair);border-radius:999px;padding:1px 4px 1px 8px;color:var(--ink);font-weight:600}
+.ctxchip button{border:0;background:none;color:var(--muted);padding:0 4px;font-size:13px}
+.chat textarea{width:100%;border:1px solid var(--hair);border-radius:8px;padding:8px;font:inherit;font-size:13px;resize:none;height:58px;margin-top:6px}
+.okc{color:var(--ok)}
+
+/* bottom controls */
+.controls{position:fixed;right:calc(var(--R) + 16px);bottom:16px;display:flex;gap:8px;z-index:25;align-items:flex-end;transition:right .2s}
+.ctlwrap{position:relative}
+.ctl{height:36px;border-radius:10px;border:0;background:#fff;box-shadow:0 0 0 1px var(--ring),0 2px 8px rgba(0,0,0,.08);padding:0 12px;font-size:13px;font-weight:550;color:var(--ink2);display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.ctl:hover{color:var(--ink)}
+.ctl b{color:var(--ink);font-weight:650}
+.ctl.round{width:36px;padding:0;justify-content:center;border-radius:50%;font-weight:700}
+.ctl[aria-expanded=true]{box-shadow:0 0 0 2px var(--ink)}
+.badge{background:var(--ink);color:#fff;border-radius:999px;font-size:11px;padding:0 6px;font-weight:700;line-height:17px}
+.popm{position:absolute;bottom:46px;right:0;background:#fff;border-radius:12px;box-shadow:0 0 0 1px var(--ring),0 10px 30px rgba(0,0,0,.14);padding:14px;width:310px;font-size:13px;color:var(--ink2)}
+.popm h6{margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.popm h6:not(:first-child){margin-top:14px}
+.opt{display:grid;grid-template-columns:18px 1fr;gap:8px;padding:8px;border-radius:8px;cursor:pointer;margin:0 -6px}
+.opt:hover{background:var(--page)}
+.opt .radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--axis);margin-top:2px}
+.opt.on .radio{border:5px solid var(--ink)}
+.opt b{color:var(--ink);display:block}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.fchip{border:1px solid var(--hair);background:#fff;border-radius:999px;padding:3px 10px;font-size:12.5px;color:var(--ink2);display:inline-flex;align-items:center;gap:6px}
+.fchip[aria-pressed=true]{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chk{display:flex;gap:8px;align-items:center;margin-top:10px;cursor:pointer}
+.pfoot{display:flex;align-items:center;border-top:1px solid var(--hair);margin-top:14px;padding-top:10px;font-size:12.5px}
+.pfoot button{margin-left:auto;border:0;background:none;text-decoration:underline;color:var(--ink2);padding:0}
+.legend .row{display:flex;align-items:center;gap:8px;margin:5px 0}
+.mnote{border-top:1px solid var(--hair);margin-top:10px;padding-top:10px;font-size:11.5px;color:var(--muted)}
+
+/* toolbar */
+.toolbar{position:fixed;bottom:16px;left:calc((var(--L) + 100vw - var(--R)) / 2);transform:translateX(-50%);background:#fff;border-radius:12px;box-shadow:0 0 0 1px var(--ring),0 4px 12px rgba(0,0,0,.08);display:flex;padding:4px;gap:2px;z-index:24;transition:left .2s}
+.toolbar .notebtn{height:38px;border:0;background:transparent;border-radius:8px;display:flex;align-items:center;gap:8px;padding:0 14px 0 10px;font-weight:600;font-size:13px;color:var(--ink);cursor:grab}
+.toolbar .notebtn:hover{background:var(--page)}
+.toolbar .notebtn.on{background:#e6effc;color:var(--fit-high)}
+.changes{display:flex;align-items:center;gap:10px;padding:0 4px 0 12px;border-left:1px solid var(--hair);margin-left:4px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.changes button{border:0;background:var(--ink);color:#fff;border-radius:8px;padding:6px 11px;font-size:12.5px;font-weight:600}
+.toolbar .notebtn .mini{width:18px;height:18px;background:#ffe36b;border-radius:2px;box-shadow:0 1px 2px rgba(0,0,0,.2)}
+
+/* popover, tooltip, toast, lightbox */
+.pop{position:fixed;z-index:60;width:320px;background:var(--ink);color:#fff;border-radius:10px;padding:12px 14px;font-size:12.5px;box-shadow:0 10px 28px rgba(0,0,0,.25);pointer-events:none}
+.pop blockquote{margin:0 0 8px;font-family:var(--serif);font-size:14px;line-height:1.45}
+.pop .pm{color:#c3c2b7}
+.pop .pm b{color:#7fd17f}
+.pop .pm b.w{color:#ffc94d}
+.pop .seeds{margin:4px 0 8px;font-size:13.5px;font-weight:600}
+.tip{position:fixed;z-index:50;max-width:290px;background:var(--ink);color:#fff;border-radius:8px;padding:8px 10px;font-size:12px;pointer-events:none}
+.tip b{display:block;font-size:12.5px;margin-bottom:3px}
+.tip .t2{color:#c3c2b7}
+.toast{position:fixed;left:calc((var(--L) + 100vw - var(--R)) / 2);bottom:72px;transform:translateX(-50%);z-index:45;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;display:flex;gap:14px;align-items:center;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:560px}
+.toast button{background:none;border:0;color:#fff;text-decoration:underline;font-weight:600}
+.lightbox{position:fixed;inset:0;z-index:80;background:rgba(11,11,11,.7);display:grid;place-items:center;padding:32px}
+.lb{background:#fff;border-radius:14px;max-width:min(1100px,94vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;position:relative;box-shadow:0 20px 60px rgba(0,0,0,.35)}
+.lb img{max-width:100%;max-height:72vh;object-fit:contain;display:block;margin:0 auto;background:#fff}
+.lbcap{padding:12px 18px 16px;border-top:1px solid var(--hair);font-size:13px;color:var(--ink2);max-width:900px}
+.lbcap b{color:var(--ink)}
+.lbcap .credit{margin-top:6px;font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="logo"><svg width="14" height="14" viewBox="0 0 16 16"><circle cx="5" cy="5" r="3" fill="#fff"/><circle cx="11.5" cy="11" r="2.5" fill="#86b6ef"/><path d="M7 7 L10 9.5" stroke="#fff" stroke-width="1.5"/></svg></div>
+  <div class="board">Melanoma immune cells</div>
+  <div class="question">Which single-cell methods help study melanoma immune cells?</div>
+  <div class="ctlwrap lookfor"><button class="lf" id="rankBtn" aria-expanded="false"></button><div class="popm down" id="rankPop" hidden></div></div>
+  <div class="grow"></div>
+  <div class="avs">
+    <div class="av" style="background:var(--ana)">A</div><div class="av" style="background:var(--igor)">I</div><div class="av" style="background:var(--ralph)">R</div>
+    <div class="av bot"><svg width="13" height="13" viewBox="0 0 16 16"><rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="6" cy="9" r="1.2" fill="#fff"/><circle cx="10" cy="9" r="1.2" fill="#fff"/><path d="M8 4.5V2" stroke="#fff" stroke-width="1.5"/></svg></div>
+  </div>
+  <button class="btn primary" id="catchBtn">Catch me up <span class="count" id="newCount">3</span></button>
+  <button class="btn" id="chatBtn" aria-pressed="false" title="Chat with the agent"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" stroke-linejoin="round"/></svg>Chat</button>
+</header>
+
+<main class="canvas" id="canvas">
+  <svg id="svg">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#d3d1c9"/></marker>
+      <marker id="aon" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#3b3a37"/></marker>
+    </defs>
+    <g id="cam"><g id="world"></g><g id="notes"></g><line id="tmpLink" style="display:none"/></g>
+    <path id="leader" style="display:none"/>
+  </svg>
+  <div class="card hide" id="card"></div>
+</main>
+
+<button class="btn listtoggle" id="listBtn" title="Show the ranked list"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M5.5 4h8M5.5 8h8M5.5 12h8"/><circle cx="2.5" cy="4" r=".9" fill="currentColor"/><circle cx="2.5" cy="8" r=".9" fill="currentColor"/><circle cx="2.5" cy="12" r=".9" fill="currentColor"/></svg>Ranked list <span class="count" id="listCount" style="background:var(--page)">4</span></button>
+<aside class="side list" id="list" hidden></aside>
+<aside class="side chat" id="chat" hidden></aside>
+
+<div class="controls" id="controls">
+  <div class="ctlwrap"><button class="ctl" id="filterBtn" aria-expanded="false"></button><div class="popm" id="filterPop" hidden></div></div>
+  <div class="ctlwrap"><button class="ctl round" id="helpBtn" aria-expanded="false" title="How to read the board">?</button><div class="popm legend" id="helpPop" hidden>
+    <h6>How to read the board</h6>
+    <div class="row"><span class="sq"></span>In your collection (seed or kept)</div>
+    <div class="row"><span class="sw" style="background:var(--fit-medium)"></span>Suggested by the agent</div>
+    <div class="row"><span class="sw" style="background:var(--fit-low)"></span><span class="sw" style="background:var(--fit-medium)"></span><span class="sw" style="background:var(--fit-high)"></span>Low → high fit</div>
+    <div class="row">Bigger = more links</div>
+    <div class="row"><svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="#52514e" stroke-width="1.5"/></svg>cites &nbsp;<svg width="22" height="6"><line x1="0" y1="3" x2="22" y2="3" stroke="#52514e" stroke-width="1.5" stroke-dasharray="4 4"/></svg>similar</div>
+    <h6>Editing</h6>
+    <div class="row">Drag papers and notes to move them.</div>
+    <div class="row">Hover a paper and drag its <b style="margin:0 2px">+</b> onto another paper to link them.</div>
+    <div class="row">Click a link to name it, hide it or delete it.</div>
+    <div class="row">Drop a note on a paper to pin it there.</div>
+    <div class="row">Drag empty space to move around; pinch or ⌘-scroll to zoom.</div>
+    <label class="chk"><input type="checkbox" id="optFig" checked> Mockup option: figure on the card</label>
+    <div class="mnote">Mockup v4. The papers, quotes, figures, citation links and citation counts are real (PubMed, PubMed Central, Semantic Scholar). The “why” lines, comparisons, scores, votes, notes, chat and timings are stand-ins for the agent.</div>
+  </div></div>
+</div>
+
+<nav class="toolbar" id="toolbar" aria-label="Tools">
+  <button class="notebtn" id="noteTool" title="Drag a note onto a paper to pin it there, or onto the board"><span class="mini"></span>Note</button>
+  <span class="changes" id="changes" hidden></span>
+</nav>
+
+<div class="lightbox" id="lightbox" hidden><div class="lb"><button class="x" data-act="lbclose" title="Close">×</button><img id="lbimg" alt=""><div class="lbcap" id="lbcap"></div></div></div>
+<div class="tip" id="tip" hidden></div>
+<div class="pop" id="pop" hidden></div>
+<div class="toast" id="toast" hidden></div>
+<div class="ghost" id="ghost" hidden>Drop on a paper to pin it</div>
+<div class="led" id="led" hidden></div>
+
+<script>
+// Real papers, quotes, figures and citation links (PubMed, PubMed Central). why, facets, scores, votes, notes, chat, timings: stand-ins.
+const DATA={"P": {"s1": {"label": "Tirosh 2016", "title": "Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq", "meta": "Tirosh et al. · Science · 2016", "pmid": "27124452", "doi": "10.1126/science.aad0501", "pmc": "PMC4944528", "cites": [], "abstract": "To explore the distinct genotypic and phenotypic states of melanoma tumors, we applied single-cell RNA sequencing (RNA-seq) to 4645 single cells isolated from 19 patients, profiling malignant, immune, stromal, and endothelial cells. Malignant cells within the same tumor displayed transcriptional heterogeneity associated with the cell cycle, spatial context, and a drug-resistance program. In particular, all tumors harbored malignant cells from two distinct transcriptional cell states, such that tumors characterized by high levels of the MITF transcription factor also contained cells with low MITF and elevated levels of the AXL kinase. Single-cell analyses suggested distinct tumor microenvironmental patterns, including cell-to-cell interactions. Analysis of tumor-infiltrating T cells revealed exhaustion programs, their connection to T cell activation and clonal expansion, and their variability across patients. Overall, we begin to unravel the cellular ecosystem of tumors and how single-cell genomics offers insights with implications for both targeted and immune therapies.", "kind": "seed", "x": 590, "y": 175, "by": "Ana", "figure": {"label": "Figure 1", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/c11f/4944528/1f7a6569b280/nihms791837f1.jpg", "caption": "Dissection of melanoma with single-cell RNA-seq (A) Overview of workflow. (B) Chromosomal landscape of inferred large-scale copy number variations (CNVs) distinguishes malignant from non-malignant cells. The Mel80 tumor is shown with individual cells…", "why": "", "model": "Picked by Nemotron 3.5 Super VL from 5 figures · 3.1 s", "pmc": "PMC4944528"}}, "s2": {"label": "Sade-Feldman 2018", "title": "Defining T Cell States Associated with Response to Checkpoint Immunotherapy in Melanoma", "meta": "Sade-Feldman et al. · Cell · 2018", "pmid": "30388456", "doi": "10.1016/j.cell.2018.10.038", "pmc": "PMC6641984", "cites": ["s1"], "abstract": "Treatment of cancer has been revolutionized by immune checkpoint blockade therapies. Despite the high rate of response in advanced melanoma, the majority of patients succumb to disease. To identify factors associated with success or failure of checkpoint therapy, we profiled transcriptomes of 16,291 individual immune cells from 48 tumor samples of melanoma patients treated with checkpoint inhibitors. Two distinct states of CD8+ T cells were defined by clustering and associated with patient tumor regression or progression. A single transcription factor, TCF7, was visualized within CD8+ T cells in fixed tumor samples and predicted positive clinical outcome in an independent cohort of checkpoint-treated patients. We delineated the epigenetic landscape and clonality of these T cell states and demonstrated enhanced antitumor immunity by targeting novel combinations of factors in exhausted cells. Our study of immune cell transcriptomes from tumors demonstrates a strategy for identifying predictors, mechanisms, and targets for enhancing checkpoint immunotherapy.", "kind": "seed", "x": 1150, "y": 178, "by": "Ana", "figure": {"label": "Figure 2", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/9bf0/6641984/f7c1a95952f5/nihms-1510803-f0003.jpg", "caption": "Identification of CD8 + T cell states associated with clinical outcome. A. tSNE plot of all CD8 + T cells collected in this study, with cells colored based on 2 clusters found by k -means clustering.", "why": "", "model": "Picked by Nemotron 3.5 Super VL from 7 figures · 3.1 s", "pmc": "PMC6641984"}}, "s3": {"label": "Oliveira 2021", "title": "Phenotype, specificity and avidity of antitumour CD8+ T cells in melanoma", "meta": "Oliveira et al. · Nature · 2021", "pmid": "34290406", "doi": "10.1038/s41586-021-03704-y", "pmc": "PMC9187974", "cites": ["s2"], "abstract": "Interactions between T cell receptors (TCRs) and their cognate tumour antigens are central to antitumour immune responses1-3; however, the relationship between phenotypic characteristics and TCR properties is not well elucidated. Here we show, by linking the antigenic specificity of TCRs and the cellular phenotype of melanoma-infiltrating lymphocytes at single-cell resolution, that tumour specificity shapes the expression state of intratumoural CD8+ T cells. Non-tumour-reactive T cells were enriched for viral specificities and exhibited a non-exhausted memory phenotype, whereas melanoma-reactive lymphocytes predominantly displayed an exhausted state that encompassed diverse levels of differentiation but rarely acquired memory properties. These exhausted phenotypes were observed both among clonotypes specific for public overexpressed melanoma antigens (shared across different tumours) or personal neoantigens (specific for each tumour). The recognition of such tumour antigens was provided by TCRs with avidities inversely related to the abundance of cognate targets in melanoma cells and proportional to the binding affinity of peptide-human leukocyte antigen (HLA) complexes. The persistence of TCR clonotypes in peripheral blood was negatively affected by the level of intratumoural exhaustion, and increased in patients with a poor response to immune checkpoint blockade, consistent with chronic stimulation mediated by residual tumour antigens. By revealing how the quality and quantity of tumour antigens drive the features of T cell responses within the tumour microenvironment, we gain insights into the properties of the anti-melanoma TCR repertoire.", "kind": "seed", "x": 890, "y": 525, "by": "Igor", "figure": {"label": "Fig. 1", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/5722/9187974/b8cc79712593/nihms-1810830-f0001.jpg", "caption": "Distinct cell states among CD8 + TCR clonotype families in melanoma. a , Schema of sample collection, processing and single-cell sequencing analysis of melanoma and peripheral blood samples. b , UMAP of scRNA-seq data from CD8 + melanoma TILs.", "why": "", "model": "Picked by Nemotron 3.5 Super VL from 14 figures · 3.1 s", "pmc": "PMC9187974"}}, "s4": {"label": "Oliveira 2022", "title": "Landscape of helper and regulatory antitumour CD4+ T cells in melanoma", "meta": "Oliveira et al. · Nature · 2022", "pmid": "35508657", "doi": "10.1038/s41586-022-04682-5", "pmc": "PMC9815755", "cites": ["s1", "s2", "s3"], "abstract": "Within the tumour microenvironment, CD4+ T cells can promote or suppress antitumour responses through the recognition of antigens presented by human leukocyte antigen (HLA) class II molecules1,2, but how cancers co-opt these physiologic processes to achieve immune evasion remains incompletely understood. Here we performed in-depth analysis of the phenotype and tumour specificity of CD4+ T cells infiltrating human melanoma specimens, finding that exhausted cytotoxic CD4+ T cells could be directly induced by melanoma cells through recognition of HLA class II-restricted neoantigens, and also HLA class I-restricted tumour-associated antigens. CD4+ T regulatory (TReg) cells could be indirectly elicited through presentation of tumour antigens via antigen-presenting cells. Notably, numerous tumour-reactive CD4+ TReg clones were stimulated directly by HLA class II-positive melanoma and demonstrated specificity for melanoma neoantigens. This phenomenon was observed in the presence of an extremely high tumour neoantigen load, which we confirmed to be associated with HLA class II positivity through the analysis of 116 melanoma specimens. Our data reveal the landscape of infiltrating CD4+ T cells in melanoma and point to the presentation of HLA class II-restricted neoantigens and direct engagement of immunosuppressive CD4+ TReg cells as a mechanism of immune evasion that is favoured in HLA class II-positive melanoma.", "kind": "seed", "x": 1095, "y": 650, "by": "Igor", "figure": {"label": "Fig. 1", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/4a8e/9815755/f1dba1bc4efd/nihms-1861468-f0001.jpg", "caption": "Melanoma HLA class II expression and phenotype of CD4 + TIL TCR clonotypes. a , Schematic of processing and single-cell sequencing analysis of melanoma samples. b , Flow cytometric assessment of HLA class II expression in 4 pdMel-CLs under basal culture…", "why": "", "model": "Picked by Nemotron 3.5 Super VL from 14 figures · 3.1 s", "pmc": "PMC9815755"}}, "s5": {"label": "Smalley 2021", "title": "Single-Cell Characterization of the Immune Microenvironment of Melanoma Brain and Leptomeningeal Metastases", "meta": "Smalley et al. · Clinical Cancer Research · 2021", "pmid": "34035069", "doi": "10.1158/1078-0432.CCR-21-1694", "pmc": "PMC8282775", "cites": ["s1"], "abstract": "Melanoma brain metastases (MBM) and leptomeningeal melanoma metastases (LMM) are two different manifestations of melanoma CNS metastasis. Here, we used single-cell RNA sequencing (scRNA-seq) to define the immune landscape of MBM, LMM, and melanoma skin metastases. scRNA-seq was undertaken on 43 patient specimens, including 8 skin metastases, 14 MBM, and 19 serial LMM specimens. Detailed cell type curation was performed, the immune landscapes were mapped, and key results were validated by IHC and flow cytometry. Association analyses were undertaken to identify immune cell subsets correlated with overall survival. The LMM microenvironment was characterized by an immune-suppressed T-cell landscape distinct from that of brain and skin metastases. An LMM patient with long-term survival demonstrated an immune repertoire distinct from that of poor survivors and more similar to normal cerebrospinal fluid (CSF). Upon response to PD-1 therapy, this extreme responder showed increased levels of T cells and dendritic cells in their CSF, whereas poor survivors showed little improvement in their T-cell responses. In MBM patients, therapy led to increased immune infiltrate, with similar T-cell transcriptional diversity noted between skin metastases and MBM. A correlation analysis across the entire immune landscape identified the presence of a rare population of dendritic cells (DC3) that was associated with increased overall survival and positively regulated the immune environment through modulation of activated T cells and MHC expression. Our study provides the first atlas of two distinct sites of melanoma CNS metastases and defines the immune cell landscape that underlies the biology of this devastating disease.", "kind": "seed", "x": 715, "y": 262, "by": "Ana", "figure": {"label": "Figure 2", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/d6ef/8282775/38fa574fd456/nihms-1709372-f0002.jpg", "caption": "The T and NK cell landscape of melanoma metastases. A: t-SNE plot showing the distribution of T and NK cells from melanoma metastatic to the skin, brain and leptomeninges. B: Expression of key T cell activation markers and immune checkpoints across all…", "why": "", "model": "Picked by Nemotron 3.5 Super VL from 7 figures · 3.1 s", "pmc": "PMC8282775"}}, "k1": {"label": "Lu 2025", "title": "Circulating tumor-reactive KIR+CD8+ T cells suppress anti-tumor immunity in patients with melanoma", "meta": "Lu et al. · Nature Immunology · 2025", "pmid": "39609626", "doi": "10.1038/s41590-024-02023-4", "pmc": "PMC12285569", "cites": ["s1", "s2", "s3", "s4"], "abstract": "Effective anti-tumor immunity is driven by cytotoxic CD8+ T cells with specificity for tumor antigens. However, the factors that control successful tumor rejection are not well understood. Here we identify a subpopulation of CD8+ T cells that are tumor-antigen-specific and can be identified by KIR expression but paradoxically impair anti-tumor immunity in patients with melanoma. These tumor-antigen-specific KIR+CD8+ regulatory T cells target other tumor-antigen-specific CD8+ T cells, can be detected in both the tumor and the blood, have a conserved transcriptional program and are associated with a poor overall survival. These findings broaden our understanding of the transcriptional and functional heterogeneity of human CD8+ T cells and implicate KIR+CD8+ regulatory T cells as a cellular mediator of immune evasion in human cancer.", "kind": "kept", "x": 925, "y": 672, "keptBy": "Ana"}, "n1": {"label": "Ibáñez-Molero 2026", "title": "Tumour-reactive heterotypic CD8 T cell clusters from clinical samples", "meta": "Ibáñez-Molero et al. · Nature · 2026", "pmid": "41261135", "doi": "10.1038/s41586-025-09754-w", "pmc": "PMC12779571", "cites": ["s1", "s2", "s3"], "abstract": "Emerging evidence suggests a correlation between CD8+ T cell-tumour cell proximity and anti-tumour immune response1,2. However, it remains unclear whether these cells exist as functional clusters that can be isolated from clinical samples. Here, using conventional and imaging flow cytometry, we show that from 21 out of 21 human melanoma metastases, we could isolate heterotypic clusters, comprising CD8+ T cells interacting with one or more tumour cells and/or antigen-presenting cells (APCs). Single-cell RNA-sequencing analysis revealed that T cells from clusters were enriched for gene signatures associated with tumour reactivity and exhaustion. Clustered T cells exhibited increased TCR clonality indicative of expansion, whereas TCR-matched T cells showed more exhaustion and co-modulation when conjugated to APCs than when conjugated to tumour cells. T cells that were expanded from clusters ex vivo exerted on average ninefold increased killing activity towards autologous melanomas, which was accompanied by enhanced cytokine production. After adoptive cell transfer into mice, T cells from clusters showed improved patient-derived melanoma control, which was associated with increased T cell infiltration and activation. Together, these results demonstrate that tumour-reactive CD8+ T cells are enriched in functional clusters with tumour cells and/or APCs and that they can be isolated and expanded from clinical samples. Typically excluded by single-cell gating in flow cytometry, these distinct heterotypic T cell clusters are a valuable source to decipher functional tumour-immune cell interactions and may also be therapeutically explored.", "kind": "new", "x": 1060, "y": 500, "type": null, "score": {"evidence": 0.88, "method": 0.66}, "why": {"evidence": ["Isolates ", {"t": "CD8+ T cells clustered with tumour cells", "ev": "q1"}, " from melanoma metastases and finds them ", {"t": "tumour-reactive", "ev": "q2"}, ", building on ", {"t": "three of your seeds", "ev": "c1"}, "."], "method": ["Adds a way to ", {"t": "isolate T-cell clusters with imaging flow cytometry", "ev": "q1"}, ", then profiles them with ", {"t": "single-cell RNA-seq", "ev": "q2"}, "."]}, "facets": {"Disease": {"v": "Melanoma metastases", "s": "same", "ev": "q1"}, "Cells": {"v": "Tumour-reactive CD8+ T cells", "s": "same", "ev": "q2"}, "Method": {"v": "scRNA-seq + cluster sorting", "s": "adds", "ev": "q1"}}, "quotes": {"q1": {"ok": true, "t": "Here, using conventional and imaging flow cytometry, we show that from 21 out of 21 human melanoma metastases, we could isolate heterotypic clusters, comprising CD8+ T cells interacting with one or more tumour cells and/or antigen-presenting cells (APCs)."}, "q2": {"ok": true, "t": "Single-cell RNA-sequencing analysis revealed that T cells from clusters were enriched for gene signatures associated with tumour reactivity and exhaustion."}, "q3": {"ok": true, "t": "T cells that were expanded from clusters ex vivo exerted on average ninefold increased killing activity towards autologous melanomas, which was accompanied by enhanced cytokine production."}}, "figure": {"label": "Fig. 3", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/e043/12779571/5ed0b509cf35/41586_2025_9754_Fig3_HTML.jpg", "caption": "Tumour-reactive CD8 + T cells from clusters. a , Diagram of the workflow of the scRNA-seq and scTCR-seq analysis. b , scRNA-seq UMAP of CD8 + T cells, highlighting the main cell states (left) and the average frequencies (right).", "why": "Shows the single-cell RNA and TCR workflow, and the CD8+ T-cell states it finds.", "model": "Picked by Nemotron 3.5 Super VL from 14 figures · 3.1 s", "pmc": "PMC12779571"}, "gaps": ["Whether it supports or challenges your seeds’ findings", "Methods and supplement: only the abstract and one figure read so far"], "prov": "Found through co-citation: it cites 3 of your seeds (PubMed). Written by Nemotron 3.5 Lightning in 0.8 s. Added by the agent for Ana, today 09:12.", "tldr": ["Do tumour-reactive CD8+ T cells sit in clusters with tumour cells?", "Flow cytometry to isolate clusters from 21 melanoma metastases, then single-cell RNA and TCR sequencing.", "Clustered T cells were more tumour-reactive and, once expanded, killed melanoma cells about nine times better."], "notes": [{"who": "Ana", "text": "Could we sort clusters like this from our biopsies?"}], "say": "The strongest new paper. It pulls tumour-reactive CD8+ T cells out of melanoma metastases and builds on three of your seeds."}, "n2": {"label": "Liu 2022", "title": "Spatial maps of T cell receptors and transcriptomes reveal distinct immune niches and interactions in the adaptive immune response", "meta": "Liu et al. · Immunity · 2022", "pmid": "36223726", "doi": "10.1016/j.immuni.2022.09.002", "pmc": "PMC9745674", "cites": ["s2", "s3", "s4"], "abstract": "T cells mediate antigen-specific immune responses to disease through the specificity and diversity of their clonotypic T cell receptors (TCRs). Determining the spatial distributions of T cell clonotypes in tissues is essential to understanding T cell behavior, but spatial sequencing methods remain unable to profile the TCR repertoire. Here, we developed Slide-TCR-seq, a 10-μm-resolution method, to sequence whole transcriptomes and TCRs within intact tissues. We confirmed the ability of Slide-TCR-seq to map the characteristic locations of T cells and their receptors in mouse spleen. In human lymphoid germinal centers, we identified spatially distinct TCR repertoires. Profiling T cells in renal cell carcinoma and melanoma specimens revealed heterogeneous immune responses: T cell states and infiltration differed intra- and inter-clonally, and adjacent tumor and immune cells exhibited distinct gene expression. Altogether, our method yields insights into the spatial relationships between clonality, neighboring cell types, and gene expression that drive T cell responses.", "kind": "new", "x": 1300, "y": 560, "type": null, "score": {"evidence": 0.4, "method": 0.9}, "why": {"evidence": ["Mostly a method paper: ", {"t": "melanoma is one of two tumour types", "ev": "q2"}, " it was tested on, so it adds little melanoma evidence."], "method": ["A new method that ", {"t": "reads T-cell receptors and whole transcriptomes in intact tissue", "ev": "q1"}, ", and ", {"t": "it works on archived clinical samples", "ev": "q3", "unv": true}, "."]}, "facets": {"Disease": {"v": "Melanoma and kidney cancer", "s": "adds", "ev": "q2"}, "Cells": {"v": "T cells and their receptors", "s": "same", "ev": "q1"}, "Method": {"v": "Slide-TCR-seq (spatial)", "s": "adds", "ev": "q1"}}, "quotes": {"q1": {"ok": true, "t": "Here, we developed Slide-TCR-seq, a 10-μm-resolution method, to sequence whole transcriptomes and TCRs within intact tissues."}, "q2": {"ok": true, "t": "Profiling T cells in renal cell carcinoma and melanoma specimens revealed heterogeneous immune responses: T cell states and infiltration differed intra- and inter-clonally, and adjacent tumor and immune cells exhibited distinct gene expression."}, "q3": {"ok": false, "t": "It works on archived clinical samples.", "closest": "We confirmed the ability of Slide-TCR-seq to map the characteristic locations of T cells and their receptors in mouse spleen."}}, "figure": {"evidence": {"label": "Figure 5", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/2249/9745674/0978c6bf52ee/nihms-1841817-f0005.jpg", "caption": "Interactions between a spatially unique T cell clone and tumor cells in melanoma (A) H&amp;E of melanoma tumor sample (top) and schematic illustrating the delineation of two distinct lobes (orange and blue) of the tumor across the corresponding H&amp;E,…", "why": "Shows one T-cell clone and the tumour cells around it in a melanoma sample.", "model": "Picked by Nemotron 3.5 Super VL from 5 figures · 3.1 s", "pmc": "PMC9745674"}, "method": {"label": "Figure 1", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/2249/9745674/6fb409b6ffb7/nihms-1841817-f0001.jpg", "caption": "Slide-TCR-seq spatially localizes T cell receptors and transcriptome information. A) Schematic of Slide-TCR-seq. First, 10 μm beads containing many DNA oligos are affixed onto a slide.", "why": "Shows how Slide-TCR-seq captures receptors and transcriptomes in place.", "model": "Picked by Nemotron 3.5 Super VL from 5 figures · 3.1 s", "pmc": "PMC9745674"}}, "gaps": ["How many melanoma samples there were, and how deeply they were profiled", "Whether the method needs fresh-frozen tissue"], "prov": "Found through co-citation: it cites 3 of your seeds (PubMed), and a Semantic Scholar recommendation. Written by Nemotron 3.5 Lightning in 0.7 s. Added by the agent for Igor, yesterday 17:40.", "tldr": ["Where do individual T-cell clones sit in tissue?", "Slide-TCR-seq: 10 µm beads that read T-cell receptors and whole transcriptomes in place.", "In kidney cancer and melanoma, T-cell states and infiltration differed within and between clones."], "notes": [], "say": ""}, "n3": {"label": "Daugherty-Lopès 2024", "title": "IMMUNE AND MOLECULAR CORRELATES OF RESPONSE TO IMMUNOTHERAPY REVEALED BY BRAIN-METASTATIC MELANOMA MODELS", "meta": "Daugherty-Lopès et al. · bioRxiv · 2024", "pmid": "39372744", "doi": "10.1101/2024.08.26.609785", "pmc": "PMC11451731", "cites": ["s2", "s3", "s5"], "abstract": "Despite the promising results of immune checkpoint blockade (ICB) therapy, outcomes for patients with brain metastasis (BrM) remain poor. Identifying resistance mechanisms has been hindered by limited access to patient samples and relevant preclinical models. Here, we developed two mouse melanoma BrM models that recapitulate the disparate responses to ICB seen in patients. We demonstrate that these models capture the cellular and molecular complexity of human disease and reveal key factors shaping the tumor microenvironment and influencing ICB response. BR1-responsive tumor cells express inflammatory programs that polarize microglia into reactive states, eliciting robust T cell recruitment. In contrast, BR3-resistant melanoma cells are enriched in neurological programs and exploit tolerance mechanisms to maintain microglia homeostasis and limit T cell infiltration. In humans, BR1 and BR3 expression signatures correlate positively or negatively with T cell infiltration and BrM patient outcomes, respectively. Our study provides clinically relevant models and uncovers mechanistic insights into BrM ICB responses, offering potential biomarkers and therapeutic targets to improve therapy efficacy.", "kind": "new", "x": 600, "y": 560, "type": "Preprint", "loading": true, "score": {"evidence": 0.58, "method": 0.48}, "why": {"evidence": ["Extends ", {"t": "your brain-metastasis seed", "ev": "c1"}, " with ", {"t": "mouse models of melanoma brain metastases", "ev": "q1"}, " that respond to immunotherapy the way patients do."], "method": ["Offers ", {"t": "two mouse models of melanoma brain metastases", "ev": "q1"}, ", useful if you need a model system rather than patient samples."]}, "facets": {"Disease": {"v": "Melanoma brain metastases", "s": "same", "ev": "q1"}, "Cells": {"v": "T cells and microglia", "s": "adds", "ev": "q2"}, "Method": {"v": "Mouse models", "s": "other", "ev": "q1"}}, "quotes": {"q1": {"ok": true, "t": "Here, we developed two mouse melanoma BrM models that recapitulate the disparate responses to ICB seen in patients."}, "q2": {"ok": true, "t": "BR1-responsive tumor cells express inflammatory programs that polarize microglia into reactive states, eliciting robust T cell recruitment."}, "q3": {"ok": true, "t": "In humans, BR1 and BR3 expression signatures correlate positively or negatively with T cell infiltration and BrM patient outcomes, respectively."}}, "figureLater": {"label": "Figure 3", "url": "https://cdn.ncbi.nlm.nih.gov/pmc/blobs/b362/11472687/8700d0da2380/nihpp-2024.08.26.609785v3-f0003.jpg", "caption": "Distinct CD8 + T cell subsets infiltrate ICB-responder compared to ICB-resistant BrMs. (A-E) scRNA-seq analysis of CD8 + T cells from untreated BR1, BR3, and PBS brains. (A) Volcano plot of BR1 versus BR3 differentially expressed genes (DEGs).", "why": "Shows which CD8+ T-cell subsets enter responding versus resistant brain metastases.", "model": "Picked by Nemotron 3.5 Super VL from 7 figures · 3.1 s", "pmc": "PMC11451731"}, "gaps": ["Preprint, not peer reviewed yet", "Mouse models: the link to patients rests on a signature correlation"], "prov": "Found through Tavily (recent preprints); it cites 3 of your seeds. Written by Nemotron 3.5 Lightning in 0.9 s. Added by the agent for Ana, 4 min ago.", "tldrLater": ["Why do melanoma brain metastases respond so differently to immunotherapy?", "Two mouse models that mirror responders and non-responders.", "In responders, tumour cells push microglia into reactive states that recruit T cells."], "notes": [], "say": "A preprint with mouse models of melanoma brain metastases. The agent is still reading it."}, "n4": {"label": "Lopez de Rodas 2025", "title": "Biological and clinical significance of tumour-infiltrating lymphocytes in the era of immunotherapy: a multidimensional approach", "meta": "Lopez de Rodas et al. · Nature Reviews Clinical Oncology · 2025", "pmid": "39820025", "doi": "10.1038/s41571-024-00984-x", "pmc": null, "cites": ["s1", "s2", "s3"], "abstract": "Immune-checkpoint inhibitors (ICIs) have improved clinical outcomes across several solid tumour types. Prominent efforts have focused on understanding the anticancer mechanisms of these agents, identifying biomarkers of response and uncovering resistance mechanisms to develop new immunotherapeutic approaches. This research has underscored the crucial roles of the tumour microenvironment and, particularly, tumour-infiltrating lymphocytes (TILs) in immune-mediated tumour elimination. Numerous studies have evaluated the prognostic and predictive value of TILs and the mechanisms that govern T cell dysfunction, fuelled by technical developments in single-cell transcriptomics, proteomics, high-dimensional spatial platforms and advanced computational models. However, questions remain regarding the definition of TILs, optimal strategies to study them, specific roles of different TIL subpopulations and their clinical implications in different treatment contexts. Additionally, most studies have focused on the abundance of major TIL subpopulations but have not developed standardized quantification strategies or analysed other crucial aspects such as their functional profile, spatial distribution and/or arrangement, tumour antigen-reactivity, clonal diversity and heterogeneity. In this Review, we discuss a conceptual framework for the systematic study of TILs and summarize the evidence regarding their biological properties and biomarker potential for ICI therapy. We also highlight opportunities, challenges and strategies to support future developments in this field.", "kind": "new", "x": 925, "y": 300, "type": "Review", "score": {"evidence": 0.26, "method": 0.3}, "why": {"evidence": ["A review that ", {"t": "cites three of your seeds", "ev": "c1"}, " and ", {"t": "sums up what TILs tell us about immunotherapy", "ev": "q2"}, ". Background, no new data."], "method": ["A review, but it ", {"t": "covers single-cell and spatial ways to study T cells", "ev": "q1"}, ". No method of its own."]}, "facets": {"Disease": {"v": "Many solid tumours", "s": "other", "ev": "q3"}, "Cells": {"v": "Tumour-infiltrating lymphocytes", "s": "same", "ev": "q2"}, "Method": {"v": "Review, no new data", "s": "other", "ev": "q2"}}, "quotes": {"q1": {"ok": true, "t": "Numerous studies have evaluated the prognostic and predictive value of TILs and the mechanisms that govern T cell dysfunction, fuelled by technical developments in single-cell transcriptomics, proteomics, high-dimensional spatial platforms and advanced computational models."}, "q2": {"ok": true, "t": "In this Review, we discuss a conceptual framework for the systematic study of TILs and summarize the evidence regarding their biological properties and biomarker potential for ICI therapy."}, "q3": {"ok": true, "t": "Immune-checkpoint inhibitors (ICIs) have improved clinical outcomes across several solid tumour types."}}, "figure": null, "gaps": ["No free full text, so no figures were read", "A review, so it has no new data of its own"], "prov": "Found through co-citation: it cites 3 of your seeds (PubMed). Written by Nemotron 3.5 Lightning in 0.6 s. Added by the agent for Ana, today 09:12.", "tldr": ["What do tumour-infiltrating lymphocytes tell us about immunotherapy?", "A review of single-cell, proteomic and spatial studies.", "Proposes a framework for studying TILs and their value as biomarkers."], "notes": [], "say": "A review. Useful background, but it has no new data, so it ranks low."}}, "EDGES": [["n1", "s1", "cites"], ["n1", "s2", "cites"], ["n1", "s3", "cites"], ["n2", "s2", "cites"], ["n2", "s3", "cites"], ["n2", "s4", "cites"], ["n3", "s2", "cites"], ["n3", "s3", "cites"], ["n3", "s5", "cites"], ["n4", "s1", "cites"], ["n4", "s2", "cites"], ["n4", "s3", "cites"], ["k1", "s1", "cites"], ["k1", "s2", "cites"], ["k1", "s3", "cites"], ["k1", "s4", "cites"], ["s2", "s1", "cites"], ["s3", "s2", "cites"], ["s4", "s1", "cites"], ["s4", "s2", "cites"], ["s4", "s3", "cites"], ["s5", "s1", "cites"], ["n1", "k1", "similar"]]};
+const P=DATA.P;let EDGES=DATA.EDGES.map(([a,b,t])=>({a,b,t}));
+// Citation counts: Semantic Scholar, fetched 2026-10-18.
+Object.entries({n1:24,n2:122,n3:0,n4:86,k1:12,s1:4551,s2:1930,s3:490,s4:175,s5:127}).forEach(([k,v])=>P[k].cited=v);
+Object.values(P).forEach(n=>{if(n.title===n.title.toUpperCase())n.title=n.title.charAt(0)+n.title.slice(1).toLowerCase().replace(/\bbrm\b/g,'BrM');n.year=+n.meta.slice(-4)});
+const PEOPLE={Ana:'var(--ana)',Igor:'var(--igor)',Ralph:'var(--ralph)'};
+const FIT_COLOR={high:'#104281',medium:'#2a78d6',low:'#86b6ef'};
+const FIT_LABEL={high:'High fit',medium:'Medium fit',low:'Low fit'};
+const STATUS={same:'✓ Same',adds:'＋ Adds',other:'≠ Other',unclear:'? Unclear'};
+const GOALS={evidence:{label:'New findings',desc:'Papers that tell you more about melanoma immune cells.'},method:{label:'Methods to reuse',desc:'Papers with techniques you could use in your own work.'}};
+const TYPES=['Research','Review'];
+const LINK_SUGG=['builds on','contradicts','same method','same cohort','compare with'];
+const CARD_W=380,GAP=24,LIST_W=340,CHAT_W=372,BOTTOM=68;
+const CLUSTERS=[{label:'Tumour ecosystem',x:500,y:85,w:300,h:240},{label:'Checkpoint response',x:1060,y:85,w:340,h:240},{label:'CD8 / CD4 T-cell states',x:800,y:425,w:380,h:315}];
+let STICKIES=[{x:1140,y:388,rot:-2,who:'Ana',paper:'n1',text:'Could we sort clusters like this from our biopsies?'},{x:480,y:690,rot:1.5,who:'Ralph',paper:null,text:'Grant needs melanoma-only cohorts.'}];
+const WORLD={minX:480,minY:70,maxX:1420,maxY:800};
+const defaultFilters=()=>({fit:new Set(['high','medium','low']),type:new Set(TYPES),peer:false,minCites:0,since:0,showDiscarded:false});
+const state={showFig:true,sel:null,goal:'evidence',details:false,tab:'evidence',catchup:null,hidden:new Set(),votes:{n2:{Ana:'keep',Igor:'discard'}},working:new Set(['n3']),
+  pulse:new Set(),hl:new Set(),hover:null,hoverEdge:null,led:null,changes:[],movedOnce:false,side:'right',list:false,chat:false,filters:defaultFilters(),tool:'select',open:null,ctxOff:false,chatLog:null};
+let cam={s:1,x:0,y:0},undoSnap=null,toastT,anim,drag=null;
+
+const $=s=>document.querySelector(s);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const isSugg=id=>!!P[id].why;
+const hid=id=>state.hidden.has(id);
+const shown=id=>!hid(id)||state.filters.showDiscarded;
+const fitOf=id=>{const s=P[id].score[state.goal];return s>=.7?'high':s>=.45?'medium':'low'};
+const votesOf=id=>state.votes[id]||{};
+const isNew=id=>P[id].kind==='new'&&!Object.keys(votesOf(id)).length&&!hid(id);
+const isSplit=id=>{const v=Object.values(votesOf(id));return v.includes('keep')&&v.includes('discard')};
+const square=id=>P[id].kind==='seed'||P[id].kind==='kept';
+const typeOf=n=>n.type==='Review'?'Review':'Research';
+const citeTxt=n=>n.cited==null?'':n.cited?` · cited ${n.cited.toLocaleString('en')}×`:' · not cited yet';
+const hasFig=n=>!!(n.figure||n.figureLater);
+const passes=id=>{if(!isSugg(id))return true;const n=P[id],f=state.filters;return f.fit.has(fitOf(id))&&f.type.has(typeOf(n))&&(!f.peer||n.type!=='Preprint')&&(n.cited||0)>=f.minCites&&n.year>=f.since};
+const filterCount=()=>{const f=state.filters;return(f.fit.size<3?1:0)+(f.type.size<2?1:0)+(f.peer?1:0)+(f.minCites?1:0)+(f.since?1:0)+(f.showDiscarded?1:0)};
+const liveEdges=()=>EDGES.filter(e=>shown(e.a)&&shown(e.b));
+const neighbours=id=>liveEdges().filter(e=>e.a===id||e.b===id).map(e=>({o:e.a===id?e.b:e.a,t:e.t,dir:e.a===id?'out':'in',e}));
+const rOf=id=>14+4*neighbours(id).length;
+const half=id=>square(id)?Math.round(rOf(id)*.8):rOf(id);
+const allSugg=()=>Object.keys(P).filter(id=>isSugg(id)&&shown(id));
+const ranking=()=>allSugg().filter(passes).sort((a,b)=>P[b].score[state.goal]-P[a].score[state.goal]);
+const focusSet=id=>new Set([id,...neighbours(id).map(n=>n.o)]);
+const avatar=p=>`<span class="av" style="background:${PEOPLE[p]}">${p[0]}</span>`;
+const size=()=>{const r=$('#canvas').getBoundingClientRect();return{w:r.width,h:r.height}};
+const insets=()=>({L:state.list?12+LIST_W:0,R:state.chat?12+CHAT_W:0});
+const figOf=n=>!n.figure?null:(n.figure.url?n.figure:n.figure[state.goal]);
+const enc=t=>encodeURIComponent(t).replace(/-/g,'%2D');
+const pubmedUrl=(n,q)=>{const w=q.replace(/\.$/,'').split(/\s+/);return `https://pubmed.ncbi.nlm.nih.gov/${n.pmid}/#:~:text=${enc(w.slice(0,6).join(' '))},${enc(w.slice(-4).join(' '))}`};
+const plainWhy=n=>n.why[state.goal].map(p=>typeof p==='string'?p:p.t).join('');
+const notesOf=id=>STICKIES.filter(t=>t.paper===id);
+const BOT='<svg width="13" height="13" viewBox="0 0 16 16"><rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="6" cy="9" r="1.2" fill="#fff"/><circle cx="10" cy="9" r="1.2" fill="#fff"/><path d="M8 4.5V2" stroke="#fff" stroke-width="1.5"/></svg>';
+
+/* ---------- camera ---------- */
+function overviewCam(){const {w,h}=size(),{L,R}=insets();const aw=w-L-R,bw=WORLD.maxX-WORLD.minX,bh=WORLD.maxY-WORLD.minY;const s=Math.min((aw-80)/bw,(h-120)/bh,1.15);
+  return{s,x:L+(aw-bw*s)/2-WORLD.minX*s,y:(h-40-bh*s)/2-WORLD.minY*s}}
+function focusCam(id){
+  const {w,h}=size(),{L,R}=insets();let a=1e9,b=1e9,c=-1e9,d=-1e9;
+  focusSet(id).forEach(i=>{const n=P[i],r=half(i);a=Math.min(a,n.x-r-62);c=Math.max(c,n.x+r+62);b=Math.min(b,n.y-r-28);d=Math.max(d,n.y+r+42)});
+  notesOf(id).forEach(t=>{a=Math.min(a,t.x);c=Math.max(c,t.x+170);b=Math.min(b,t.y);d=Math.max(d,t.y+95)});
+  const side=P[id].x>=(a+c)/2?'right':'left';
+  const x0=L,x1=w-R,rw=x1-x0-CARD_W-3*GAP,rh=h-2*GAP-56,bw=c-a,bh=d-b;const s=Math.max(.45,Math.min(1.15,rw/bw,rh/bh));
+  const cardLeft=side==='right'?x1-CARD_W-GAP:x0+GAP;
+  const x=side==='right'?(cardLeft-GAP)-c*s:(cardLeft+CARD_W+GAP)-a*s;
+  return{cam:{s,x,y:GAP+(rh-bh*s)/2-b*s},side,cardLeft};
+}
+function applyCam(){$('#cam').setAttribute('transform',`translate(${cam.x},${cam.y}) scale(${cam.s})`);drawLeader()}
+function camTo(t,ms=650){cancelAnimationFrame(anim);const f={...cam},t0=performance.now();
+  const step=now=>{const k=Math.min(1,(now-t0)/ms),e=k<.5?4*k*k*k:1-Math.pow(-2*k+2,3)/2;
+    cam={s:f.s+(t.s-f.s)*e,x:f.x+(t.x-f.x)*e,y:f.y+(t.y-f.y)*e};applyCam();if(k<1)anim=requestAnimationFrame(step)};anim=requestAnimationFrame(step)}
+const toScreen=id=>({x:P[id].x*cam.s+cam.x,y:P[id].y*cam.s+cam.y});
+const toWorld=(cx,cy)=>{const r=$('#canvas').getBoundingClientRect();return{x:(cx-r.left-cam.x)/cam.s,y:(cy-r.top-cam.y)/cam.s}};
+
+/* ---------- graph + notes ---------- */
+function bnd(id,ux,uy,pad){const r=half(id);return square(id)?r/Math.max(Math.abs(ux),Math.abs(uy))+pad:r+pad}
+function edgeText(e){return e.label?(e.t==='cites'?`${e.label} · cites`:e.label):(e.t==='user'?'linked':e.t)}
+function relText(x){return x.e.label||(x.t==='cites'?(x.dir==='in'?'cites it':'cited by it'):x.t==='user'?'linked':x.t)}
+function drawGraph(){
+  const sel=state.sel&&shown(state.sel)?state.sel:null,F=sel?focusSet(sel):null;let h='',labels='';
+  const pul=new Set([...state.pulse,...state.hl]);
+  CLUSTERS.forEach(c=>h+=`<g class="cluster"><rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" rx="18" ${F?'opacity=".55"':''}/><text x="${c.x+16}" y="${c.y+24}">${c.label}</text></g>`);
+  liveEdges().forEach(e=>{
+    const {a,b,t}=e,i=EDGES.indexOf(e),A=P[a],B=P[b],dx=B.x-A.x,dy=B.y-A.y,dd=Math.hypot(dx,dy)||1,ux=dx/dd,uy=dy/dd;
+    const hov=state.hoverEdge===i||state.led===i,on=(sel&&(a===sel||b===sel))||hov,fade=!hov&&((sel&&!on)||!passes(a)||!passes(b)),mine=t==='user'||!!e.label,coll=!sel&&!mine&&!isSugg(a)&&!isSugg(b);
+    const x1=A.x+ux*bnd(a,ux,uy,3),y1=A.y+uy*bnd(a,ux,uy,3),x2=B.x-ux*bnd(b,ux,uy,t==='cites'?6:3),y2=B.y-uy*bnd(b,ux,uy,t==='cites'?6:3);
+    h+=`<line class="ehit" data-edge="${i}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"/>`;
+    h+=`<line class="edge ${t} ${mine?'mine':''} ${on?'on':''} ${fade?'faded':''} ${coll?'coll':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${t==='cites'?`marker-end="url(#${on?'aon':'a'})"`:''}/>`;
+    if(mine||on){const mx=(x1+x2)/2,my=(y1+y2)/2,tx=edgeText(e);
+      labels+=mine?`<g class="elpill ${fade?'faded':''}" data-edge="${i}" transform="translate(${mx},${my})"><rect x="${-(tx.length*3.2+9)}" y="-10" width="${tx.length*6.4+18}" height="20" rx="10"/><text y="4" text-anchor="middle">${esc(tx)}</text></g>`
+        :`<text class="elbl" data-edge="${i}" x="${mx}" y="${my-5}" text-anchor="middle">${tx}</text>`}
+  });
+  STICKIES.forEach(t=>{if(!t.paper||!shown(t.paper))return;const n=P[t.paper],r=half(t.paper),tx=t.x+3,ty=t.y+52,dx=tx-n.x,dy=ty-n.y,dd=Math.hypot(dx,dy)||1;
+    h+=`<line class="pinline ${F&&t.paper!==sel?'faded':''}" x1="${n.x+dx/dd*(r+3)}" y1="${n.y+dy/dd*(r+3)}" x2="${tx}" y2="${ty}"/>`});
+  Object.keys(P).forEach(id=>{
+    if(!shown(id))return;const n=P[id],r=half(id),dim=(F&&!F.has(id))?'dim':(!passes(id)||hid(id))?'fdim':'';
+    let s=`<g class="node ${dim}" data-id="${id}">`;
+    if(state.hover===id&&!drag)s+=`<circle cx="${n.x}" cy="${n.y}" r="${r+26}" fill="transparent"/>`;
+    if(pul.has(id))s+=square(id)?`<rect class="pulse" x="${n.x-r-9}" y="${n.y-r-9}" width="${2*r+18}" height="${2*r+18}" rx="12"/>`:`<circle class="pulse" cx="${n.x}" cy="${n.y}" r="${r+9}"/>`;
+    if(sel===id)s+=square(id)?`<rect x="${n.x-r-6}" y="${n.y-r-6}" width="${2*r+12}" height="${2*r+12}" rx="11" fill="none" stroke="#0b0b0b" stroke-width="2"/>`:`<circle cx="${n.x}" cy="${n.y}" r="${r+6}" fill="none" stroke="#0b0b0b" stroke-width="2"/>`;
+    if(square(id)){s+=`<rect x="${n.x-r}" y="${n.y-r}" width="${2*r}" height="${2*r}" rx="8" fill="#fff" stroke="#0b0b0b" stroke-width="2.2"/><path d="M${n.x-5} ${n.y-7} h10 v14 l-5 -4 l-5 4 z" fill="#0b0b0b"/>`;
+      if(n.kind==='kept')s+=`<circle cx="${n.x+r}" cy="${n.y-r}" r="8.5" fill="#0b0b0b" stroke="#fff" stroke-width="2"/><path d="M${n.x+r-4} ${n.y-r} l3 3 l5 -6" stroke="#fff" stroke-width="2" fill="none"/>`}
+    else s+=`<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${FIT_COLOR[fitOf(id)]}"/>`;
+    if(state.working.has(id))s+=`<circle cx="${n.x}" cy="${n.y}" r="${r+11}" fill="none" stroke="#52514e" stroke-width="2" stroke-dasharray="4 7"><animateTransform attributeName="transform" type="rotate" from="0 ${n.x} ${n.y}" to="360 ${n.x} ${n.y}" dur="6s" repeatCount="indefinite"/></circle>`;
+    if(isNew(id))s+=`<g transform="translate(${n.x+r*.45},${n.y-r-12})"><rect width="34" height="16" rx="8" fill="#0b0b0b"/><text x="17" y="11.6" text-anchor="middle" font-size="9" font-weight="700" fill="#fff" letter-spacing=".6">NEW</text></g>`;
+    s+=`<text class="lbl" x="${n.x}" y="${n.y+r+17}" text-anchor="middle">${n.label}</text>`;
+    const sub=hid(id)?'Discarded':state.working.has(id)?'Agent is reading…':'';
+    if(sub)s+=`<text class="sub" x="${n.x}" y="${n.y+r+31}" text-anchor="middle">${sub}</text>`;
+    h+=s+'</g>';
+  });
+  h+=labels;
+  if(state.hover&&P[state.hover]&&shown(state.hover)&&!drag&&state.tool!=='note'){const n=P[state.hover],r=half(state.hover);
+    h+=`<g class="handle" data-handle="${state.hover}" transform="translate(${n.x+r+13},${n.y})"><title>Drag onto another paper to link them</title><circle r="9"/><path d="M-4 0h8M0 -4v8"/></g>`}
+  $('#world').innerHTML=h;updateNoteDim();
+}
+function drawNotes(){
+  $('#notes').innerHTML=STICKIES.map((t,i)=>`<foreignObject x="${t.x}" y="${t.y}" width="180" height="160" data-note="${i}"><div xmlns="http://www.w3.org/1999/xhtml" class="sticky" style="transform:rotate(${t.rot}deg)">${t.paper?'<span class="pin" title="Pinned to a paper"></span>':''}<div class="ntext">${esc(t.text)}</div><div class="who"><span class="dot" style="background:${PEOPLE[t.who]}"></span>${t.who}</div></div></foreignObject>`).join('');
+  updateNoteDim();
+}
+function positionNotes(){document.querySelectorAll('#notes foreignObject').forEach(fo=>{const t=STICKIES[+fo.dataset.note];if(t){fo.setAttribute('x',t.x);fo.setAttribute('y',t.y)}})}
+function updateNoteDim(){document.querySelectorAll('#notes foreignObject').forEach(fo=>{const t=STICKIES[+fo.dataset.note];fo.classList.toggle('note-dim',!!state.sel&&t&&t.paper!==state.sel)})}
+function drawLeader(){
+  const L=$('#leader'),c=$('#card');if(!state.sel||c.classList.contains('hide')){L.style.display='none';return}
+  const p=toScreen(state.sel),r=half(state.sel)*cam.s+8,left=parseFloat(c.style.left),top=parseFloat(c.style.top);
+  const cy=Math.min(Math.max(p.y,top+28),top+c.offsetHeight-28);
+  const ex=state.side==='right'?left-8:left+CARD_W+8;const sx=state.side==='right'?p.x+r:p.x-r;
+  if((state.side==='right'&&ex-sx<12)||(state.side==='left'&&sx-ex<12)){L.style.display='none'}else{L.style.display='';L.setAttribute('d',`M${sx} ${p.y} L${ex} ${cy}`)}
+  c.style.setProperty('--py',`${cy-top}px`);
+}
+
+/* ---------- card ---------- */
+function whyHtml(n){return n.why[state.goal].map(p=>typeof p==='string'?p:`<span class="ev-u ${p.unv?'unv':''}" data-ev="${p.ev}">${p.t}</span>${p.unv?'<span class="wmark" title="Not found word for word">⚠</span>':''}`).join('')}
+function facetsHtml(n){
+  const order=state.goal==='method'?['Method','Cells','Disease']:['Disease','Cells','Method'];
+  return `<div class="match"><div class="mlabel">Compared with your seeds</div>${order.map((k,i)=>{const f=n.facets[k];
+    return `<div class="mrow ${i===0?'primary':''}" data-ev="${f.ev||'none'}"><span class="k">${k}</span><span class="v">${f.v}</span><span class="s ${f.s}">${STATUS[f.s]}</span></div>`}).join('')}</div>`;
+}
+const coverHtml=(n,f)=>f?`<button class="cover" data-act="fig" title="Open the figure"><img src="${f.url}" alt="${f.label} from the paper"><span class="figtag">${f.label} · from the paper</span></button>`:(n.loading?`<div class="cover pending"><div class="reading"><span class="spin"></span>Finding the most relevant figure…</div></div>`:'');
+function tourHtml(id){
+  const c=state.catchup;if(!c)return'';const last=c.i===c.list.length-1;
+  return `<div class="tour"><div class="r1"><span class="av">${BOT}</span>CATCH-UP · ${c.i+1} OF ${c.list.length}<span class="dots">${c.list.map((_,k)=>`<i class="${k===c.i?'on':''}"></i>`).join('')}</span>
+    <span class="nav"><button data-act="prev" ${c.i===0?'disabled':''} title="Previous">‹</button><button data-act="${last?'done':'next'}">${last?'Done':'Next ›'}</button><button data-act="stop" title="End the catch-up">×</button></span></div>
+    <div class="say">${P[id].say||''}</div></div>`;
+}
+function detailsHtml(id){
+  const n=P[id],tab=state.tab,notes=notesOf(id);
+  const tabs=`<div class="tabs" role="tablist">${[['evidence','Evidence'],['summary','Summary'],['notes',`Notes${notes.length?' ('+notes.length+')':''}`]].map(([k,l])=>`<button role="tab" data-tab="${k}" aria-selected="${tab===k}">${l}</button>`).join('')}</div>`;
+  let body='';
+  if(tab==='evidence'){
+    body+=Object.entries(n.quotes).map(([k,q])=>`<div class="q ${q.ok?'':'unv'}"><blockquote>“${q.t}”</blockquote><div class="qm">${q.ok?`<span class="okt">✓ In the abstract, word for word</span> · <a data-act="pubmed" data-q="${k}">PubMed ↗</a>`:`<span class="bad">⚠ Not in the abstract word for word.</span> Closest: “${q.closest}”`}</div></div>`).join('');
+    body+=`<div class="h5">Cites ${n.cites.length} of your seeds</div><div class="seedlinks">${n.cites.map(s=>`<a data-pulse="${s}" data-open="${s}">${P[s].label}</a>`).join(', ')}</div>`;
+    const f=figOf(n);
+    if(f)body+=`<div class="h5">Key figure</div><div class="figrow"><img class="thumb" src="${f.url}" alt="${f.label}" data-act="fig"><div><div class="cap"><b>${f.label}</b> ${f.caption}</div><div class="why2"><span class="ai">AI</span>${f.why}</div><div class="prov" style="margin-top:4px">${f.model}</div></div></div>`;
+    else if(n.loading)body+=`<div class="h5">Key figure</div><div class="reading"><span class="spin"></span>Looking for the most relevant figure…</div>`;
+    body+=`<div class="h5">Not checked</div><ul class="gaps">${n.gaps.map(g=>`<li>${g}</li>`).join('')}</ul><div class="prov">${n.prov}</div>`;
+  }
+  if(tab==='summary')body+=n.loading?`<div class="reading"><span class="spin"></span>Summarising…</div><div class="skel"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:60%"></div>`
+    :`<div class="h5" style="margin-top:0"><span class="ai">AI</span>In three lines</div><ol class="tldr">${n.tldr.map(t=>`<li>${t}</li>`).join('')}</ol><div class="h5">Abstract</div><div class="abs">${Object.values(n.quotes).filter(q=>q.ok).reduce((a,q)=>a.replace(q.t,`<mark>${q.t}</mark>`),n.abstract)}</div>`;
+  if(tab==='notes')body+=`${notes.map(x=>`<div class="note">${avatar(x.who)}<div>${esc(x.text)||'<i style="color:var(--muted)">Empty note</i>'}</div></div>`).join('')||'<div class="meta" style="margin-bottom:8px">No notes on this paper yet. Drag a note from the toolbar next to it, or type one here.</div>'}<input class="addnote" id="addnote" placeholder="Add a note. Everyone on the board sees it.">`;
+  body+=`<div class="deeper"><button class="btn" data-act="openpaper">Open full paper</button><button class="btn text" data-act="ask">Ask the agent about it</button></div>`;
+  return `<div class="details">${tabs}${body}</div>`;
+}
+function suggCard(id){
+  const n=P[id],v=votesOf(id),c=state.catchup;
+  const kick=[`<span class="dot" style="background:${FIT_COLOR[fitOf(id)]};width:9px;height:9px"></span><b title="Fit for ${GOALS[state.goal].label.toLowerCase()}">${FIT_LABEL[fitOf(id)]}</b>`];
+  if(isNew(id)&&!c)kick.push('New');
+  if(n.kind==='kept')kick.push('Kept by you');
+  if(hid(id))kick.push('Discarded');
+  if(n.type==='Preprint')kick.push('<span class="flag">Preprint</span>');if(n.type==='Review')kick.push('Review');
+  const others=Object.entries(v).filter(([p])=>p!=='Ralph');
+  const votes=others.length?`<div class="votes">${isSplit(id)?'<span class="split">Split vote:</span>':''}${others.map(([p,d])=>`${avatar(p)}${p} ${d==='keep'?'kept it':'discarded it'}`).join(' · ')}</div>`:'';
+  const keep=n.kind==='kept'?`<button class="btn" data-act="more">Find more like this</button>`:hid(id)?`<button class="btn" data-act="restore">Bring it back</button>`:`<button class="btn" data-act="discard">Discard</button><button class="btn primary" data-act="keep">Keep</button>`;
+  return `${c?'':'<button class="x" data-act="close" title="Close">×</button>'}${tourHtml(id)}${state.showFig?coverHtml(n,figOf(n)):''}<div class="chead"><div class="kick">${kick.join('<span class="sep">·</span>')}</div>
+    <h2 class="ttl"><a href="https://doi.org/${n.doi}" target="_blank">${n.title}</a></h2><div class="meta">${n.meta}${citeTxt(n)}</div></div>
+    <div class="cbody"><p class="why">${whyHtml(n)}</p>${facetsHtml(n)}
+      ${state.working.has(id)?'<div class="reading"><span class="spin"></span>Still reading. Details fill in as they’re ready.</div>':''}${votes}
+      ${state.details?detailsHtml(id):''}</div>
+    <div class="cfoot ${state.details?'open':''}"><button class="more" data-act="details">${state.details?'Less':'Details'} <span class="chev">⌄</span></button><span class="grow"></span>${keep}</div>`;
+}
+function collectionCard(id){
+  const n=P[id],linked=neighbours(id).filter(x=>isSugg(x.o));
+  return `<button class="x" data-act="close" title="Close">×</button>${state.showFig?coverHtml(n,figOf(n)):''}<div class="chead"><div class="kick"><span class="sq" style="width:10px;height:10px"></span><b>In your collection</b><span class="sep">·</span>${n.kind==='seed'?`Seed from ${n.by}`:`Kept by ${n.keptBy}`}</div>
+    <h2 class="ttl"><a href="https://doi.org/${n.doi}" target="_blank">${n.title}</a></h2><div class="meta">${n.meta}${citeTxt(n)}</div></div>
+    <div class="cbody"><div class="h5">${linked.length} suggestion${linked.length===1?'':'s'} linked to it</div>
+      ${linked.map(x=>`<div class="linked" data-open="${x.o}" data-pulse="${x.o}"><span class="sw" style="background:${FIT_COLOR[fitOf(x.o)]}"></span><b>${P[x.o].label}</b><span class="r">${relText(x)}</span></div>`).join('')||'<div class="meta">None yet.</div>'}</div>
+    <div class="cfoot"><span class="grow"></span><button class="btn" data-act="more">Find more like this</button></div>`;
+}
+function renderCard(){
+  const c=$('#card'),id=state.sel;
+  if(!id||!shown(id)){c.classList.add('hide');$('#leader').style.display='none';return}
+  const body=c.querySelector('.cbody'),keep=body?body.scrollTop:0;
+  c.innerHTML=isSugg(id)?suggCard(id):collectionCard(id);
+  c.classList.remove('hide','left','right');c.classList.add(state.side);
+  c.classList.toggle('dopen',state.details&&isSugg(id));c.classList.toggle('touring',!!state.catchup);
+  const nb=c.querySelector('.cbody');if(nb)nb.scrollTop=keep;
+  const an=$('#addnote');if(an)an.addEventListener('keydown',e=>{if(e.key==='Enter'&&an.value.trim()){addNoteFor(id,an.value.trim())}});
+}
+function placeCard(f){
+  const c=$('#card');if(!state.sel||c.classList.contains('hide'))return;
+  const {h}=size(),p={x:P[state.sel].x*f.cam.s+f.cam.x,y:P[state.sel].y*f.cam.s+f.cam.y};
+  c.style.maxHeight=(h-GAP-BOTTOM)+'px';const ch=Math.min(c.offsetHeight,h-GAP-BOTTOM);
+  const minTop=(f.side==='left'&&!state.list)?56:GAP;
+  c.style.left=f.cardLeft+'px';c.style.top=Math.max(minTop,Math.min(p.y-80,h-ch-BOTTOM))+'px';
+}
+function open(id,{fly=true}={}){
+  if(P[id].loading&&!P[id]._t)P[id]._t=setTimeout(()=>finishReading(id),5000);
+  state.sel=id;state.pulse=new Set();hidePop();
+  const f=focusCam(id);state.side=f.side;
+  drawGraph();renderCard();placeCard(f);drawList();drawChat();
+  if(fly)camTo(f.cam);else{cam=f.cam;applyCam()}
+  setTimeout(drawLeader,520);
+}
+function close(){state.sel=null;state.details=false;state.catchup=null;hidePop();drawGraph();renderCard();drawList();drawChat();camTo(overviewCam())}
+function refreshCard(){if(!state.sel)return;renderCard();const f=focusCam(state.sel);state.side=f.side;$('#card').classList.remove('left','right');$('#card').classList.add(f.side);placeCard(f);drawLeader()}
+function refocus(){if(state.sel){const f=focusCam(state.sel);state.side=f.side;renderCard();placeCard(f);camTo(f.cam,450)}else camTo(overviewCam(),450)}
+
+/* ---------- list ---------- */
+function drawList(){
+  const l=$('#list');l.hidden=!state.list;$('#listBtn').hidden=state.list;
+  const ids=ranking(),total=allSugg().length;$('#listCount').textContent=ids.length;
+  if(!state.list)return;
+  const keep=l.querySelector('.rows')?.scrollTop||0;
+  l.innerHTML=`<header><div><div class="h">Ranked for ${GOALS[state.goal].label.toLowerCase()}</div><small>${ids.length} of ${total} suggestions${filterCount()?` · filtered · <a href="#" data-act="clearf">clear</a>`:''}</small></div><button class="xs" data-act="closelist" title="Hide the list">×</button></header>
+  <div class="rows">${ids.map((id,i)=>{const n=P[id],f=figOf(n);
+    const k=[`<span class="sw" style="background:${FIT_COLOR[fitOf(id)]};width:9px;height:9px"></span>${FIT_LABEL[fitOf(id)]}`];
+    if(isNew(id))k.push('New');if(n.kind==='kept')k.push('Kept');if(hid(id))k.push('Discarded');if(isSplit(id))k.push('<span class="flag">Split vote</span>');
+    if(n.type==='Preprint')k.push('<span class="flag">Preprint</span>');if(n.type==='Review')k.push('Review');
+    return `<div class="lrow ${state.sel===id?'sel':''}" data-open="${id}" data-pulse="${id}"><div class="rk">${i+1}</div><div><div class="lkick">${k.join(' · ')}</div><div class="lt">${n.title}</div><div class="lm">${n.meta}${citeTxt(n)}</div><div class="lwhy">${plainWhy(n)}</div></div>${f?`<img class="lthumb" src="${f.url}" alt="">`:`<div class="lthumb none">${n.loading?'<span class="spin"></span>':'no figure'}</div>`}</div>`}).join('')||`<div class="empty">No papers match your filters. <button data-act="clearf">Clear filters</button></div>`}</div>`;
+  l.querySelector('.rows').scrollTop=keep;
+}
+
+/* ---------- chat ---------- */
+const pm=id=>`<a class="pmn" data-open="${id}" data-pulse="${id}">${P[id].label}</a>`;
+function initChat(){state.chatLog=[
+  {u:'Find more papers around our CD8 seeds. Melanoma first.'},
+  {tool:'search · find_candidates',d:'29 papers cite 3 or more of your seeds (PubMed citation links)',l:'Nemotron 3.5 Lightning · 6.2 s · $0.01'},
+  {tool:'score_candidates',d:'Scored 28 papers in parallel · 1 claim unverified',l:'Nemotron 3.5 Lightning · 14 s · $0.02'},
+  {tool:'rerank',d:'Ranked them with all seed abstracts in context',l:'Nemotron 3.5 Super VL · 9 s · $0.03'},
+  {tool:'canvas · add_papers',d:'Placed 4 papers next to their closest cluster',l:'0.3 s'},
+  {a:`I added 4 papers. The strongest is ${pm('n1')}: it isolates tumour-reactive CD8+ T cells from melanoma metastases. ${pm('n2')} is mostly a method paper, so it ranks low for new findings but high for methods to reuse. I skipped Oliveira 2022 because it’s already one of your seeds.`}]}
+function drawChat(){
+  const c=$('#chat');c.hidden=!state.chat;$('#chatBtn').setAttribute('aria-pressed',state.chat);if(!state.chat)return;
+  if(!state.chatLog)initChat();
+  const keep=c.querySelector('.body')?.scrollTop;
+  const sel=state.sel&&!state.ctxOff?state.sel:null;
+  c.innerHTML=`<header><div><div class="h">Agent</div><small>Only you see this chat. What the agent adds to the board, everyone sees.</small></div><button class="xs" data-act="closechat" title="Hide the chat">×</button></header>
+  <div class="body">${state.chatLog.map(m=>m.u?`<div class="msg-u">${esc(m.u)}</div>`:m.tool?`<div class="tool"><div class="h"><span class="okc">✓</span>${m.tool}</div><div class="d">${m.d}</div><div class="lbl2">${m.l}</div></div>`:m.wait?`<div class="msg-a"><span class="spin" style="display:inline-block"></span></div>`:`<div class="msg-a">${m.a}${m.canned?'<span class="canned">Canned reply in this mockup.</span>':''}</div>`).join('')}</div>
+  <div class="foot"><div class="ctx">Context: ${sel?`<span class="ctxchip"><span class="${square(sel)?'sq':'sw'}" style="${square(sel)?'width:9px;height:9px':`background:${FIT_COLOR[fitOf(sel)]};width:9px;height:9px`}"></span>${P[sel].label}<button data-act="ctxoff" title="Remove">×</button></span>`:'the whole board'}</div>
+  <textarea id="chatIn" placeholder="Ask about ${sel?'this paper':'the board'}…"></textarea></div>`;
+  const b=c.querySelector('.body');b.scrollTop=keep==null?b.scrollHeight:keep;
+  $('#chatIn').addEventListener('keydown',e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendChat(e.target.value.trim())}});
+}
+function sendChat(t){if(!t)return;state.chatLog.push({u:t},{wait:true});drawChat();$('#chat .body').scrollTop=1e6;
+  setTimeout(()=>{state.chatLog.pop();state.chatLog.push({a:`Two of these papers look at where T cells sit in tissue: ${pm('n2')} maps T-cell clones on tissue sections, and ${pm('n1')} isolates T cells clustered with tumour cells. I’ve highlighted both on your board.`,canned:true});
+    state.hl=new Set(['n1','n2']);drawGraph();drawChat();$('#chat .body').scrollTop=1e6;setTimeout(()=>{state.hl=new Set();drawGraph()},6000)},900)}
+
+/* ---------- controls ---------- */
+function drawControls(){
+  $('#rankBtn').innerHTML=`Looking for <b>${GOALS[state.goal].label}</b> <span style="font-size:11px;margin-left:2px">▾</span>`;
+  const n=filterCount();$('#filterBtn').innerHTML=`<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 3.5h12M4.5 8h7M7 12.5h2"/></svg>Filter${n?` <span class="badge">${n}</span>`:''}`;
+  ['rank','filter','help'].forEach(k=>{$('#'+k+'Btn').setAttribute('aria-expanded',state.open===k);$('#'+k+'Pop').hidden=state.open!==k});
+  if(state.open==='rank')$('#rankPop').innerHTML=`<h6>What are you looking for?</h6>${Object.entries(GOALS).map(([k,g])=>`<div class="opt ${state.goal===k?'on':''}" data-goal="${k}"><span class="radio"></span><div><b>${g.label}</b>${g.desc}</div></div>`).join('')}<div class="mnote" style="margin-top:8px">The colours on the board and the order of the list follow this choice.</div>`;
+  if(state.open==='filter'){const f=state.filters,single=k=>k==='since'||k==='minCites';
+    const chip=(key,val,label,pre='')=>`<button class="fchip" data-f="${key}" data-v="${val}" aria-pressed="${single(key)?f[key]===val:f[key].has(val)}">${pre}${label}</button>`;
+    const best=allSugg().sort((a,b)=>P[b].score[state.goal]-P[a].score[state.goal])[0];
+    $('#filterPop').innerHTML=`<h6>Fit</h6><div class="chips">${['high','medium','low'].map(k=>chip('fit',k,FIT_LABEL[k].replace(' fit',''),`<span class="sw" style="background:${FIT_COLOR[k]};width:9px;height:9px;box-shadow:0 0 0 1.5px #fff"></span>`)).join('')}</div>
+      <h6>Type</h6><div class="chips">${TYPES.map(t=>chip('type',t,t)).join('')}</div>
+      <h6>Quality</h6><label class="chk" style="margin-top:0"><input type="checkbox" data-f="peer" ${f.peer?'checked':''}> Peer reviewed only (hides preprints)</label>
+      <div class="sub6">Cited at least</div><div class="chips">${[[0,'Any'],[10,'10×'],[50,'50×']].map(([v,l])=>chip('minCites',v,l)).join('')}</div>
+      <div class="mnote" style="border:0;padding-top:6px;margin-top:4px">New papers haven’t had time to be cited${best?`: the best match, ${P[best].label}, has ${P[best].cited}`:''}. Counts from Semantic Scholar.</div>
+      <h6>Published</h6><div class="chips">${[[0,'Any time'],[2023,'Since 2023'],[2025,'Since 2025']].map(([v,l])=>chip('since',v,l)).join('')}</div>
+      <label class="chk"><input type="checkbox" data-f="showDiscarded" ${f.showDiscarded?'checked':''}> Show discarded papers${state.hidden.size?` (${state.hidden.size})`:''}</label>
+      <div class="pfoot">Showing ${ranking().length} of ${allSugg().filter(id=>!hid(id)||f.showDiscarded).length} suggestions<button data-act="clearf">Clear</button></div>`}
+}
+function filtersChanged(){drawGraph();drawList();drawControls();if(state.sel)renderCard()}
+
+/* ---------- popover ---------- */
+const pop=$('#pop');
+function showPop(el){
+  const n=P[state.sel],ev=el.dataset.ev;if(!n||!isSugg(state.sel))return;let h='';
+  if(ev==='c1'){h=`<div class="pm">Cites ${n.cites.length} of your seeds</div><div class="seeds">${n.cites.map(s=>P[s].label).join(' · ')}</div><div class="pm">From PubMed’s citation links. A citation is a link, not agreement.</div>`;state.pulse=new Set(n.cites);drawGraph()}
+  else if(ev==='none')h=`<div class="pm">The abstract doesn’t say, so this is marked unclear.</div>`;
+  else{const q=n.quotes[ev];h=q.ok?`<blockquote>“${q.t}”</blockquote><div class="pm"><b>✓</b> In the abstract, word for word · click to open PubMed</div>`:`<blockquote>“${q.t}”</blockquote><div class="pm"><b class="w">⚠</b> Not found word for word. Closest sentence: “${q.closest}”</div>`}
+  pop.innerHTML=h;pop.hidden=false;const r=el.getBoundingClientRect();
+  let x=Math.max(12,Math.min(r.left,innerWidth-336)),y=r.bottom+10;if(y+pop.offsetHeight>innerHeight-12)y=r.top-pop.offsetHeight-10;
+  pop.style.left=x+'px';pop.style.top=y+'px';el.classList.add('on');
+}
+function hidePop(){pop.hidden=true;document.querySelectorAll('.ev-u.on').forEach(e=>e.classList.remove('on'));if(state.pulse.size){state.pulse=new Set();drawGraph()}}
+
+/* ---------- catch-up, votes, toast ---------- */
+function startCatchup(){const list=ranking().filter(isNew);if(!list.length){toast(filterCount()?'Nothing new matches your filters.':'Nothing new since your last visit.');return}state.catchup={list,i:0};state.details=false;open(list[0])}
+function stepCatch(d){const c=state.catchup;c.i=Math.max(0,Math.min(c.list.length-1,c.i+d));state.details=false;open(c.list[c.i])}
+function afterVote(){
+  const c=state.catchup;if(!c){refreshCard();drawGraph();drawList();return}
+  c.list=c.list.filter(isNew);
+  if(!c.list.length){state.catchup=null;setTimeout(()=>{close();toast('You’re caught up.')},700);return}
+  c.i=Math.min(c.i,c.list.length-1);setTimeout(()=>open(c.list[c.i]),700);
+}
+function toast(m,undo){const t=$('#toast');t.innerHTML=`<span>${m}</span>${undo?'<button id="undo">Undo</button>':''}`;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,5000);if(undo)$('#undo').onclick=typeof undo==='function'?undo:doUndo}
+function snap(){undoSnap=JSON.stringify({k:Object.fromEntries(Object.entries(P).map(([i,n])=>[i,[n.kind,n.keptBy]])),h:[...state.hidden],v:state.votes,sel:state.sel})}
+function doUndo(){const s=JSON.parse(undoSnap);Object.entries(s.k).forEach(([i,[k,b]])=>{P[i].kind=k;P[i].keptBy=b});state.hidden=new Set(s.h);state.votes=s.v;$('#toast').hidden=true;state.catchup=null;drawChrome();if(s.sel)open(s.sel);else{drawGraph();drawList()}}
+function drawChrome(){$('#newCount').textContent=Object.keys(P).filter(isNew).length;drawControls()}
+function finishReading(id){const n=P[id];if(!n.loading)return;n.loading=false;n.figure=n.figureLater;n.tldr=n.tldrLater;state.working.delete(id);n.say='A preprint with mouse models of melanoma brain metastases. The agent just finished reading it.';drawGraph();drawList();if(state.sel===id)refreshCard();toast(`The agent finished reading ${n.label}.`)}
+function openLightbox(id){const n=P[id],f=figOf(n);if(!f)return;$('#lbimg').src=f.url;$('#lbimg').alt=f.label;
+  $('#lbcap').innerHTML=`<b>${f.label}</b> ${f.caption}${f.why?`<div style="margin-top:6px"><span class="ai">AI</span>${f.why}</div>`:''}<div class="credit">From ${n.meta} · via <a href="https://pmc.ncbi.nlm.nih.gov/articles/${f.pmc}/" target="_blank">PubMed Central ↗</a></div>`;$('#lightbox').hidden=false}
+
+/* ---------- notes ---------- */
+function nearestPaper(x,y,max=200){let best=null,bd=max;Object.keys(P).forEach(id=>{if(!shown(id))return;const d=Math.hypot(P[id].x-x,P[id].y-y);if(d<bd){bd=d;best=id}});return best}
+function attachNote(t,p){t.paper=p;if(!p)return;const r=half(p),k=STICKIES.filter(x=>x!==t&&x.paper===p).length;t.x=P[p].x+r+24;t.y=P[p].y-56+k*30}
+function newNote(text){const t={x:0,y:0,rot:+(Math.random()*4-2).toFixed(1),who:'Ralph',paper:null,text};STICKIES.push(t);return t}
+function addNoteAt(wx,wy,text=''){
+  const t=newNote(text);t.x=wx-80;t.y=wy-46;const p=nearestPaper(wx,wy,170);if(p)attachNote(t,p);
+  drawNotes();drawGraph();markChange(p?`Added a note on ${P[p].label}`:'Added a note');
+  toast(p?`Note pinned to ${P[p].label}. It moves with the paper and shows in its card.`:'Note added. Drop it on a paper to pin it there.');
+  if(state.sel)renderCard();if(!text)editNote(STICKIES.length-1);
+}
+function addNoteFor(id,text,edit){const t=newNote(text||'');attachNote(t,id);drawNotes();drawGraph();markChange(`Added a note on ${P[id].label}`);if(state.sel===id){state.tab='notes';refreshCard()}if(edit)editNote(STICKIES.length-1)}
+function dropNote(i){const t=STICKIES[i],was=t.paper,p=nearestPaper(t.x+80,t.y+46,170);
+  if(p){attachNote(t,p);if(p!==was)toast(`Pinned to ${P[p].label}. It moves with the paper.`)}else{t.paper=null;if(was)toast('Note unpinned.')}
+  if(p!==was)markChange(p?`Pinned a note to ${P[p].label}`:'Unpinned a note');
+  drawNotes();drawGraph();if(state.sel)renderCard()}
+function editNote(i){const fo=document.querySelector(`#notes [data-note="${i}"]`);if(!fo)return;const el=fo.querySelector('.ntext');el.contentEditable='true';el.focus();
+  const r=document.createRange();r.selectNodeContents(el);r.collapse(false);const s=getSelection();s.removeAllRanges();s.addRange(r);
+  el.oninput=()=>{STICKIES[i].text=el.innerText};
+  el.onkeydown=e=>{if(e.key==='Escape'||(e.key==='Enter'&&!e.shiftKey)){e.preventDefault();el.blur()}};
+  el.onblur=()=>{el.contentEditable='false';STICKIES[i].text=el.innerText.trim();if(!STICKIES[i].text){STICKIES.splice(i,1);drawNotes();drawGraph()}if(state.sel)renderCard()};
+}
+function setTool(t){state.tool=t;$('#noteTool').classList.toggle('on',t==='note');$('#canvas').classList.toggle('notemode',t==='note');drawGraph()}
+
+/* ---------- links ---------- */
+function finishLink(from,e){
+  const el=document.elementFromPoint(e.clientX,e.clientY),g=el&&el.closest('[data-id]');let to=g?g.dataset.id:null;
+  if(!to){const w=toWorld(e.clientX,e.clientY);to=nearestPaper(w.x,w.y,70)}
+  if(!to||to===from){toast('Drop the link on another paper.');drawGraph();return}
+  const ex=EDGES.findIndex(x=>(x.a===from&&x.b===to)||(x.a===to&&x.b===from));
+  if(ex>=0){toast('These papers are already linked. You can name that link.');openLinkEditor(ex);return}
+  EDGES.push({a:from,b:to,t:'user',label:'',by:'Ralph'});markChange(`Linked ${P[from].label} and ${P[to].label}`);drawGraph();if(state.sel)refreshCard();openLinkEditor(EDGES.length-1);
+}
+function openLinkEditor(i){
+  const e=EDGES[i];if(!e)return;hidePop();$('#tip').hidden=true;state.led=i;const A=P[e.a],B=P[e.b],r=$('#canvas').getBoundingClientRect();
+  const sx=((A.x+B.x)/2)*cam.s+cam.x+r.left,sy=((A.y+B.y)/2)*cam.s+cam.y+r.top;
+  const info=e.t==='cites'?`From PubMed: ${A.label} cites ${B.label}. Your label is added next to “cites”.`:e.t==='similar'?'The agent found similar abstracts. Your label replaces “similar”.':`Drawn by ${e.by==='Ralph'?'you':e.by}.`;
+  const L=$('#led');L.innerHTML=`<div class="le-h">${A.label} <span>${e.t==='cites'?'→':'↔'}</span> ${B.label}</div><input id="leIn" maxlength="40" placeholder="Why are these linked?" value="${esc(e.label||'')}"><div class="chips">${LINK_SUGG.map(x=>`<button class="fchip" data-lesug="${x}">${x}</button>`).join('')}</div><div class="le-note">${info}</div><div class="le-f"><button class="btn text" data-leact="del">${e.t==='cites'?'Hide link':'Delete link'}</button><span class="grow"></span><button class="btn primary" data-leact="done">Done</button></div>`;
+  L.hidden=false;L.style.left=Math.max(12,Math.min(sx-150,innerWidth-312))+'px';L.style.top=Math.max(64,Math.min(sy+16,innerHeight-L.offsetHeight-12))+'px';
+  const inp=$('#leIn');inp.focus();inp.select();inp.onkeydown=ev=>{if(ev.key==='Enter'){ev.preventDefault();commitLink()}if(ev.key==='Escape'){ev.preventDefault();closeLinkEditor()}};drawGraph();
+}
+function commitLink(){const i=state.led;if(i==null)return;const e=EDGES[i],v=$('#leIn').value.trim();if(e&&(e.label||'')!==v){e.label=v;markChange(v?`Named a link “${v}”`:'Removed a link name')}closeLinkEditor()}
+function closeLinkEditor(){if(state.led==null)return;state.led=null;$('#led').hidden=true;drawGraph();if(state.sel)renderCard()}
+function deleteLink(){const i=state.led,e=EDGES[i];state.led=null;$('#led').hidden=true;EDGES.splice(i,1);markChange(`${e.t==='cites'?'Hid':'Deleted'} the link ${P[e.a].label} – ${P[e.b].label}`);drawGraph();if(state.sel)refreshCard();
+  toast(e.t==='cites'?'Link hidden. The citation stays in the data, just not on this board.':'Link deleted.',()=>{EDGES.splice(i,0,e);state.changes.pop();drawChanges();drawGraph();if(state.sel)refreshCard();$('#toast').hidden=true})}
+
+/* ---------- changes: the agent waits while you edit ---------- */
+function markChange(d){state.changes.push(d);drawChanges()}
+function drawChanges(){const c=$('#changes'),n=state.changes.length;c.hidden=!n;if(n)c.innerHTML=`<span title="${esc(state.changes.join('\n'))}">${n} change${n>1?'s':''} · the agent is waiting</span><button data-act="sync">Update suggestions</button>`}
+/* ---------- events ---------- */
+const tip=$('#tip'),svg=$('#svg');
+function panBy(dx,dy,d){cancelAnimationFrame(anim);$('#canvas').classList.add('panning');cam.x=d.cx+dx;cam.y=d.cy+dy;applyCam()}
+svg.addEventListener('pointerdown',e=>{
+  hideMenus();if(state.led!=null)commitLink();
+  const base={sx:e.clientX,sy:e.clientY,cx:cam.x,cy:cam.y,moved:false};
+  const fo=e.target.closest('[data-note]'),hd=e.target.closest('[data-handle]'),g=e.target.closest('[data-id]'),eg=e.target.closest('[data-edge]');
+  if(fo){const i=+fo.dataset.note;if(fo.querySelector('.ntext').isContentEditable)return;drag={...base,type:'note',i,fo,ox:STICKIES[i].x,oy:STICKIES[i].y}}
+  else if(hd)drag={...base,type:'link',from:hd.dataset.handle};
+  else if(g){const id=g.dataset.id;drag={...base,type:'node',id,ox:P[id].x,oy:P[id].y}}
+  else if(eg)drag={...base,type:'edge',i:+eg.dataset.edge};
+  else drag={...base,type:'pan'};
+  svg.setPointerCapture(e.pointerId);
+});
+svg.addEventListener('pointermove',e=>{
+  if(drag){const dx=e.clientX-drag.sx,dy=e.clientY-drag.sy;if(Math.hypot(dx,dy)>4)drag.moved=true;if(!drag.moved)return;tip.hidden=true;
+    if(drag.type==='pan'||drag.type==='edge')panBy(dx,dy,drag);
+    else if(drag.type==='note'){const t=STICKIES[drag.i];t.x=drag.ox+dx/cam.s;t.y=drag.oy+dy/cam.s;drag.fo.setAttribute('x',t.x);drag.fo.setAttribute('y',t.y);if(t.paper)drawGraph()}
+    else if(drag.type==='node'){const n=P[drag.id],nx=drag.ox+dx/cam.s,ny=drag.oy+dy/cam.s,mx=nx-n.x,my=ny-n.y;n.x=nx;n.y=ny;notesOf(drag.id).forEach(t=>{t.x+=mx;t.y+=my});positionNotes();drawGraph();drawLeader()}
+    else if(drag.type==='link'){const w=toWorld(e.clientX,e.clientY),A=P[drag.from],L=$('#tmpLink');L.setAttribute('x1',A.x);L.setAttribute('y1',A.y);L.setAttribute('x2',w.x);L.setAttribute('y2',w.y);L.style.display=''}
+    return}
+  const g=e.target.closest('[data-id],[data-handle]'),hv=g?(g.dataset.id||g.dataset.handle):null,eg=e.target.closest('[data-edge]'),he=eg?+eg.dataset.edge:null;
+  if(hv!==state.hover||he!==state.hoverEdge){state.hover=hv;state.hoverEdge=he;drawGraph()}
+  if(eg&&!g){const ed=EDGES[he];tip.innerHTML=`<b>${edgeText(ed)}</b><span class="t2">Click to name, hide or delete this link</span>`;tip.style.left=Math.min(e.clientX+16,innerWidth-305)+'px';tip.style.top=(e.clientY+18)+'px';tip.hidden=false;return}
+  if(!g||!g.dataset.id||g.dataset.id===state.sel){tip.hidden=true;return}
+  const id=g.dataset.id,n=P[id];tip.innerHTML=isSugg(id)?`<b>${n.title}</b><span class="t2">${plainWhy(n)}</span>`:`<b>${n.title}</b><span class="t2">In your collection · drag to move</span>`;
+  tip.style.left=Math.max(12,Math.min(e.clientX-40,innerWidth-305))+'px';tip.style.top=(e.clientY+24)+'px';tip.hidden=false;
+});
+svg.addEventListener('pointerup',e=>{
+  $('#canvas').classList.remove('panning');const d=drag;drag=null;if(!d)return;
+  if(d.type==='note'){if(d.moved)dropNote(d.i);return}
+  if(d.type==='link'){$('#tmpLink').style.display='none';if(d.moved)finishLink(d.from,e);else drawGraph();return}
+  if(d.type==='node'){
+    if(d.moved){P[d.id].pinned=true;markChange(`Moved ${P[d.id].label}`);if(!state.movedOnce){state.movedOnce=true;toast('Moved. The agent won’t move this paper again.')}if(state.sel)refreshCard();drawGraph()}
+    else if(state.tool==='note'){addNoteFor(d.id,'',true);setTool('select');toast(`Note pinned to ${P[d.id].label}.`)}
+    else{tip.hidden=true;state.catchup=null;state.details=false;open(d.id)}
+    return}
+  if(d.type==='edge'){if(!d.moved)openLinkEditor(d.i);return}
+  if(!d.moved){if(state.tool==='note'){const w=toWorld(e.clientX,e.clientY);addNoteAt(w.x,w.y);setTool('select')}else if(state.sel)close()}
+});
+svg.addEventListener('dblclick',e=>{const fo=e.target.closest('[data-note]');if(fo)editNote(+fo.dataset.note)});
+svg.addEventListener('mouseleave',()=>{tip.hidden=true;if(state.hover||state.hoverEdge!=null){state.hover=null;state.hoverEdge=null;if(!drag)drawGraph()}});
+svg.addEventListener('wheel',e=>{e.preventDefault();cancelAnimationFrame(anim);
+  if(e.ctrlKey||e.metaKey){const r=$('#canvas').getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top,ns=Math.max(.35,Math.min(2.5,cam.s*Math.exp(-e.deltaY*(e.ctrlKey?.01:.002))));
+    cam.x=px-(px-cam.x)*(ns/cam.s);cam.y=py-(py-cam.y)*(ns/cam.s);cam.s=ns}else{cam.x-=e.deltaX;cam.y-=e.deltaY}applyCam()},{passive:false});
+
+// drag a note out of the toolbar, or click it and then click the board or a paper
+const nt=$('#noteTool'),ghost=$('#ghost');let ndrag=null;
+nt.addEventListener('pointerdown',e=>{e.preventDefault();ndrag={sx:e.clientX,sy:e.clientY,moved:false};nt.setPointerCapture(e.pointerId)});
+nt.addEventListener('pointermove',e=>{if(!ndrag)return;if(Math.hypot(e.clientX-ndrag.sx,e.clientY-ndrag.sy)>6)ndrag.moved=true;if(ndrag.moved){ghost.hidden=false;ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px'}});
+nt.addEventListener('pointerup',e=>{const d=ndrag;ndrag=null;ghost.hidden=true;if(!d)return;
+  if(!d.moved){setTool(state.tool==='note'?'select':'note');if(state.tool==='note')toast('Click a paper to pin a note to it, or click empty space.');return}
+  const el=document.elementFromPoint(e.clientX,e.clientY);if(!el||!el.closest('#canvas')||el.closest('.card')){toast('Drop the note on the board.');return}
+  const w=toWorld(e.clientX,e.clientY);addNoteAt(w.x,w.y)});
+
+function hideMenus(){if(state.open){state.open=null;drawControls()}}
+['rank','filter','help'].forEach(k=>$('#'+k+'Btn').addEventListener('click',e=>{e.stopPropagation();state.open=state.open===k?null:k;drawControls()}));
+function menuClick(e){
+  const g=e.target.closest('[data-goal]');if(g){if(g.dataset.goal!==state.goal){state.goal=g.dataset.goal;filtersChanged();refreshCard();toast(`Looking for ${GOALS[state.goal].label.toLowerCase()}. Colours and the list order have changed.`)}return}
+  const c=e.target.closest('.fchip');if(c&&c.dataset.f){const f=state.filters,k=c.dataset.f;if(k==='since'||k==='minCites')f[k]=+c.dataset.v;else{const s=f[k];s.has(c.dataset.v)?s.delete(c.dataset.v):s.add(c.dataset.v)}filtersChanged()}
+}
+$('#controls').addEventListener('click',menuClick);$('#rankPop').addEventListener('click',menuClick);
+$('#controls').addEventListener('change',e=>{const k=e.target.dataset.f;if(k){state.filters[k]=e.target.checked;filtersChanged()}if(e.target.id==='optFig'){state.showFig=e.target.checked;refreshCard()}});
+document.addEventListener('pointerdown',e=>{if(state.open&&!e.target.closest('.ctlwrap'))hideMenus()});
+
+document.addEventListener('click',e=>{
+  const ls=e.target.closest('[data-lesug]');if(ls){$('#leIn').value=ls.dataset.lesug;commitLink();return}
+  const la=e.target.closest('[data-leact]');if(la){la.dataset.leact==='del'?deleteLink():commitLink();return}
+  const a=e.target.closest('[data-act]');
+  if(a){e.preventDefault();const id=state.sel,n=id&&P[id];
+    switch(a.dataset.act){
+      case'close':close();break;
+      case'details':state.details=!state.details;refreshCard();break;
+      case'keep':snap();n.kind='kept';n.keptBy='you';state.votes[id]={...votesOf(id),Ralph:'keep'};drawChrome();drawGraph();drawList();refreshCard();toast(`Kept. The agent will search around ${n.label} on the next run.`,true);afterVote();break;
+      case'discard':snap();state.hidden.add(id);state.votes[id]={...votesOf(id),Ralph:'discard'};drawChrome();drawList();
+        if(state.catchup){drawGraph();$('#card').classList.add('hide');$('#leader').style.display='none';toast(`Hidden. You’ll see fewer papers like ${n.label}.`,true);afterVote()}else{close();toast(`Hidden. You’ll see fewer papers like ${n.label}.`,true)}break;
+      case'restore':state.hidden.delete(id);delete state.votes[id].Ralph;drawChrome();drawGraph();drawList();refreshCard();toast(`${n.label} is back on the board.`);break;
+      case'next':stepCatch(1);break;case'prev':stepCatch(-1);break;
+      case'done':close();toast('You’re caught up.');break;case'stop':close();break;
+      case'more':toast(`Run started: the agent is looking for papers around ${n.label}.`);break;
+      case'openpaper':window.open(n.pmc?`https://pmc.ncbi.nlm.nih.gov/articles/${n.pmc}/`:`https://doi.org/${n.doi}`,'_blank');break;
+      case'ask':state.chat=true;state.ctxOff=false;setInsets();drawChat();refocus();setTimeout(()=>$('#chatIn')?.focus(),300);break;
+      case'pubmed':window.open(pubmedUrl(n,n.quotes[a.dataset.q].t),'_blank');break;
+      case'fig':openLightbox(id);break;
+      case'lbclose':$('#lightbox').hidden=true;break;
+      case'closelist':state.list=false;setInsets();drawList();refocus();break;
+      case'closechat':state.chat=false;setInsets();drawChat();refocus();break;
+      case'ctxoff':state.ctxOff=true;drawChat();break;
+      case'clearf':state.filters=defaultFilters();filtersChanged();break;
+      case'sync':{const k=state.changes.length;toast(`The agent is updating suggestions with your ${k} change${k>1?'s':''}…`);state.working.add('n1');drawGraph();
+        setTimeout(()=>{state.changes=[];drawChanges();state.working.delete('n1');drawGraph();toast('Done. Your links, names and notes are now part of what the agent ranks with.')},1800);break}
+    }return}
+  const t=e.target.closest('[data-tab]');if(t){state.tab=t.dataset.tab;refreshCard();return}
+  const o=e.target.closest('[data-open]');if(o&&!e.target.closest('#svg')){state.catchup=null;state.details=false;state.ctxOff=false;open(o.dataset.open);return}
+  const q=e.target.closest('.ev-u,.mrow');if(q&&q.dataset.ev&&q.dataset.ev!=='c1'&&q.dataset.ev!=='none'){const n=P[state.sel],qq=n.quotes[q.dataset.ev];if(qq&&qq.ok)window.open(pubmedUrl(n,qq.t),'_blank');else toast('This claim isn’t in the abstract word for word, so there’s nothing to open.');return}
+  if(e.target.id==='lightbox'){$('#lightbox').hidden=true}
+});
+document.addEventListener('mouseover',e=>{
+  const u=e.target.closest('.ev-u,.mrow');if(u){if(pop.hidden||!u.classList.contains('on'))showPop(u);return}
+  if(!pop.hidden&&!e.target.closest('#pop'))hidePop();
+  const p=e.target.closest('[data-pulse]');const want=p?new Set([p.dataset.pulse]):new Set();
+  if([...want].join()!==[...state.pulse].join()){state.pulse=want;drawGraph()}
+});
+function setInsets(){const {L,R}=insets();document.body.style.setProperty('--L',L+'px');document.body.style.setProperty('--R',R+'px')}
+$('#catchBtn').onclick=startCatchup;
+$('#chatBtn').onclick=()=>{state.chat=!state.chat;setInsets();drawChat();refocus()};
+$('#listBtn').onclick=()=>{state.list=true;setInsets();drawList();refocus()};
+addEventListener('keydown',e=>{if(e.target.closest&&e.target.closest('input,textarea,[contenteditable=true]'))return;
+  if(e.key==='Escape'){if(!$('#lightbox').hidden)$('#lightbox').hidden=true;else if(state.led!=null)closeLinkEditor();else if(state.open)hideMenus();else if(state.tool==='note')setTool('select');else if(state.sel)close()}
+  if(e.key==='n')setTool('note');
+  if(state.catchup&&e.key==='ArrowRight')stepCatch(1);if(state.catchup&&e.key==='ArrowLeft')stepCatch(-1)});
+addEventListener('resize',()=>{if(state.sel){const f=focusCam(state.sel);state.side=f.side;cam=f.cam;applyCam();refreshCard()}else{cam=overviewCam();applyCam()}});
+
+// deep links: #sel=n1&details=1&tab=notes&goal=method&catchup=1&list=1&chat=1&menu=filter
+const hp=new URLSearchParams(location.hash.slice(1));
+if(hp.get('goal'))state.goal=hp.get('goal');
+if(hp.get('details'))state.details=true;if(hp.get('tab'))state.tab=hp.get('tab');
+if(hp.get('list'))state.list=true;if(hp.get('chat'))state.chat=true;
+if(hp.get('menu'))state.open=hp.get('menu');
+attachNote(STICKIES[0],'n1');setInsets();cam=overviewCam();applyCam();drawChrome();drawGraph();drawNotes();drawList();drawChat();drawChanges();
+if(hp.get('catchup'))startCatchup();else if(hp.get('sel'))open(hp.get('sel'),{fly:false});
+</script>
+</body>
+</html>
