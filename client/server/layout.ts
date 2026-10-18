@@ -97,15 +97,50 @@ export function placeNear(records: Iterable<TLRecord>, size: { w: number; h: num
 		(content
 			? { x: content.x + content.w + RING_GAP + size.w / 2, y: content.y + size.h / 2 }
 			: EMPTY_PAGE_ANCHOR)
-	const step = Math.max(size.w, size.h) + RING_GAP
-	for (let k = 0; k <= MAX_RINGS; k++) {
-		for (let i = 0; i < (k === 0 ? 1 : 8); i++) {
-			const angle = (i * Math.PI) / 4
-			const x = Math.round(start.x + k * step * Math.cos(angle) - size.w / 2)
-			const y = Math.round(start.y + k * step * Math.sin(angle) - size.h / 2)
-			if (isFree(boxes, { x, y, ...size })) return { x, y }
-		}
+	for (const spot of ringSpots(start, size, MAX_RINGS)) {
+		if (isFree(boxes, { ...spot, ...size })) return spot
 	}
 	// unreachable in practice: past the outermost shape every spot is free
 	return { x: Math.round((content?.x ?? 0) + (content?.w ?? 0) + RING_GAP), y: Math.round(content?.y ?? 0) }
+}
+
+/**
+ * Top-left (page space) for a new box of `size` inside the frame `frameId`, as placeNear does on
+ * the page: the nearest ring spot around `anchor` that lies MARGIN inside the frame and keeps
+ * MARGIN clear of every other shape. Null if the frame has no room left.
+ */
+export function placeInside(
+	records: Iterable<TLRecord>,
+	size: { w: number; h: number },
+	anchor: Vec | null,
+	frameId: string
+): Vec | null {
+	const all = shapeBoxes(records)
+	const frame = all.get(frameId)
+	if (!frame) return null
+	all.delete(frameId)
+	const boxes = [...all.values()]
+	const inner = { x: frame.x + MARGIN, y: frame.y + MARGIN, w: frame.w - 2 * MARGIN, h: frame.h - 2 * MARGIN }
+	const inside = (b: Box) =>
+		b.x >= inner.x && b.y >= inner.y && b.x + b.w <= inner.x + inner.w && b.y + b.h <= inner.y + inner.h
+	const rings = Math.ceil(Math.hypot(frame.w, frame.h) / (Math.max(size.w, size.h) + RING_GAP)) + 1
+	for (const spot of ringSpots(anchor ?? centre(frame), size, rings)) {
+		const box = { ...spot, ...size }
+		if (inside(box) && isFree(boxes, box)) return spot
+	}
+	return null
+}
+
+// Top-left corners on rings around `start` at radius k × (size + 40), 8 angles per ring, nearest first.
+function* ringSpots(start: Vec, size: { w: number; h: number }, rings: number): Generator<Vec> {
+	const step = Math.max(size.w, size.h) + RING_GAP
+	for (let k = 0; k <= rings; k++) {
+		for (let i = 0; i < (k === 0 ? 1 : 8); i++) {
+			const angle = (i * Math.PI) / 4
+			yield {
+				x: Math.round(start.x + k * step * Math.cos(angle) - size.w / 2),
+				y: Math.round(start.y + k * step * Math.sin(angle) - size.h / 2),
+			}
+		}
+	}
 }

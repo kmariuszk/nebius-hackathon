@@ -2,7 +2,7 @@
 import type { TLRecord } from '@tldraw/tlschema'
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { centre, isFree, MARGIN, placeNear, shapeBoxes, type Box } from './layout.ts'
+import { centre, isFree, MARGIN, placeInside, placeNear, shapeBoxes, type Box } from './layout.ts'
 
 const shape = (id: string, x: number, y: number, type: string, props: Record<string, unknown>, parentId = 'page:page') =>
 	({ typeName: 'shape', id: `shape:${id}`, type, x, y, parentId, props }) as unknown as TLRecord
@@ -67,4 +67,28 @@ test('boxes: notes are 200 × scale, arrows take no space, frame children are in
 	assert.deepEqual(boxes.get('shape:note'), { x: 10, y: 10, w: 400, h: 400 })
 	assert.equal(boxes.has('shape:arrow'), false)
 	assert.deepEqual(boxes.get('shape:child'), { x: 1020, y: 1030, w: 10, h: 10 })
+})
+
+test('placeInside: free spots inside a frame, clear of its cards and of shapes over it, until it is full', () => {
+	const records: TLRecord[] = [
+		shape('frame', 1000, 1000, 'frame', { w: 300, h: 200 }),
+		// a card in the frame (frame coordinates) and one on the page lying over it
+		shape('child', 30, 30, 'paper-card', { w: 48, h: 48 }, 'shape:frame'),
+		card('over', 1200, 1100),
+	]
+	const frame = { x: 1000, y: 1000, w: 300, h: 200 }
+	const inner = { x: frame.x + MARGIN, y: frame.y + MARGIN, w: frame.w - 2 * MARGIN, h: frame.h - 2 * MARGIN }
+	const placed: TLRecord[] = []
+	for (;;) {
+		const spot = placeInside([...records, ...placed], { w: 48, h: 48 }, centre(frame), 'shape:frame')
+		if (!spot) break
+		const box = { ...spot, w: 48, h: 48 }
+		assert.ok(box.x >= inner.x && box.y >= inner.y && box.x + 48 <= inner.x + inner.w && box.y + 48 <= inner.y + inner.h)
+		const others = [...shapeBoxes([...records, ...placed])].filter(([id]) => id !== 'shape:frame').map(([, b]) => b)
+		assert.ok(isFree(others, box), `spot ${JSON.stringify(spot)} overlaps`)
+		placed.push(card(`p${placed.length}`, spot.x, spot.y))
+		assert.ok(placed.length < 20, 'never fills forever')
+	}
+	assert.ok(placed.length >= 1)
+	assert.equal(placeInside(records, { w: 48, h: 48 }, null, 'shape:missing'), null)
 })

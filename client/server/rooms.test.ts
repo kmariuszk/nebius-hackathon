@@ -9,6 +9,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, before, test } from 'node:test'
+import { isFree, shapeBoxes } from './layout.ts'
 import { closeAllRooms, getRoom, IDLE_CLOSE_MS, isRoomOpen, putShapes, readRoom, setRoomsDir } from './rooms.ts'
 
 const PORT = 6000 + Math.floor(Math.random() * 1000)
@@ -18,7 +19,8 @@ let server: ChildProcess
 
 before(async () => {
 	server = spawn(process.execPath, ['server/server.ts'], {
-		env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir },
+		// no papers MCP, so the canvas MCP lists exactly its core tools whatever runs on :8001
+		env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, PAPERS_MCP_URL: 'http://127.0.0.1:9/mcp' },
 		stdio: ['ignore', 'pipe', 'pipe'],
 	})
 	await new Promise<void>((resolve, reject) => {
@@ -169,6 +171,38 @@ test('the canvas MCP route needs a member bearer and lists its tools', async () 
 	await client.close()
 })
 
+test('a canvas MCP round trip on the real server: papers, links twice, a card a person moved', async () => {
+	const client = new Client({ name: 'test', version: '0' })
+	await client.connect(
+		new StreamableHTTPClientTransport(new URL(`${BASE}/api/mcp/canvas/trip`), {
+			requestInit: { headers: { Authorization: 'Bearer m_test', 'X-Run-Id': 'run_00112233aabb' } },
+		})
+	)
+	const call = async (name: string, args: Record<string, unknown>) =>
+		JSON.parse(((await client.callTool({ name, arguments: args })) as { content: { text: string }[] }).content[0].text)
+	const papers = [{ paperId: 'pmid:1', title: 'One' }, { paperId: 'pmid:2', title: 'Two', near: 'pmid:1' }, { paperId: 'pmid:3', title: 'Three', near: 'pmid:1' }]
+	assert.deepEqual((await call('add_papers', { papers })).added, ['pmid:1', 'pmid:2', 'pmid:3'])
+	const links = [{ from: 'pmid:2', to: 'pmid:1', kind: 'cites' }, { from: 'pmid:3', to: 'pmid:1', kind: 'similar' }]
+	assert.equal((await call('link_papers', { links })).linked.length, 2)
+	assert.equal((await call('link_papers', { links })).linked.length, 2)
+	let board = await call('get_board', {})
+	assert.equal(board.papers.length, 3)
+	assert.equal(board.links.length, 2)
+
+	// the browser marks a card a person dragged; the agent then leaves it alone
+	const moved = await fetch(`${BASE}/api/rooms/trip/shapes`, {
+		method: 'PATCH',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify([{ id: 'shape:paper-pmid_2', x: 900, meta: { pinnedByHuman: true } }]),
+	})
+	assert.equal(moved.status, 200)
+	const again = await call('add_papers', { papers: [{ paperId: 'pmid:2', title: 'Two, renamed' }] })
+	assert.deepEqual(again.skipped, [{ paperId: 'pmid:2', reason: 'moved by a person' }])
+	board = await call('get_board', {})
+	assert.equal(board.papers.find((p: { paperId: string }) => p.paperId === 'pmid:2').humanTouched, true)
+	await client.close()
+})
+
 test('what the REST route wrote is in the room file', async () => {
 	server.kill()
 	await new Promise((resolve) => server.once('exit', resolve))
@@ -177,6 +211,12 @@ test('what the REST route wrote is in the room file', async () => {
 	const pin = records.find((r) => r.id === 'binding:pin')
 	assert.equal(pin?.typeName === 'binding' && pin.type, 'note-pin')
 	assert.equal(records.filter((r) => r.typeName === 'binding' && r.type === 'arrow').length, 2)
+	// the round trip's three cards were placed apart, and the moved one stayed where the person put it
+	const trip = readRoom('trip', (txn) => [...txn.values()]) as TLRecord[]
+	const boxes = [...shapeBoxes(trip).values()]
+	assert.equal(boxes.length, 3)
+	boxes.forEach((box, i) => assert.ok(isFree(boxes.slice(0, i), box), 'cards overlap'))
+	assert.equal((trip.find((r) => r.id === 'shape:paper-pmid_2') as { x: number }).x, 900)
 	closeAllRooms()
 })
 

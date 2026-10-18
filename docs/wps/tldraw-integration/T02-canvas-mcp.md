@@ -7,7 +7,7 @@
 | Depends on | T00, T01 |
 | Unblocks | T12, T11, the harness owner's agents |
 | Milestone | M2 |
-| Status | Not started |
+| Status | Done: the eight core tools, layout v0, idle close and bindings on the REST route merged with [PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13) (Oct 18); `apply_clusters`, `label_cluster` and placing new papers inside their neighbour's cluster on `feat/board-model-canvas-mcp`. `add_highlight` waits on T10's PDF reading |
 | Owner | TBD |
 
 ## Goal
@@ -23,9 +23,9 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 
 ## Scope
 
-**In:** MCP server over streamable HTTP; v1 tools below; attribution from headers; human-touched rules; idempotent writes; layout v0 (neighbour placement); closing rooms opened only for agent writes; an event hook for T08; binding records on the low-level REST route.
+**In:** MCP server over streamable HTTP; v1 tools below; attribution from headers; human-touched rules; idempotent writes; layout v0 (neighbour placement); closing rooms opened only for agent writes; an event hook for T08; binding records on the low-level REST route; `apply_clusters` and `label_cluster`, listed only while the papers MCP lists `cluster_papers` ([I5](interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp)).
 
-**Out (phase 2, once the discovery tools exist):** `apply_clusters`, `label_cluster`, `add_table`, `add_diagram`, the d3-force "Structure by" layout ([Concept: Clustering and layout](../../Concept.md#system-architecture)). Figures arrive through `set_card` once `get_figures` exists. The v4 and v5 mockups put quotes and figures in the opened paper (v5's widgets), not on the board, so there are no `quote` or `figure` shapes.
+**Out (phase 2, once the discovery tools exist):** `add_table`, `add_diagram`, the d3-force "Structure by" layout ([Concept: Clustering and layout](../../Concept.md#system-architecture)). Figures arrive through `set_card` once `get_figures` exists. The v4 and v5 mockups put quotes and figures in the opened paper (v5's widgets), not on the board, so there are no `quote` or `figure` shapes.
 
 ## Design
 
@@ -37,7 +37,8 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | `client/server/canvasMcp.ts` | `handleCanvasMcp(req, res, boardId)`: builds an `McpServer` with the tools and a stateless `StreamableHTTPServerTransport` per request |
 | `client/server/canvasTools.ts` | The tool handlers as plain functions `(ctx, input) => output`, testable without MCP |
 | `client/server/layout.ts` | `placeNear(records, size, anchor)` and helpers |
-| `client/server/papersClient.ts` | Cached `get_paper` calls to the papers MCP (also used by T08) |
+| `client/server/clusterTools.ts` | `apply_clusters` and `label_cluster`, registered only while the papers MCP lists `cluster_papers` |
+| `client/server/papersClient.ts` | Cached `get_paper` calls to the papers MCP (also used by T08); its tool list (`hasTool`, cached 30 s) and `cluster_papers` |
 
 **Server.** `@modelcontextprotocol/sdk` 1.32.1 with `zod` 4.6.5. Stateless mode (`sessionIdGenerator: undefined`): no MCP session state to lose on restart. Routes `POST`, `GET` and `DELETE` on `/api/mcp/canvas/:boardId` go to `transport.handleRequest(req, res, body)`. The server's `instructions` field states the board rules from [I4](interfaces.md#i4-how-agents-use-the-canvas), because external agents don't get our system prompt.
 
@@ -54,7 +55,7 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 
 | Tool | Input | Output | Rules |
 | --- | --- | --- | --- |
-| `get_board` | none | `{boardId, question, goals, papers: [{paperId, label, title, year, type, kind, status, scores, working, cluster, humanTouched, pinnedNotes}], links: [{from, to, kind, label, by}], notes: [{shapeId, text, author, pinnedTo}], discardedIds, removedLinks}` | Compact, never raw records; `question`, `goals`, `discardedIds` and `removedLinks` come from T08's board DB and are empty before it exists; capped at 500 papers |
+| `get_board` | none | `{boardId, question, goals, papers: [{paperId, label, title, year, type, kind, status, scores, working, cluster, humanTouched, pinnedNotes}], links: [{from, to, kind, label, by}], notes: [{shapeId, text, author, pinnedTo}], clusters: [{clusterId, label, labelGenerated, humanTouched}], discardedIds, removedLinks}` | Compact, never raw records; `question`, `goals`, `discardedIds` and `removedLinks` come from T08's board DB and are empty before it exists; capped at 500 papers |
 | `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, type?, peerReviewed?, citedBy?, foundBy?, retracted?, kind?, near?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; retracted papers and seeds already on the board are skipped; `type` accepts whatever discovery emits and is stored through T01's `normaliseType` (raw value in `typeRaw`); `peerReviewed` is true, false or null (unknown); `foundBy` is how discovery found the paper (for example `pubmed`, `cites 3 seeds`), shown under More (T10); an existing card is patched (never replaced) unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
 | `set_scores` | `{paperId, scores: {[goal]: {score, fit, why}}}` | `{ok, skipped}` | `score` 0 to 1; `goal` must be one of the board's goals; the node colour and ranked list follow it |
 | `set_card` | `{paperId, oneLine?, claims?, glance?, figure?, summary?, gaps?}` | `{ok, skipped}` | Fills the widgets (T10): `oneLine` and `claims` are "Why it matters to you", `glance` is "The paper at a glance" (3–4 steps of `{label, text, quoteId, relation}`, `relation` one of `same`, `adds`, `other` or null), `figure` is the figure (`{imageUrl, label, caption, captionByAi}`), `summary` and `gaps` go under More. Each field can arrive on its own, so the widgets fill in one by one. `claims[].text` must appear verbatim in `oneLine`; `claims[].evidence` must name quote IDs that exist on the card (or `seeds`), and so must each `glance[].quoteId` (or be null); `figure` needs an `imageUrl` from the paper (no generated images). Records `provenance[field] = {model, at}` for each field written, from `X-Model` |
@@ -63,6 +64,13 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | `mark_working` | `{paperIds, on}` | `{ok}` | The "Agent is reading…" ring |
 | `add_note` | `{text, paperId?}` | `{shapeId}` | Built-in note, authored as the agent; with `paperId` it is pinned to that card with a `note-pin` binding (T01, props `{dx, dy}`) and appears in its Team notes widget (T10) |
 | `add_highlight` | `{paperId, text, page?, category?, note?}` | `{shapeId}` | Only if T10's PDF reading is in scope: `highlight` shape beside its card; no `rects` (the PDF view anchors it by text) |
+
+**Cluster tools**, listed only while the papers MCP lists `cluster_papers` (I5: hidden, not faked). Clusters come from data, not the agent's judgement ([Concept: Clustering and layout](../../Concept.md#system-architecture)), so `apply_clusters` calls `cluster_papers` itself instead of taking clusters from the agent as Concept's table has it.
+
+| Tool | Input | Output | Rules |
+| --- | --- | --- | --- |
+| `apply_clusters` | `{paperIds?}`, 2 to 500; default every paper card on the board | `{clusters: [{clusterId, label, paperIds}], skipped: [{paperId or clusterId, reason}]}`, or a tool error that writes nothing if `cluster_papers` fails | Each cluster is a built-in `frame`, ID `shape:cluster-<slug(clusterId)>`, named by discovery's `label`, with `meta.clusterId`, `labelGenerated` and `renamedByHuman` (T01) and the agent meta. A new frame is sized for a grid of its papers, placed by `placeNear` around where they were and stacked under every other shape so links stay visible; the papers move into the grid. A cluster already on the board keeps its place; papers not yet in it go into free space inside (`placeInside`), and an agent frame nobody touched grows downwards when it is full and the space below is free. Papers people made or moved, and papers with a note pinned that a person made, moved or edited, stay put (`skipped`). A moved paper's own notes are placed beside it again, outside the frame, and their `note-pin` offset is updated, so browsers keep them there. A re-run moves nothing already in place; the label is updated only on the agent's untouched frames. `similarities` order each new grid, most similar first |
+| `label_cluster` | `{clusterId, label}`, label at most 60 characters | `{ok}` or `{ok: false, skipped}` | Renames the frame and sets `labelGenerated`; skipped if a person made the frame, renamed it (`renamedByHuman`, T14) or edited it (`editedByHuman`) |
 
 **Creates and updates are different writes** (PR #6 review, finding 6). New shapes go through T00's insert-only `putShapes`; every update goes through T00's `patchShapes`, which merges props and keeps `x`, `y`, `rotation`, `index`, `parentId` and `meta` unless the tool is allowed to change them. A tool never re-creates an existing record, so an update can't reset a person's layout or move a card to the top of the stack.
 
@@ -74,7 +82,7 @@ Every write sets the meta from the [shared contracts](README.md#shared-contracts
 
 **Layout v0.** `placeNear` is deterministic and runs inside the write transaction:
 
-1. Anchor: the `near` card's centre; else the most recent card from the same run; else just right of the page's content bounds.
+1. Anchor: the `near` card's centre; else the most recent card from the same run; else just right of the page's content bounds. If the `near` card sits in a cluster frame, or `near` is a cluster ID, the card goes inside that frame (`placeInside`: the same rings, kept inside the frame), and onto the page beside it only when the frame has no room and can't grow (a person made or edited it, or the space below is taken).
 2. Candidates: rings around the anchor at radius `k × (size + 40)`, 8 angles per ring, nearest first.
 3. Take the first candidate whose box (plus a 24 px margin) overlaps no shape box on the page. Server-side boxes come from `x`, `y` and `w`/`h` props (notes count as 200 × `scale`; arrows are ignored).
 4. A batch places cards one by one, each seeing the previous ones.
@@ -88,15 +96,16 @@ The agent may suggest `near`; it never sends coordinates (the input schemas have
 ## Tasks
 
 - [x] `client/package.json`: `@modelcontextprotocol/sdk@1.32.1`, `zod@4.6.5` (on `feat/board-build`).
-- [ ] Extract `client/server/rooms.ts` from `server.ts` (no behaviour change; `POST /api/rooms/:room/shapes` keeps working).
-- [ ] Binding records (`typeName: 'binding'`) on `POST /api/rooms/:room/shapes`.
-- [ ] `client/server/layout.ts` with unit tests.
-- [ ] `client/server/canvasTools.ts`: the eight core tools as plain functions (`add_highlight` only with T10's PDF reading).
-- [ ] `client/server/papersClient.ts`: MCP client to `PAPERS_MCP_URL`, `get_paper` cached per paper ID in memory.
-- [ ] `client/server/canvasMcp.ts` and the route in `server.ts`.
-- [ ] Idle close in `rooms.ts`.
-- [ ] Root `README.md`: replace "Write to a board from another service" with the canvas MCP (keep the REST route as the low-level option).
-- [ ] `.env.example`: `CANVAS_MCP_URL` comment now points at `http://localhost:5858/api/mcp/canvas/<boardId>`.
+- [x] Extract `client/server/rooms.ts` from `server.ts` (no behaviour change; `POST /api/rooms/:room/shapes` keeps working).
+- [x] Binding records (`typeName: 'binding'`) on `POST /api/rooms/:room/shapes`.
+- [x] `client/server/layout.ts` with unit tests.
+- [x] `client/server/canvasTools.ts`: the eight core tools as plain functions (`add_highlight` only with T10's PDF reading, not built).
+- [x] `client/server/papersClient.ts`: MCP client to `PAPERS_MCP_URL`, `get_paper` cached per paper ID in memory.
+- [x] `client/server/canvasMcp.ts` and the route in `server.ts`.
+- [x] Idle close in `rooms.ts`.
+- [x] Root `README.md`: replace "Write to a board from another service" with the canvas MCP (keep the REST route as the low-level option).
+- [x] `.env.example`: `CANVAS_MCP_URL` comment now points at `http://localhost:5858/api/mcp/canvas/<boardId>`.
+- [x] `client/server/clusterTools.ts`: `apply_clusters` and `label_cluster`, gated on the papers MCP's tool list; `add_papers` places new papers inside their neighbour's cluster.
 
 ## Acceptance criteria
 
@@ -112,10 +121,11 @@ The agent may suggest `near`; it never sends coordinates (the input schemas have
 
 ## Tests
 
-- `client/server/layout.test.ts`: no overlaps across 200 placements; determinism; `near` respected.
+- `client/server/layout.test.ts`: no overlaps across 200 placements; determinism; `near` respected; `placeInside` keeps inside its frame.
 - `client/server/canvasTools.test.ts`: each tool against a real `TLSocketRoom` on a temp `DATA_DIR`, including human-touched skips, idempotency, `set_card`'s quote ID checks for claims and glance steps, and `provenance`.
-- `client/server/shapesRoute.test.ts`: binding records on the REST route, in the same transaction as their shapes.
-- `client/server/canvasMcp.test.ts`: the HTTP route with the SDK's `Client` and `StreamableHTTPClientTransport`; 401 without a bearer.
+- `client/server/rooms.test.ts` (planned as `shapesRoute.test.ts`): binding records on the REST route, in the same transaction as their shapes; idle close; and a canvas MCP round trip on the real server (three papers, links written twice, a card a person moved skipped, no overlaps).
+- `client/server/canvasMcp.test.ts`: the HTTP route with the SDK's `Client` and `StreamableHTTPClientTransport`; 401 without a bearer; the cluster tools listed only when the papers MCP has `cluster_papers`.
+- `client/server/clusterTools.test.ts`: `apply_clusters` and `label_cluster` on a real room: frames, attribution, people's papers left alone, re-runs, frames growing, no overlaps.
 
 ## Risks
 

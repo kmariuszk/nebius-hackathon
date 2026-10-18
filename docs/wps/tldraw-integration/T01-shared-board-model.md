@@ -7,7 +7,7 @@
 | Depends on | — |
 | Unblocks | T02, T08, T09, T10, T13, T14 |
 | Milestone | M2 |
-| Status | Not started |
+| Status | Done and merged ([PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13), Oct 18), except the display-name prompt on first visit (names come from tldraw's people menu for now); the schema drift test on `feat/board-model-canvas-mcp` |
 | Owner | TBD |
 
 ## Goal
@@ -105,16 +105,16 @@ So a Keep or Discard, or a node resized by its link count, never locks a paper f
 ## Tasks
 
 - [x] `client/shared/paperCard.ts`, `ids.ts`, `meta.ts`, `display.ts`, `fixtures/paper-ids.json` (IDs with `:`, `/`, `.` and unicode), with `ids.test.ts` and `display.test.ts` (on `feat/board-build`).
-- [ ] `client/shared/shapes.ts` and `bindings.ts`: validators and migrations for `paper-card` and `note-pin`.
+- [x] `client/shared/shapes.ts` and `bindings.ts`: validators and migrations for `paper-card` and `note-pin`.
 - [x] `client/package.json`: `@tldraw/validate` pinned to 5.5.2; `client/tsconfig.json`: include `shared`.
 - [x] `client/server/server.ts`: custom shapes and bindings merged into the schema.
-- [ ] `client/client/shapes/PaperCardShapeUtil.tsx` (v5 node look, open and lit states, click), `NotePinBindingUtil.ts`, `index.ts`.
+- [x] `client/client/shapes/PaperCardShapeUtil.tsx` (v5 node look, open and lit states, click), `NotePinBindingUtil.ts`, `index.ts`.
 - [x] `client/client/viewerState.ts`, `client/client/identity.ts` (`getMemberId`).
 - [ ] Display-name prompt on first visit (`getDisplayName`).
 - [x] `client/client/pages/Room.tsx`: utils in `useSync` and `<Tldraw>`, the side-effect hook, `getShapeVisibility`.
-- [ ] `client/client/sideEffects.ts`: the handlers above.
-- [ ] `client/server/addShape.ts`: a `paper` mode that writes one `paper-card`, as a living example.
-- [ ] Tests (below).
+- [x] `client/client/sideEffects.ts`: the handlers above (rules in `boardRules.ts`).
+- [x] `client/server/addShape.ts`: a `paper` mode that writes one `paper-card`, as a living example.
+- [x] Tests (below).
 
 ## Acceptance criteria
 
@@ -131,13 +131,14 @@ So a Keep or Discard, or a node resized by its link count, never locks a paper f
 - `client/shared/ids.test.ts` (in place): every fixture pair and link IDs; Python mirrors it in `harness/tests/test_board_ids.py` (T04) against the same file.
 - `client/shared/display.test.ts` (in place): `nodeLabel` (one author, particles, accents), `shortAuthors`, `sentenceCase`, and `normaliseType` for every value the discovery sources emit plus an unknown OpenAlex type.
 - `client/server/schema.test.ts`: the server schema validates one sample of each custom shape and binding and rejects a `paper-card` with a bad `fit` or a glance step with a bad `relation`.
-- `client/client/sideEffects.test.ts`: the flag rules as pure functions (`nextMeta(prev, next, source)`), including vote props and `w`/`h` leaving `editedByHuman` unset, so no DOM is needed.
+- `client/client/boardRules.test.ts` (planned as `sideEffects.test.ts`): the flag rules as pure functions (`nextMeta(prev, next, source)`), including vote props and `w`/`h` leaving `editedByHuman` unset, so no DOM is needed.
+- `client/client/shapes/schemaDrift.test.ts` (the schema drift risk): Vite loads the browser's shape and binding utils, whose schema must equal the server's; a room on the server's schema sends its paper cards to a client on that schema and commits the paper card the client pushes.
 
 Run with `pnpm test` (`node --test` over `server/`, `shared/` and `client/`) from `client/`.
 
 ## Risks
 
-- **Schema drift** between server and client: a client whose schema has a shape the server lacks can't connect. Both import `client/shared/`, and `schema.test.ts` fails if they diverge.
+- **Schema drift** between server and client: a client whose schema has a shape the server lacks can't connect (the room closes its socket with `INVALID_RECORD` on its first write of that shape). Both import `client/shared/`, and `client/client/shapes/schemaDrift.test.ts` fails if the browser's utils and the server's schema diverge.
 - **Flags on remote echoes:** check that the store reports changes from the sync server as `remote`; the pure-function test covers the rule, a two-browser check covers the wiring.
 - **Props grow** as the widgets fill in (claims, quotes, glance): a few KB per paper is fine for a few hundred papers; long texts (summary) stay short by contract with the reader agent.
 

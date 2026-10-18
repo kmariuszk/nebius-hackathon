@@ -89,9 +89,9 @@ The board service is an MCP client of the papers MCP for paper details (T08) and
 | `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type`, and (wanted, [I9](#i9-discovery-data-the-v5-widgets-show)) `citedBy`, `peerReviewed`, `retracted` | T08 paper record, T02 `add_quote` check against the abstract, T10 widgets |
 | `get_fulltext(paper_id)` | Planned (Concept) | `sections[{title, text, page}]`, `source` | T02 `add_quote` check against full text, T10 |
 | `get_figures(paper_id)` | Planned | `[{figureId, caption, imageUrl, page, bbox}]` | The figure widget via `set_card` (T10) |
-| `cluster_papers` | Planned | `clusters`, `similarities` | T02 `apply_clusters` |
+| `cluster_papers(paper_ids)` | Planned (discovery owner, in progress Oct 18) | `clusters [{clusterId, paperIds, label}]`, `similarities [{a, b, similarity}]` (k nearest neighbours per paper) | T02 `apply_clusters`, which calls it itself, so clusters come from data rather than from the agent |
 
-Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the widgets show no figure, `apply_clusters` isn't listed.
+Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the widgets show no figure, and `apply_clusters` and `label_cluster` aren't listed. The canvas MCP reads the papers MCP's tool list on each request, cached for 30 seconds, so the cluster tools appear without a board service restart once discovery serves `cluster_papers`.
 
 ## I6. Which model slots take images
 

@@ -28,6 +28,11 @@ export function agentShapeId(kind: string) {
 	return `shape:agent-${slug(kind)}-${randomHex(12)}` as const
 }
 
+/** The built-in frame that holds a cluster (meta.clusterId): `shape:cluster-c1`. */
+export function clusterShapeId(clusterId: string) {
+	return `shape:cluster-${slug(clusterId)}` as const
+}
+
 /** One run per ACP prompt turn, made by the harness and sent as `X-Run-Id`. */
 export const RUN_ID_PATTERN = /^run_[0-9a-f]{12}$/
 
