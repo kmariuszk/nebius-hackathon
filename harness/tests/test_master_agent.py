@@ -20,9 +20,9 @@ def scripted_search(query: str, seeds: list[str] | None = None) -> LlmAgent:
     turns = [call("search", query=query)]
     if seeds:
         turns.append(call("find_candidates", seed_ids=seeds))
-    answer = {"subQuery": query, "candidates": [], "seedCandidates": len(seeds or []), "notes": ""}
+    turns.append(call("done", sub_query=query, candidates=[], seed_candidates=len(seeds or []), notes=""))
     agent = search.build()
-    agent.model = ScriptedLlm(turns=[*turns, say(json.dumps(answer))])
+    agent.model = ScriptedLlm(turns=turns)
     return agent
 
 
@@ -68,7 +68,8 @@ async def test_parallel_searches_feed_rerank_their_real_ids(papers_mcp):
     # Both search runs finish before the master's next turn, with no MCP errors.
     responses = [p.function_response for p in model.requests[2].contents[-1].parts if p.function_response]
     assert [r.name for r in responses] == ["search", "search"]
-    assert all('"seedCandidates"' in r.response["result"] for r in responses)
+    # A run that ends with done still hands its answer back to the master.
+    assert sorted(r.response["subQuery"] for r in responses) == ["slow melanoma T cells", "spatial exhaustion"]
     searched = [args["query"] for name, args in papers_mcp.calls if name == "search"]
     assert sorted(searched) == ["slow melanoma T cells", "spatial exhaustion", "spatial niches"]
 
