@@ -1,10 +1,10 @@
 # Hackathon brainstorm: picking a track (Granola transcript)
 
-- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:32
+- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:56
 - **Source:** Granola note "New note", https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd
 - **Recorded by:** Ralph van Spanje (microphone only; speakers are not separated, so every line is labelled "Microphone")
 - **Note:** Verbatim auto-transcript. It has transcription errors (e.g. "Nematron"/"Nimotron" = Nemotron, "Free Blue and Brown" = 3Blue1Brown).
-- **Edited:** German (and garbled Dutch, plus a few Turkish/Chinese/French) speech from other people in the room has been removed, along with a few English fragments that were clearly part of their conversation.
+- **Edited:** German (and garbled Dutch, plus a few Turkish/Chinese/French/Russian) speech from other people in the room has been removed, along with a few English fragments that were clearly part of their conversation.
 
 ---
 
@@ -997,3 +997,143 @@ Microphone: Medium, high, and bigger is more links.
 Microphone: Oh, you have voting to it. They don't, yeah, I don't understand this voting thing. I mean, either sites similar. Oh, that can also be a good one. Sites and similar indeed. Yeah. Yeah. But you had that already. I also think that, so this coloring should be rated by the model, which is looking for the paper. So it's classified. Yeah. Oh, definitely. Yeah. But what about the researcher themselves? Can they rank?
 
 Microphone: Can they adjust the ranking? Yeah, but let's leave that. I mean, yeah, how would they rank if they just see the paper for the first time, right? Like they could rank. Yeah, but after that, because then The agent also knows who really searched around that one maybe, or personal ranking. Ah, then you make it too complex. And yeah, I mean, you could, for example, you could just store data how often they open the paper.
+
+---
+
+*[Added in the 14:56 Granola sync]*
+
+---
+
+Microphone: Right, if they open it more often, then it's more relevant. However, many researchers— I don't know how about you, but I know many researchers are printing their papers because they just like the feeling of paper. Yes, they like to highlight Paper spinner, so when they read it.
+
+Microphone: Yeah, but it's cool.
+
+Microphone: So we already started building.
+
+Microphone: Yep, this one.
+
+Microphone: I'm gonna focus now fully on that, what's gonna be in the panel first. But I push it now. I can push it already. Yeah, yeah, yeah, exactly.
+
+Microphone: Oh, the voting is literally everybody gets this daily new paper.
+
+Microphone: And then if you say keep, that's the vote. Yeah, because there's multiple people in there, that's the difference.
+
+Microphone: Sorry.
+
+Microphone: You pushed it in your mind.
+
+Microphone: No, it says to begin the candidate discovery. For me? Yeah, yeah, yeah, right. I'm gonna double-check which feature is reducing. Does it product scope?
+
+Microphone: Can you show me your— Yes.
+
+Microphone: Oh, are you asking to record?
+
+Microphone: All right, yeah, on the main there is a version that doesn't do that.
+
+Microphone: Yeah, we don't define how clusters are being cloned right now. Yeah, we don't really define it in the concept.
+
+Microphone: Well, it should be graph, so you think paper sets. Yeah, but how are we going to define the distance between them?
+
+Microphone: Even how far we should be in space with it. So I guess if there is— we're gonna have embeddings so you can calculate similarity score, and then based on that you can probably define the distance between every other paper. Oh, that's a good one. That's really good.
+
+Microphone: Wait a minute, if we're gonna have this mechanism of keeping and discarding things, Then each person is going to have their own vector database that's going to define what's a good similarity for this work, or is it going to be calculated for the entire work and every paper in order the data pack should be there for one and for all your work. Yeah, that's an collaborators on the C because they can use search engine, but they are not amazing.
+
+Microphone: So can they edit the work? They should. I think it would make sense.
+
+Microphone: So they can be commentators, but can they remove papers? Can they move papers around? You can tell me more, because if I were a researcher, I would fucking hate if somebody came to my board and like started moving things around.
+
+Microphone: Well, maybe it makes sense for the content producer to make a request to delete something.
+
+Microphone: What's the problem? Why would you like to mess with that?
+
+Microphone: Create the board and you're out of the paper grid when there's been somebody else referring this week. Like, do you ever have this working space? Researchers, the April papers researchers.
+
+Microphone: They can also collaborate on the papers. I'm not sure about the editing ability, but at least they can collaborate. So it's not like you only carry papers on your own personal documents, you also have something that is shareable? I think we can transfer it from one board to another. When you work on the paper, yeah, you share all the papers that are related to the paper.
+
+Microphone: So it's good for candid snakes, but it's good for other snakes. Oh, okay.
+
+Microphone: Um, yeah, I'm on my process.
+
+Microphone: I will send the Q&A.
+
+Microphone: Stu, yeah.
+
+Microphone: No, I'm trying to understand the system.
+
+Microphone: I was waiting for your startup because I need address to work in the documentation.
+
+Microphone: Should I just go full front end?
+
+Microphone: I think so. I think it makes sense because you can start it right on the ADL. Yeah, we should probably tell our agents they shouldn't touch much front end right now. Yeah, just, just saying. Okay. And then it's the smartest to just do it on the HTML, go, go on and on. Yeah, yeah, yeah, I don't know.
+
+Microphone: It's just to make sure.
+
+Microphone: Yeah, you know, once we find the right HTML, it's going to be super easy to transfer. Yeah, nice.
+
+Microphone: Yeah, so right now I'm just like, this one is for understanding which parts of the partner services we're using.
+
+Microphone: This is not super interesting. This was just to validate that we're actually using it. This one is pretty cool.
+
+Microphone: It helps understand the system better.
+
+Microphone: Okay, it's just impossible.
+
+Microphone: It makes sense more for less.
+
+Microphone: It moves to make sense. I feel like the devil is going to be in the detail when it's going to be about defining how do you run the paper. So I think we're going to need to quickly start. I think what would make sense for us right now is probably start with the searching agent.
+
+Microphone: Have it really quickly, and then one of us can start iterating on the quality of that, and then the other can already start building on the next thing. What do you think?
+
+Microphone: It makes sense. Well, maybe they can split the part.
+
+Microphone: So because this search part is the agent and this part is the operations.
+
+Microphone: Mm-hmm.
+
+Microphone: Cut here. What's the agent card is?
+
+Microphone: So one, one build for this information, then the canvas is speaking. Yeah.
+
+Microphone: I can look into that because I know that TLDRAW is already giving some, some access, some canvas entity. There are some custom build ones, so I could try to use it and see how far it goes, and if it's fine, we can just reuse it. Yeah, sure. So I can start here and what, you're gonna beam that paper some CPU? Is it actually gonna beam CPU? It's also— oh, okay, can you— can you— oh, this is not perfect.
+
+Microphone: You might try to make it almost
+
+Microphone: On the vision.
+
+Microphone: Okay, so we have some infra stuff we need to do, we have some agent harness stuff we need to do, and we have some frontend stuff.
+
+Microphone: Which one do you want to work on?
+
+Microphone: I just think we, like, they require from us the technical implementation to be sensible, and I think the most important technical part of our system is going to be the rerun algorithm. Like, this is like where you can have green edge. And, um, there are also graph visualizations.
+
+Microphone: That's not my writer. Yeah, I agree.
+
+Microphone: So yeah, I think the most pressing things right now is this and the harness. So now it's up to you if you prefer to work on the harness or if you prefer to deploy these models. I can deploy these models. Maybe you can work on harness. I didn't make any work on this.
+
+Microphone: So then you're gonna build this canvas engine.
+
+Microphone: So we will use also this Google library.
+
+Microphone: Yeah, yeah.
+
+Microphone: Okay, I don't know what they mean by packages.
+
+Microphone: Because I don't know this case. Maybe there is a definition of a package there. No, no, it's just workload. Like, yeah, all right, how we split the work, like each worker is a sub-agent.
+
+Microphone: Do you have the, like, what are the skills that you told me to install? What are they? They have different It's a different skills for coding, for merge request review, for some workflows. Like, yeah, all right, I can't even ever review. Yeah, some templates. There are so many skills for Python. Does your code pick them up by itself, or do you need to always tell it to use them?
+
+Microphone: I can push them. No, no, I'm asking you if the code— if your code, when you're working with it, is it picking it up on its own? Yeah, I think yeah. And I think Pagan is also picking some automatically.
+
+Microphone: Okay, it's already way nicer. It is.
+
+Microphone: But now it's here, but I think, do we want it small or big, right? Bigger. I think it's fine, like what you are showing.
+
+Microphone: I also need to stop the dev file.
+
+Microphone: Some core things like the key, and so some examples, naming conversion.
+
+Microphone: Naming convention. Yeah, yeah, like .n, for example. Oh yeah, it's the same thing. Yeah.
+
+Microphone: Yeah.
+
+Microphone: Yeah, yeah, yeah.
