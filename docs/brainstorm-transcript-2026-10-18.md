@@ -1,6 +1,6 @@
 # Hackathon brainstorm: picking a track (Granola transcript)
 
-- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:56
+- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 16:01
 - **Source:** Granola note "New note", https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd
 - **Recorded by:** Ralph van Spanje (microphone only; speakers are not separated, so every line is labelled "Microphone")
 - **Note:** Verbatim auto-transcript. It has transcription errors (e.g. "Nematron"/"Nimotron" = Nemotron, "Free Blue and Brown" = 3Blue1Brown).
@@ -1137,3 +1137,339 @@ Microphone: Naming convention. Yeah, yeah, like .n, for example. Oh yeah, it's t
 Microphone: Yeah.
 
 Microphone: Yeah, yeah, yeah.
+
+---
+
+*[Added in the 15:13 Granola sync]*
+
+---
+
+Microphone: Shift to what is, uh,
+
+Microphone: So you can check my branch.
+
+Microphone: You can start dividing into work packages.
+
+Microphone: So I think that we should split the pipe.
+
+Microphone: On architecture, so one part will be integration with SteelDrop.
+
+Microphone: Well, I think that Separated from package, separated model.
+
+Microphone: It's a system.
+
+Microphone: Yep, definitely. I mean, it's an agent, but it's also the master agent. So there will be 3 parts.
+
+Microphone: Till drone integration, which this agent will use. And then the search engine, which this agent will use. And maybe some small subagents.
+
+Microphone: Yes, so it's— yeah, so basically Canvas, right? Yeah.
+
+Microphone: Then agent, I mean, then we need also MCP for the hypers MCP. All the tools are like predefined there, and then, but we need our harness that's gonna basically power all these agents.
+
+Microphone: Yeah, yeah, we can write it just in Python. Yeah, definitely true.
+
+Microphone: And then, well,
+
+Microphone: I think we're also going to need to integrate the harness to the front end, right?
+
+Microphone: Because like our messages, user messages has to reach the harness somehow and it can be not through MCP only. The harness can communicate with the board through MCP, but there has to be communication between the chatbots. What is this?
+
+Microphone: Isn't it basically REST?
+
+Microphone: Okay, sure, we can use it.
+
+Microphone: So what's this? Like, agent can be separately run separately.
+
+Microphone: Some, some service.
+
+Microphone: Okay.
+
+Microphone: I'm letting my clunker run.
+
+Microphone: I'm gonna go first.
+
+Microphone: Did you make any significant play today? You've had some significant changes here.
+
+Microphone: Serverless deployment.
+
+Microphone: And deploy models. You need to deploy a serverless.
+
+Microphone: I think you can use a VM. Yeah. And then you don't need to make— you can have a proper server because we need databases. Yeah.
+
+Microphone: Well, as I understand, you just provide
+
+Microphone: Yeah, they do.
+
+Microphone: For, yeah, for the whole team. That's why I had to form the team in the first place.
+
+Microphone: You also received another email. There will be for that one where you have a link to accept the invite. I wonder if it's gonna work for you now because I have to find a different link to actually reach it.
+
+Microphone: I go through this one where I could accept the invitation.
+
+Microphone: I wonder if it's gonna work for you now because I have to find a different link to actually reach it.
+
+Microphone: Yes, correct.
+
+Microphone: Something on Discord that's important, maybe. Are you in the Discord? Check it because they're saying something that there is something important in Discord. I've heard something with Nemotron, a PDF or something. No, no. Okay, perfect. Then nothing. They were super desired. I was like, shit.
+
+Microphone: Markets, we're not the only ones.
+
+Microphone: Ah, scoring. Just selected the right. I didn't select any. Competition specs 20 points. Creativity 20 points. Except the thing. I can show you what I see. So this is what I see, and I guess here I can create things if I need them, create resources and stuff like that.
+
+Microphone: Oh, is it?
+
+Microphone: Network free.
+
+Microphone: Yeah, we're gonna basically never break possible.
+
+Microphone: Wow, nice!
+
+Microphone: Bro, there's never— there's nowhere water. Okay.
+
+Microphone: It's like warm water in the toilet.
+
+Microphone: Okay, is it looking good? Like the stuff that you— okay, this is too much, right? It's like crime. Yeah, it's a bit— it can be cool, but this is too much.
+
+Microphone: It's not so bad. Yeah, but this, this is bad. Not this, but this. No, I think it's too much.
+
+Microphone: Oh, but it also went— it used the wrong, uh, not the new design. So let me check.
+
+Microphone: You can create some design system.
+
+Microphone: Yeah, yeah, I think I'm thinking this. I make a nice HTML and then you guys just get your Claude to get it and configure it. I think that's the best way. So I'm now just gonna test a lot, a lot of difference.
+
+Microphone: I'm sorry, it's quite cool actually. Well, wow, yes, it's cool. It is insane.
+
+Microphone: Did you get water somewhere or no?
+
+Microphone: It's a bit too much, but I used the V1 too, so I'll fix it. But
+
+Microphone: I think the legend is too complicated right now. Oh yeah, but that one is gone. Like there's just this little popup that you want. So it is already way better. And now use 2 figures. Awesome.
+
+Microphone: Awesome. And this one needs to be inside, of course, because now it's a bit off. But yeah, so, and you can do then details. Yeah, awesome. Can you also add Filters instead of having this small agenda here, this legend, can we have a popup here where we have like different filters that you can click and then you see different things? Yes, they asked for that. Yeah, good one.
+
+---
+
+*[Added in the 16:00 Granola sync]*
+
+---
+
+Microphone: Can you sit down for one moment?
+
+Microphone: Where's it?
+
+Microphone: Just be—
+
+Microphone: No, I just told my agent to work on I explained to it what I wanted to work on.
+
+Microphone: You mean, but you don't need to pay for it?
+
+Microphone: Yes. Airtight, which is a pre-filter.
+
+Microphone: Yeah.
+
+Microphone: I think I'm gonna need to go out with some of these guys before they help me with setting up the cloud for you.
+
+Microphone: It was quite strange in the direction that you went.
+
+Microphone: They said that you need to repeat.
+
+Microphone: I mean, what they put in the documentation is just not happening. You should have received the invite. Maybe you should open spam, junk, I don't know.
+
+Microphone: Yeah, there's also nothing. This is the email that you should have received. Yeah, yeah, but I got this one too, but it doesn't— it didn't give me anything.
+
+Microphone: This one, yeah, I got this one, but before that I also got this one from Nigus. I'm gonna first push this in so that you can work a little bit, and then I'm gonna go and try to figure that out. All right? Yes.
+
+Microphone: Do you want to review PRs or are we just merging them?
+
+Microphone: I'm just checking the folder structure created.
+
+Microphone: But I think, yeah, we have the partner part and the part for the discovery, the research.
+
+Microphone: Okay, merging.
+
+Microphone: And you have also plan updated for you. I think it put only— it didn't create a documentation part of it. It populated it. I will create the documentation for my part.
+
+Microphone: Yeah, go ahead and I'm gonna copy from my page.
+
+Microphone: All right, I'm gonna go to these guys and try to figure this one out.
+
+Microphone: Yeah, this is
+
+Microphone: So ChatGPT, this is awesome.
+
+Microphone: Yeah, I like that.
+
+Microphone: Yeah, I hope I'm wrong.
+
+Microphone: Is going well.
+
+Microphone: Nice, cool.
+
+Microphone: How do you study your interests?
+
+Microphone: Did you do any relevant medical projects?
+
+Microphone: Nice. What did you ask?
+
+Microphone: So, nice.
+
+Microphone: I think the issue is because I created the cloud instance before joining the team.
+
+Microphone: Oh, I also want with, uh, Nebius shirts.
+
+Microphone: Of Nebius sweater and they said they keep it until you submit something. But he just said like, oh, my size is gonna run out, can I please get one? And then he got one. No, no, it was in the toilet.
+
+Microphone: Uh, they're upstairs.
+
+Microphone: No, no, no, no, I got the credits. Okay, you can download. Okay.
+
+Microphone: But I suppose they expect from us to be so transparent that this is your ID, right?
+
+Microphone: So there are 3 teams working on this.
+
+Microphone: And your team, deep research.
+
+Microphone: Only 3. Yeah, free teams.
+
+Microphone: I wonder if everybody else is doing anything there, or if people just have been joining the channels.
+
+Microphone: That's not so possible, of course.
+
+Microphone: Yeah, true.
+
+Microphone: Do you have any multiple university?
+
+Microphone: Okay, because I think then we need your email to get an API key for Simantec Store.
+
+Microphone: Yeah.
+
+Microphone: Yeah, let's get you in.
+
+Microphone: Make no mistakes. Make no mistakes.
+
+Microphone: And that's awesome.
+
+Microphone: Yeah, let's get you in.
+
+Microphone: And then we also have the apartment.
+
+Microphone: I got the access here.
+
+Microphone: I'm gonna open this stuff in the Nebis Cloud so you can just fetch all my secrets too.
+
+Microphone: Definitely for the POC.
+
+Microphone: How's it going? Well, cool.
+
+Microphone: Good stuff.
+
+Microphone: That's looking good. Yeah, really good.
+
+Microphone: Making the landing page and the starter page for either the new user and edit.
+
+Microphone: Yeah, I got it.
+
+Microphone: I can just send them to you on Discord. I'm also gonna open a smoke here where I'm just explaining to our agents how to fetch them from the cloud.
+
+Microphone: There's iPhone for a while.
+
+Microphone: So Token Factory, Daily, OpenAlex has published.
+
+Microphone: We're gonna figure that out in the merge.
+
+Microphone: Yeah, I got it.
+
+Microphone: I'm seeing everything on the third floor.
+
+Microphone: From them, for what exactly?
+
+Microphone: Which one?
+
+Microphone: Yeah, that's for sure.
+
+Microphone: Wait, native stuff? They don't write this stuff, do they? No, no, we don't deploy our own project, but it's possible that the form model system What do I do with the play models here when we have Button Factory? Yeah, right.
+
+Microphone: For the agent, we should use Neuraltron 3.5 Supermodel. Yes.
+
+Microphone: Starting page, we can either do one box or bigger box research question and then rough context with upload seed page or just ask research to start with topics and with this. Which one? One box.
+
+Microphone: Uh, this is then home returning. You see your projects.
+
+Microphone: See your projects, and then it's sort of a landing page kind of idea to explain it.
+
+Microphone: Missing links, I've named it.
+
+Microphone: That's already know what build, like, yeah, so I said him I mean, did you build it from the latest link? So it's not what I already pushed.
+
+Microphone: Yeah, yeah.
+
+Microphone: I've mailed the people now with just some landing pages. This one is.
+
+Microphone: Now this one is old, so wait, sorry.
+
+Microphone: Yeah, this one is the newest. I also have that you can, the notes, you can add them to the certain things or just— Maybe with red lines. Oh, definitely. Yeah, yeah. But this is sort of the main one. And here I've just pure design to iterate on the design. It is cool. So I merge it into this one. We can pitch it like, for example, I don't know. Every research is like investigating a crime. Yeah, 100%. So I did this and then also, so when you change stuff, You see like 4 changes. That's that UI for that part and then update suggestions and then it's pushed. Your branch updated because I will also reuse. Yes. Okay. I will. I'm almost done and I will put it together with the right design too. Okay. Okay.
+
+Microphone: In your guys', yeah, but there is just an old version of there. Is there only in the first one? I think in main. Do you see a first version or not?
+
+Microphone: I think I have it here. I just want to know which branch I'm working with.
+
+Microphone: Oh yeah, yeah, main. I'm just on that own one, so I'm not
+
+Microphone: You put the packages or you—
+
+Microphone: If you want to, you can realign the naming of these variables by those 3. It's okay.
+
+Microphone: In that case, I'm also gonna merge it. Okay.
+
+Microphone: Make no mistakes and be faster.
+
+Microphone: 62.000. Yeah.
+
+Microphone: I have now pushed the
+
+Microphone: Push the useful HTML, but not with the design yet, but the one that's working. Did you open it here or did you push straight to main? Main.
+
+Microphone: Wait.
+
+Microphone: Oh no, sorry.
+
+Microphone: Do this.
+
+Microphone: I'm so clueless. Nice.
+
+Microphone: By the way, this may be useful for you. So for the animation, if you're pressing what you need to search for, how then it's gonna look. So set babies one at a time as they're found, so then they get put on the screen, you know, what we talked about. Treat notes as Yeah, and also able to put notes while it's loading, like the user can already put some notes on. Which one? The bird. The bird board. Okay. Useful. So
+
+Microphone: These are clusters, right? Yeah, I don't know. And each of these is papers? Yeah, yeah, papers. This is already saved, this is new, but that design is gonna go away, of course.
+
+Microphone: And when you click on one of these papers, what happens?
+
+Microphone: Okay, so wow, this is cool.
+
+Microphone: And we have— you have chat. Okay, so one thing that I think would be super cool is when you open a paper, when you open a paper, when you click on it, then the artifacts appear around it, like the diagram the source, that the summary exists. No, it's because it already shows images. Yeah, but then it's not super visual right now. What other artifacts do you mean? Like you could generate a diagram. Out of a paper to explain something. You could generate, you could take the artifacts from the paper. The figures. Yeah, yeah, that's what— yeah, yeah, or like the modified abstract, because right now there is no modified abstract. I don't see it.
+
+Microphone: Right.
+
+Microphone: What do you mean modified abstract? Oh, that it's made for you. Yeah, the summary of the paper for you. No, yeah, that's here. Extend your brain metastasis with mouse model of, and then with quotes. Out of it in the abstract word for word. Right now it's overwhelming in my opinion. Like I don't understand what's happening with this card on the left.
+
+Microphone: And then the card is— but isn't it, if we do them with diagrams and stuff, would it then be even worse? But in my view, you click on a paper and then these things appear around the paper. Like you almost go deeper into it. Like separate widgets. Yeah, that's how I was thinking about it. I'm not sure if there is time to build it now.
+
+Microphone: To build these widgets around the paper, the additional widgets. But I agree with maybe the title. Yeah. Okay, yeah, but if we have time, then maybe the title and already only this separate, separate from each other can be nice because then you always need to know where to look at. Maybe we can, when you finish with general year and general style, you can handle this part yeah, because it's separate. Yeah, what, uh, now getting the design, uh, Fixing, tuning some design and I'm fixing it on top of the thing. I think the main one is now done. So I can already try some main stuff with separate widgets.
+
+Microphone: Oh no, no, that's, that's done. I just did 2 prompts and then have it.
+
+Microphone: I'm not focused on that. Great. Okay, cool.
+
+Microphone: I was looking for researchers that work for me.
+
+Microphone: Berkeley.
+
+Microphone: Probably nobody knows about it. No, that's it.
+
+Microphone: Yeah, nice. I'll circle around you guys and I can get some amazing buildings.
+
+Microphone: Press papers.
+
+Microphone: Oh, by the way, also here's the rank list now.
+
+Microphone: Okay, top. Of the new, uh, things. Perfect.
