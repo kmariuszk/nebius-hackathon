@@ -14,8 +14,6 @@ import uvicorn
 from mcp.server import MCPServer
 from mcp.server.mcpserver import Context
 
-from harness.board.ids import paper_shape_id
-
 BOARD_ID = "b_test"
 PATH = f"/api/mcp/canvas/{BOARD_ID}"
 
@@ -28,6 +26,15 @@ class FakeCanvas:
         self.delay = 0.0  # seconds get_board takes, for cancel tests
         self.closing = False
         self.url = ""
+        # What get_board returns, and the abstract add_quote checks quotes against.
+        self.board: dict[str, Any] = {
+            "papers": [{"paperId": "pmid:9", "title": "Seed paper", "kind": "seed", "status": "new"}],
+            "clusters": [],
+            "goals": [],
+            "discardedIds": [],
+        }
+        self.abstract = ""
+        self.quotes: dict[str, list[str]] = {}
         self.server = MCPServer(name="canvas")
 
         def record(ctx: Context, tool: str, **args: Any) -> None:
@@ -49,14 +56,13 @@ class FakeCanvas:
             started = time.monotonic()
             while time.monotonic() - started < self.delay and not self.closing:
                 await asyncio.sleep(0.05)
-            paper = {"paperId": "pmid:9", "title": "Seed paper", "status": "seed"}
-            return {"papers": [paper], "clusters": [], "goals": []}
+            return self.board
 
         @self.server.tool()
         async def add_papers(papers: list[dict[str, Any]], ctx: Context, near: str | None = None) -> dict[str, Any]:
             """Add paper cards."""
             record(ctx, "add_papers", papers=papers, near=near)
-            return {"added": [paper_shape_id(p["paperId"]) for p in papers], "skipped": []}
+            return {"added": [p["paperId"] for p in papers], "updated": [], "skipped": []}
 
         @self.server.tool()
         async def add_note(text: str, ctx: Context, paperId: str | None = None) -> dict[str, Any]:
@@ -71,9 +77,43 @@ class FakeCanvas:
             return {"added": [], "skipped": []}
 
         @self.server.tool()
-        async def set_scores(scores: list[dict[str, Any]]) -> dict[str, Any]:
+        async def set_scores(paperId: str, scores: dict[str, Any], ctx: Context) -> dict[str, Any]:
             """Not one of board_assistant's tools, so it must never see it."""
-            return {"updated": []}
+            record(ctx, "set_scores", paperId=paperId, scores=scores)
+            return {"ok": True}
+
+        @self.server.tool()
+        async def set_card(
+            paperId: str,
+            ctx: Context,
+            oneLine: str | None = None,
+            claims: list[dict[str, Any]] | None = None,
+            glance: list[dict[str, Any]] | None = None,
+            summary: str | None = None,
+            gaps: list[str] | None = None,
+        ) -> dict[str, Any]:
+            """Fill in a paper's card."""
+            given = {"oneLine": oneLine, "claims": claims, "glance": glance, "summary": summary, "gaps": gaps}
+            fields = {k: v for k, v in given.items() if v is not None}
+            record(ctx, "set_card", paperId=paperId, **fields)
+            return {"ok": True, "written": sorted(fields)}
+
+        @self.server.tool()
+        async def add_quote(paperId: str, text: str, ctx: Context, source: str | None = None) -> dict[str, Any]:
+            """Add a quote from the abstract."""
+            record(ctx, "add_quote", paperId=paperId, text=text)
+            if text not in self.abstract:
+                raise ValueError(f"That text isn't in the abstract of {paperId} word for word; nothing was written")
+            quotes = self.quotes.setdefault(paperId, [])
+            if text not in quotes:
+                quotes.append(text)
+            return {"quoteId": f"q{quotes.index(text) + 1}"}
+
+        @self.server.tool()
+        async def mark_working(paperIds: list[str], on: bool, ctx: Context) -> dict[str, Any]:
+            """Turn the reading badge on or off."""
+            record(ctx, "mark_working", paperIds=paperIds, on=on)
+            return {"ok": True, "skipped": []}
 
     def tools_called(self) -> list[str]:
         return [call["tool"] for call in self.calls]

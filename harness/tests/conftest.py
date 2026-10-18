@@ -57,6 +57,7 @@ class FakePapers:
 
     def __init__(self) -> None:
         self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.fulltext_delay = 0.0  # seconds get_fulltext takes
         self.server = MCPServer(name="papers")
 
         @self.server.tool()
@@ -99,8 +100,23 @@ class FakePapers:
             return {"ranked": ranked, "backend": "super_vl", "skipped": []}
 
         @self.server.tool()
+        async def score_candidates(
+            question: str, candidate_ids: list[str], seed_ids: list[str] | None = None, limit: int = 20
+        ) -> dict[str, Any]:
+            """Scores the candidates in reverse ID order, each closest to the first seed."""
+            args = {"question": question, "candidate_ids": candidate_ids, "seed_ids": seed_ids, "limit": limit}
+            self.calls.append(("score_candidates", args))
+            top = [
+                {"paperId": paper_id, "title": f"Paper {paper_id}", "year": 2024, "score": round(0.9 - 0.1 * i, 2),
+                 "closestSeed": (seed_ids or [None])[0]}
+                for i, paper_id in enumerate(sorted(candidate_ids, reverse=True)[:limit])
+            ]
+            return {"top": top, "scored": len(candidate_ids), "skipped": []}
+
+        @self.server.tool()
         async def get_fulltext(paper_id: str, max_chars: int = 40_000) -> dict[str, Any]:
             self.calls.append(("get_fulltext", {"paper_id": paper_id}))
+            await asyncio.sleep(self.fulltext_delay)
             sections = [{"title": "Results", "text": FULLTEXT}]
             figures = [{"figureId": "F2", "label": "Figure 2", "caption": "TOX expression by T cell state."}]
             return {"paperId": paper_id, "source": "pmc", "url": "https://pmc/PMC1/", "sections": sections,
