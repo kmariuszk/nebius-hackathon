@@ -51,7 +51,8 @@ The demo path is seed upload, a discovery run that fills the board live, the pap
 | Candidate discovery | Build | The master agent splits the question into about 3 sub-queries and runs a search agent on each: PubMed MCP and OpenAlex keyword search, OpenAlex papers citing or sharing references with 2+ seeds, Semantic Scholar recommendations, Tavily for recent work |
 | Ranking + explanations | Build | Embedding and citation-overlap score, Lightning verdicts, Super VL listwise rerank, quote checked by exact match |
 | Early placement | Build | A card goes on the board once its Lightning verdict clears a threshold; the rerank and the summaries update it in place |
-| Canvas graph | Build | Node size = link count, colour = rating; server-side layout |
+| Canvas graph | Build | Node size = link count, colour = rating; distance on the canvas = paper similarity (see Clustering and layout) |
+| Clusters | Build | Leiden communities on a similarity graph of embeddings plus citations; Lightning names each cluster |
 | Filters and "structure by" | Build | Per-viewer filters dim cards by rating, status, year or source; "Structure by" citation, cluster or year re-runs the layout for unpinned cards |
 | Ranked list view | Build | The brief's ranked list, kept in step with the canvas |
 | Paper overlay with summary, quotes and figures | Build | A reader agent summarises the paper on its own, then a context agent relates it to the board; Parse crops figures, Super VL picks the key ones |
@@ -123,9 +124,19 @@ Every change to a board, from a person or an agent, lands in the board's sync ro
 7. A researcher's highlight is saved as a `highlight` shape in the room, so every collaborator sees it and the agent reads it through `get_board`.
 8. Keep or Discard goes over REST, is recorded per researcher, and updates the card's status in the room.
 
+**Clustering and layout:**
+
+Closeness on the canvas means similarity: two cards near each other are about related things. Clusters come from data, not from the agent's judgement, so they are reproducible and explainable.
+
+- **Similarity between two papers** blends meaning and citations: `similarity = 0.6 × cosine(embeddings) + 0.4 × citation overlap`. Embeddings are of title plus abstract (or the rewritten abstract once the reader has run). Citation overlap is the mean of bibliographic coupling (Jaccard overlap of their reference lists) and co-citation (how often other candidates cite both). Distance is `1 − similarity`. Embeddings catch papers on the same topic that never cite each other, including across fields; citations catch papers that are close within a field. The weights are a starting point, tuned on the held-out evaluation.
+- **Clusters.** The discovery service builds a k-nearest-neighbour graph (k ≈ 10, edges weighted by similarity) over the board's papers and finds communities with Leiden. That takes milliseconds for a few hundred papers and needs no GPU. Lightning then names each cluster from its papers' titles; the label is shown as generated and people can rename it.
+- **Layout.** A force-directed layout (d3-force) in the board service: links pull with a strength equal to similarity, each cluster pulls its cards towards its own centre, and cards repel so they never overlap. Cluster centres are placed by their average similarity to each other, so related clusters sit side by side.
+- **Stability.** Clustering runs once after the first discovery run and again only when someone presses "Structure by cluster". In between, a new paper joins the cluster of its most similar neighbour and is placed beside it without moving anything else.
+- **What the agent does.** It never invents clusters or coordinates. It names clusters (`label_cluster`) and, through `near`, can suggest a neighbour; the layout service checks the suggestion against similarity.
+
 **Canvas layout rules:**
 
-- A layout service inside the board service places new cards next to the named neighbour or inside the named cluster, avoiding overlaps.
+- A layout service inside the board service places new cards next to their most similar neighbour, inside that neighbour's cluster, avoiding overlaps.
 - Node size = number of links; colour = rating; badges mark new, working, kept and contested papers.
 - Highlights, quotes, figures and agent notes sit next to their paper card, linked to it.
 - Agents name a cluster or a neighbour (`near`), never coordinates.
@@ -261,6 +272,7 @@ def build_agent(canvas_url: str, papers_url: str, token: str) -> LlmAgent:
 8. **Rerank** (`rerank`). Once scoring finishes, Super VL ranks the top \~100 listwise with all seed abstracts in context; `set_rating` updates the placed cards and the ranked list.
 9. **Read** (`process_papers` → `reader`). For each placed paper, Parse extracts the full text and figures of the open-access PDF, and the reader writes a summary, a rewritten abstract, highlights, quotes checked verbatim against the full text, and the key figures. Papers without an open-access PDF get an abstract-only summary, marked as such.
 10. **Relate** (`context`). The context agent explains why the paper matters for this board and links it to the seeds, notes and highlights it connects to; then the badge clears.
+11. **Cluster** (`cluster_papers`, `label_cluster`). After the first run, the discovery service clusters the board's papers by similarity and the layout service arranges them; Lightning names each cluster. Later runs add papers to existing clusters until someone re-structures the board.
 
 **Memory.** Per board: seeds, kept and discarded papers, verdicts, full text and embeddings, in the discovery service (LanceDB and SQLite); notes, highlights and summaries live in the sync room. Per researcher: their chat history, in the ADK session, and the last activity they saw, for catch-me-up. Discarded papers are a negative signal for every later run, whoever discarded them.
 
@@ -501,7 +513,8 @@ Runs started over REST use a headless harness session, so onboarding and daily r
 | `link_papers` | `{from, to, relation}` | `{linkId}` | Relation: cites, cited\_by, similar, contradicts or extends |
 | `set_rating` | `{paperId, score, verdict}` | `{ok}` | Score 0 to 1; sets the card colour |
 | `add_note` | `{text, paperId}` | `{noteId}` | Authored as the agent on behalf of the member |
-| `create_cluster` | `{label, paperIds}` | `{clusterId}` | Takes the board lease |
+| `apply_clusters` | `{clusters: [{clusterId, paperIds}], similarities}` | `{ok}` | Writes cluster frames and re-runs the layout for unpinned cards; takes the board lease |
+| `label_cluster` | `{clusterId, label}` | `{ok}` | Shown as generated; skipped if a person has renamed the cluster |
 | `mark_working` | `{paperIds, on}` | `{ok}` | The "working" badge everyone sees |
 | `set_summary` | `{paperId, summary, tldr, rewrittenAbstract, whyItMatters}` | `{ok, skipped}` | Skips fields a person has edited |
 | `add_highlight` | `{paperId, text, page, category, note}` | `{highlightId}` | Anchored by finding `text` in the PDF text layer; the category sets the colour |
@@ -520,6 +533,7 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
 | `find_candidates` | `{boardId, seedIds, excludeIds, strategies, since, limit}` | `{candidateIds, countsByStrategy}` |
 | `score_candidates` | `{boardId, candidateIds}` | `{top, scored, unverified}` |
 | `rerank` | `{boardId, paperIds, k}` | `{ranked}` |
+| `cluster_papers` | `{boardId, paperIds}` | `{clusters: [{clusterId, paperIds}], similarities: [{a, b, score}]}`, the k nearest neighbours per paper |
 | `search` | `{query, limit}` | `[PaperSummary]` |
 | `get_paper` | `{paperId}` | `Paper` |
 | `get_fulltext` | `{paperId}` | `{sections: [{title, text, page}], source}`, with `source` either the PDF or the abstract only |
@@ -577,7 +591,7 @@ There is no selection tool, no vote tool and no layout tool: selection is per vi
 | `paper-card` (custom) | `paperId`, `title`, `year`, `rating`, `status`, `w`, `h` | `createdBy`, `onBehalfOf`, `runId`, `pinnedByHuman` |
 | Arrow (built-in, bound to two cards) | Start and end bindings | `relation`, `createdBy` |
 | Note (built-in) | Rich text | `author` |
-| `cluster` (frame) | `label` | `createdBy` |
+| `cluster` (frame) | `label`, `labelGenerated` | `createdBy`, `renamedByHuman` |
 | `highlight` (custom) | `paperId`, `text`, `page`, `category` | `author` or `createdBy`, `runId` |
 | `quote` (custom) | `paperId`, `text`, `section`, `verified` | `createdBy`, `runId` |
 | `figure` (custom) | `paperId`, `figureId`, `imageUrl`, `caption` | `createdBy`, `runId` |
@@ -684,6 +698,7 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 
 - [ ] How many hours do we have? Ralph owns the UI and user flows and the others split the backend and agents; the hours set how much of the Build list survives.
 - [ ] What exactly does Best use of Nemotron judge? The award exists; its criteria aren't in our notes.
+- [ ] Similarity weights: is 0.6 embeddings / 0.4 citations right? Check against the held-out evaluation, and see whether citations are too sparse for very recent preprints.
 - [ ] Which highlight categories? Method, dataset and result came up; the agent assigns them, but can a researcher override?
 - [ ] Are pluggable agents part of the pitch? If not, ADK's own API server with SSE replaces the ACP layer and saves 2 to 3 hours.
 - [ ] Does a Nebius Serverless Endpoint allow one harness process per session, and how much memory does each need?
