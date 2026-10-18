@@ -1,6 +1,27 @@
 # Mockups
 
-## Current: v5, the paper splits into widgets
+## Current: v6, the pinboard look
+
+v5 with the approved pinboard design. Download [`flashcard-v6.html`](flashcard-v6.html) and open it in a browser (online, for the figures and the handwriting font). It works exactly like v5 below; only the look changed.
+
+- **Every paper is a card** that says what it is: "In your collection", or "Suggested · High fit" in words. Saved papers are pinned. New suggestions are taped up, with the agent's reading order in a red circle (it follows Looking for and the filters, and matches the ranked list).
+- **Status on the corner:** New, Split vote, Reading…, ✓ Kept, Discarded, Added by you, Not linked yet.
+- **Strings run pin to pin:** red for cites, a dotted thread for similar, blue for links people draw. They're faint at rest and light up for the card you point at.
+- **Clusters** are faint dotted areas, named on torn tape. Everything you could do with them in v5 still works.
+- **Notes** are handwritten. The agent's notes are red handwriting under new cards.
+- **The opened paper's hub** is the paper's own card, circled in red marker. "Why it matters to you" shows the rank and the fit in words instead of a colour bar.
+- **Pinboard** in the top bar switches the background from paper to cork. It always opens on paper.
+
+![v6 overview](shots-v6/1-overview.png)
+
+| | |
+|---|---|
+| ![An opened paper](shots-v6/2-open.png) | ![Hovering a suggestion](shots-v6/5-hover-suggestion.png) |
+| ![Looking for methods to reuse](shots-v6/6-goal-method.png) | ![Pinboard switched on](shots-v6/7-pinboard-on.png) |
+| ![The key](shots-v6/8-help-key.png) | ![Catch me up](shots-v6/15-catchup.png) |
+| ![List and chat open](shots-v6/16-list-chat.png) | ![Editing clusters](shots-v6/14-clusters-edited.png) |
+
+## Earlier: v5, the paper splits into widgets
 
 The same board as v4, but opening a paper no longer shows one card. The paper splits into widgets around its node. Download [`flashcard-v5.html`](flashcard-v5.html) and open it in a browser (online, for the figures). Everything else (the list, chat, filters, notes, links, Catch me up) works as in v4 below.
 
@@ -34,6 +55,32 @@ We found the v4 card still overwhelming: you didn't know where to look. In v5, e
 **What it needs from the backend:** one more field per paper for the diagram, `glance[]`: 3–4 steps, each with a label (Samples, Method…), a short text, the ID of the quote it comes from, and `same`, `adds` or `other` against the seeds. The agent extracts it from the abstract; the app draws it, so no image model is involved.
 
 **If there's little time to build it:** the cheapest win is separating the title from the why text. The diagram comes next.
+
+### Editing the board
+
+People can change everything the agent made. Each edit counts as a change, and the agent waits until someone presses **Update suggestions**, as agreed in the brainstorm. Click "N changes" in the toolbar to see what the agent will catch up on.
+
+- **Notes:** click a note to edit it, on the board or in the open paper's notes widget. × deletes it, with Undo. Editing someone else's note shows "edited by you".
+- **Clusters:** the agent groups papers by how similar their abstracts are (embeddings), and marks its clusters **AI**. A cluster's box fits around its papers. You can:
+  - click its name to rename or ungroup it (renaming removes the AI tag);
+  - drag the cluster to move it with its papers;
+  - drag its edges or corners to make it bigger. Papers without a cluster that end up inside join it, and it can't be made smaller than its own papers;
+  - drag a paper in or out. The target cluster lights up while you drag. A paper dragged out offers "Start a new cluster".
+- **Papers you found:** drop a PDF on the board (or on a cluster, to put it there), paste a DOI, or use **Paper** in the toolbar. It's read, then waits as "Not linked yet". On Update suggestions the agent links it to its seeds and says which cluster fits it best, but leaves it where you put it. In the mockup every added paper becomes Sievers 2023 (Cancer Cell), a real paper that cites four of the seeds.
+- **Update suggestions:** the chat shows your changes, then each step the agent took, with model and time.
+
+**What it needs from the backend:**
+- clusters stored with the board: `id`, `label`, `by` (agent or a person), the member papers, and the size a person gave them;
+- user-added papers: the file or DOI, and whether the agent has read and linked them yet;
+- a list of pending changes that Update suggestions sends to the agent in one go.
+
+| | |
+|---|---|
+| ![Clusters with AI tags](shots-v5/12-clusters.png) | ![Renaming a cluster](shots-v5/13-cluster-rename.png) |
+| ![Dragging a paper into a cluster](shots-v5/14-drag-into.png) | ![A paper dragged out](shots-v5/15-dropped-out.png) |
+| ![Making a cluster bigger](shots-v5/22-cluster-resized.png) | ![Dropping a PDF](shots-v5/19-dropzone.png) |
+| ![A paper you added, not linked yet](shots-v5/16-paper-added.png) | ![Editing a note in the open paper](shots-v5/18-note-edit.png) |
+| ![What the agent will catch up on](shots-v5/23-changes-list.png) | ![After Update suggestions](shots-v5/24-update-log.png) |
 
 | | |
 |---|---|

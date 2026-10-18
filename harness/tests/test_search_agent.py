@@ -32,7 +32,7 @@ async def test_search_agent_calls_the_papers_mcp_and_finishes_with_done(papers_m
                 "done",
                 sub_query="melanoma T cells",
                 candidates=[CANDIDATE],
-                candidate_ids=["pmid:1", "pmid:2"],
+                seed_candidates=1,
                 notes="",
             ),
         ]
@@ -56,7 +56,7 @@ async def test_search_agent_calls_the_papers_mcp_and_finishes_with_done(papers_m
     assert state[search.RESULT_KEY] == {
         "subQuery": "melanoma T cells",
         "candidates": [{"paperId": "pmid:1", "title": "Single-cell melanoma atlas", "foundBy": ["pubmed"], "why": "atlas"}],
-        "candidateIds": ["pmid:1", "pmid:2"],
+        "seedCandidates": 1,
         "notes": "",
     }
 
@@ -65,8 +65,8 @@ async def test_done_with_a_bad_answer_asks_the_model_to_fix_it(papers_mcp):
     agent = search.build()
     agent.model = model = ScriptedLlm(
         turns=[
-            call("done", sub_query="melanoma T cells", candidates=[{"title": "no id"}], candidate_ids=[], notes=""),
-            call("done", sub_query="melanoma T cells", candidates=[], candidate_ids=[], notes="no results"),
+            call("done", sub_query="melanoma T cells", candidates=[{"title": "no id"}], seed_candidates=0, notes=""),
+            call("done", sub_query="melanoma T cells", candidates=[], seed_candidates=0, notes="no results"),
         ]
     )
 

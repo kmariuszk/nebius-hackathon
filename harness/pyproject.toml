@@ -37,4 +37,6 @@ filterwarnings = [
     # ADK announces its own experimental features and deprecations on every run.
     "ignore:\\[EXPERIMENTAL\\]:UserWarning",
     "ignore:MCPTool class is deprecated:DeprecationWarning",
+    # AgentTool passes the parent's plugins to its own runner the old way.
+    "ignore:The `plugins` argument is deprecated:DeprecationWarning",
 ]

@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Missing Links: find the papers you’re missing</title>
+<meta name="description" content="Start from a question, a few papers you trust, or both. An agent finds the papers your search missed and shows the sentence behind every claim.">
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./landing.css">
+</head>
+<body data-page="start">
+<header class="nav-wrap">
+  <nav class="nav">
+    <a class="logo" href="./index.html"><svg class="pp-logo" aria-hidden="true"><use href="#ppLogo"/></svg>Missing Links</a>
+    <span class="grow"></span>
+    <a href="./how-it-works.html">How it works</a>
+    <a href="#" data-login data-guest>Log in</a>
+    <button class="btn sm" type="button" data-login data-guest>Sign up</button>
+    <a class="user" href="./home.html" data-user hidden><span class="av" data-user-initial></span><span data-user-name></span></a>
+  </nav>
+</header>
+
+<main class="start">
+  <h1>Find the papers you’re <span id="missing">missing</span>.</h1>
+  <svg class="pp-overlay" id="overlay" aria-hidden="true"></svg>
+  <p class="sub">Start from a question, a few papers you trust, or both.</p>
+
+  <div class="compose">
+    <div class="onebox">
+      <label for="ta" class="sr-only">Your research question, topic, or papers</label>
+      <textarea class="ta" id="ta" rows="3" placeholder="Ask a research question, describe your topic, or paste DOIs and PubMed links…"></textarea>
+      <div class="chips" id="seeds" aria-live="polite"></div>
+      <div class="bar">
+        <button class="attach" id="addPapers" type="button">+ Add papers</button>
+        <input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+        <span class="small">PDFs, DOIs or PubMed links</span>
+        <span class="grow"></span>
+        <button class="send" id="send" type="button" title="Start" aria-label="Start" disabled>↑</button>
+      </div>
+    </div>
+    <div class="hint" id="hint" aria-live="polite"></div>
+  </div>
+
+  <div class="examples">
+    <span class="pp-hand">Try an example:<svg class="pp-arrow" viewBox="0 0 26 16" aria-hidden="true"><path d="M2 5 C9 2 15 4 22 9"/><path d="M16.5 9.6 L22.4 9.3 L20.3 4.2"/></svg></span>
+    <button class="chip" type="button" data-example="melanoma">Melanoma immune cells</button>
+    <button class="chip" type="button" data-example="topic">CD4 T-cell help</button>
+    <button class="chip" type="button" data-example="topic">Gut microbiome and immunotherapy</button>
+  </div>
+
+  <div class="demo-link" id="demoLink" hidden>or <a href="#">open a demo board that’s been running for an hour →</a></div>
+</main>
+
+<footer class="tinyfoot">Built at the Pre-GTC HCLS Hackathon · <a data-repo="">GitHub</a></footer>
+
+<script src="./config.js"></script>
+<script src="./api.js"></script>
+<script src="./landing.js"></script>
+</body>
+</html>

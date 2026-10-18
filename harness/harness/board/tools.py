@@ -104,7 +104,10 @@ class BoardTools:
             return NoTools()
         return McpToolset(
             connection_params=StreamableHTTPConnectionParams(
-                url=self.canvas_url, headers=self.canvas_headers or None, timeout=toolsets.TIMEOUT
+                url=self.canvas_url,
+                headers=self.canvas_headers or None,
+                timeout=toolsets.CONNECT_TIMEOUT,
+                sse_read_timeout=toolsets.CALL_TIMEOUT,
             ),
             tool_filter=list(tool_names) or None,
             header_provider=self.run_headers,

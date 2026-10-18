@@ -36,8 +36,9 @@ with a broader rewording.
 to expand from the seeds through citations, similar articles and recommendations.
 3. Call `done` with your answer, even if the results are thin; say so in `notes`. `done` ends the run.
 - `candidates`: up to 15 papers from `search` that look on-topic, with why each fits the sub-query.
-- `candidate_ids`: every on-topic ID from `search` plus every ID from `find_candidates`.
+- `seed_candidates`: how many IDs `find_candidates` returned, or 0 if you didn't call it.
 - `notes`: sources that failed or were skipped, thin results, or "".
+Every ID the tools return is collected for ranking automatically, so don't list them all.
 
 Only report paper IDs and titles that a tool returned. Never invent them.
 """
@@ -53,14 +54,14 @@ class Candidate(BaseModel):
 class SearchResult(BaseModel):
     sub_query: str = Field(serialization_alias="subQuery")
     candidates: list[Candidate]
-    candidate_ids: list[str] = Field(serialization_alias="candidateIds")
+    seed_candidates: int = Field(ge=0, serialization_alias="seedCandidates")
     notes: str
 
 
 def done(
     sub_query: str,
     candidates: list[Candidate],
-    candidate_ids: list[str],
+    seed_candidates: int,
     notes: str,
     tool_context: ToolContext,
 ) -> dict:
@@ -70,12 +71,12 @@ def done(
         sub_query: The sub-query you ran.
         candidates: Up to 15 on-topic papers from `search`, each with paper_id, title,
             found_by and why (a short phrase on how it fits the sub-query).
-        candidate_ids: Every on-topic ID from `search` plus every ID from `find_candidates`.
+        seed_candidates: How many IDs `find_candidates` returned, or 0 if you didn't call it.
         notes: Sources that failed or were skipped, thin results, or "".
     """
     try:
         result = SearchResult(
-            sub_query=sub_query, candidates=candidates, candidate_ids=candidate_ids, notes=notes
+            sub_query=sub_query, candidates=candidates, seed_candidates=seed_candidates, notes=notes
         )
     except ValidationError as error:
         return {"error": f"Fix these fields and call done again: {error}"}
@@ -91,8 +92,9 @@ def build() -> LlmAgent:
         name="search",
         description=(
             "Runs one search sub-query over PubMed, OpenAlex and the web, optionally expanding "
-            "from seed papers, and returns candidate paper IDs. Input: the sub-query, plus any "
-            "seed paper IDs and IDs to exclude."
+            "from seed papers, and reports its picks; every ID its tools return goes to the "
+            "master's candidate pool. Input: the sub-query, plus any seed paper IDs and IDs "
+            "to exclude."
         ),
         model=models.lightning(),
         instruction=INSTRUCTION,

@@ -9,12 +9,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Iterable
+import os
+import xml.etree.ElementTree as ET
+from collections.abc import Awaitable, Callable, Iterable
+from dataclasses import asdict
 from typing import Any, Literal
 
 import httpx
 
-from discovery.papers import Paper, format_id, ids_from_url, parse_id
+from discovery import fulltext
+from discovery import rerank as listwise
+from discovery import rerank_vl
+from discovery.fulltext import FullText
+from discovery.papers import Paper, default_url, format_id, ids_from_url, parse_id
 from discovery.sources import Skipped, arxiv, openalex, pubmed, semantic_scholar, tavily
 from discovery.store import Store
 
@@ -24,6 +31,8 @@ SearchSource = Literal["pubmed", "openalex", "web"]
 Strategy = Literal["keyword", "web", "pubmed_links", "citing", "recommend"]
 SEARCH_SOURCES: tuple[SearchSource, ...] = ("pubmed", "openalex", "web")
 SEED_STRATEGIES: tuple[Strategy, ...] = ("pubmed_links", "citing", "recommend")
+RerankBackend = Literal["super_vl", "rerank_vl"]
+RERANK_BACKENDS: tuple[RerankBackend, ...] = ("super_vl", "rerank_vl")
 
 # PubMed similar articles taken per seed; the list is ranked, so the top is enough.
 SIMILAR_PER_SEED = 20
@@ -63,16 +72,8 @@ class Discovery:
         limit: int = 100,
         query: str | None = None,
     ) -> dict[str, Any]:
-        seeds, skipped = [], []
-        for seed_id in seed_ids:
-            try:
-                seeds.append(await self.get_paper(seed_id))
-            except (ValueError, Skipped, httpx.HTTPError) as error:
-                skipped.append(f"seed {seed_id}: {error}")
-        excluded = {alias for seed in seeds for alias in seed.aliases()}
-        for paper_id in exclude_ids or []:
-            stored = self.store.get(paper_id)
-            excluded |= set(stored.aliases()) if stored else {format_id(*parse_id(paper_id))}
+        seeds, skipped = await self._papers(seed_ids, "seed")
+        excluded = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
 
         jobs: dict[str, Awaitable[list[Paper]]] = {}
         for strategy in dict.fromkeys(strategies):
@@ -103,6 +104,60 @@ class Discovery:
             "countsByStrategy": {name: len(hits) for name, hits in found.items()},
             "skipped": skipped + failed,
         }
+
+    async def rerank(
+        self,
+        goal: str,
+        paper_ids: list[str],
+        seed_ids: list[str] | None = None,
+        exclude_ids: list[str] | None = None,
+        k: int = 20,
+        backend: RerankBackend | None = None,
+    ) -> dict[str, Any]:
+        k = max(1, k)
+        backend = backend or os.environ.get("RERANK_BACKEND", "").strip() or "super_vl"
+        if backend not in RERANK_BACKENDS:
+            raise ValueError(
+                f"Unknown rerank backend {backend!r} (RERANK_BACKEND): use one of {', '.join(RERANK_BACKENDS)}"
+            )
+        seeds, skipped = await self._papers(seed_ids or [], "seed")
+        # Seeds and excluded papers are never ranked, under any of their IDs.
+        seen = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
+        # Cap before loading: each ID missing from the store costs scholarly API calls.
+        wanted = [i for i in dict.fromkeys(paper_ids) if i not in seen]
+        if len(wanted) > listwise.MAX_CANDIDATES:
+            skipped.append(
+                f"{len(wanted) - listwise.MAX_CANDIDATES} candidates past the first "
+                f"{listwise.MAX_CANDIDATES} were not ranked"
+            )
+            wanted = wanted[: listwise.MAX_CANDIDATES]
+        candidates, failed = await self._papers(wanted, "candidate")
+        skipped += failed
+        # The same paper under two IDs is ranked once.
+        unique = []
+        for paper in candidates:
+            if not seen & set(paper.aliases()):
+                seen |= set(paper.aliases())
+                unique.append(paper)
+        if not unique:
+            model = rerank_vl.model_id() if backend == "rerank_vl" else listwise.model_id()
+            result = {"ranked": [], "model": model, "seconds": 0.0}
+            skipped.append("no candidates to rank")
+            return {**result, "backend": backend, "candidates": 0, "skipped": skipped}
+        if backend == "rerank_vl":
+            try:
+                result = await rerank_vl.rerank(self.client, goal, unique, k)
+            except Skipped as error:
+                skipped.append(f"rerank_vl: {error}; ranked with super_vl")
+                backend = "super_vl"
+            except (httpx.HTTPError, KeyError, IndexError, TypeError) as error:
+                log.error("rerank_vl failed", exc_info=error)
+                skipped.append(f"rerank_vl: {type(error).__name__}: {error}; ranked with super_vl")
+                backend = "super_vl"
+        if backend == "super_vl":
+            result = await listwise.rerank(self.client, goal, seeds, unique, k)
+        skipped += result.pop("warnings")
+        return {**result, "backend": backend, "candidates": len(unique), "skipped": skipped}
 
     async def resolve_seed(
         self, doi: str | None = None, pmid: str | None = None, title: str | None = None
@@ -140,6 +195,100 @@ class Discovery:
         if paper is None:
             raise ValueError(f"No paper found for {paper_id!r}")
         return self.store.save(paper)
+
+    async def get_fulltext(self, paper_id: str, max_chars: int = fulltext.DEFAULT_MAX_CHARS) -> dict[str, Any]:
+        paper = await self.get_paper(paper_id)
+        text, skipped = await self._fulltext(paper)
+        return {
+            "paperId": paper.paper_id,
+            "title": paper.title,
+            "source": text.source,
+            "url": text.url,
+            **text.fit(max_chars),
+            "figures": [asdict(f) for f in text.figures],
+            "skipped": skipped,
+        }
+
+    async def check_quotes(self, paper_id: str, quotes: list[str]) -> dict[str, Any]:
+        paper = await self.get_paper(paper_id)
+        text, _ = await self._fulltext(paper)
+        checked = []
+        for passage in quotes:
+            section = text.find(passage)
+            checked.append(
+                {
+                    "text": passage,
+                    "verbatim": section is not None,
+                    "section": section.title if section else None,
+                    "link": fulltext.text_link(text.url, passage) if section else None,
+                }
+            )
+        return {"paperId": paper.paper_id, "source": text.source, "quotes": checked}
+
+    async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str]]:
+        """The paper's full text from the first source that has it, and why the others didn't."""
+        if cached := self.store.get_fulltext(paper.paper_id):
+            return cached, []
+        if "pmcid" not in paper.ids and "pmid" in paper.ids:
+            # OpenAlex and Semantic Scholar records often lack the PMCID that PubMed's has.
+            try:
+                if record := await self._by_pmid(paper.ids["pmid"]):
+                    paper = self.store.save(record)
+            except httpx.HTTPError as error:
+                log.warning("PubMed lookup for %s failed: %s", paper.paper_id, error)
+        url = paper.url or default_url(paper.ids)
+        attempts: list[tuple[str, Callable[[], Awaitable[FullText | None]]]] = []
+        if pmcid := paper.ids.get("pmcid"):
+            pmc_url = f"https://pmc.ncbi.nlm.nih.gov/articles/{pmcid}/"
+            attempts.append(("pmc", lambda: self._pmc(pmcid, pmc_url, paper.abstract)))
+        if arxiv_id := paper.ids.get("arxiv"):
+            attempts.append(("arxiv", lambda: self._web(f"https://arxiv.org/html/{arxiv_id}")))
+        # PubMed and arXiv abstract pages hold no more than the record already does.
+        for page in dict.fromkeys(filter(None, [paper.open_access_pdf, url])):
+            if "arxiv.org" not in page and "pubmed.ncbi" not in page:
+                attempts.append(("web", lambda page=page: self._web(page)))
+        skipped = [] if attempts else ["no PMC, arXiv or publisher copy is known"]
+        for name, attempt in attempts:
+            try:
+                if found := await attempt():
+                    self.store.save_fulltext(paper.paper_id, found)
+                    return found, skipped
+                skipped.append(f"{name}: no full text there")
+            except (Skipped, httpx.HTTPError, ET.ParseError) as error:
+                skipped.append(f"{name}: {error}")
+        return fulltext.from_abstract(paper.abstract, url), skipped
+
+    async def _pmc(self, pmcid: str, url: str, abstract: str | None) -> FullText | None:
+        return fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
+
+    async def _web(self, url: str) -> FullText | None:
+        markdown = await tavily.extract(self.client, url)
+        return fulltext.from_markdown(markdown, url) if markdown else None
+
+    async def _papers(self, paper_ids: list[str], role: str) -> tuple[list[Paper], list[str]]:
+        """The records for `paper_ids`, loaded concurrently, and a note for each that failed."""
+        unique = list(dict.fromkeys(paper_ids))
+        results = await asyncio.gather(*map(self.get_paper, unique), return_exceptions=True)
+        papers, skipped = [], []
+        for paper_id, result in zip(unique, results):
+            if isinstance(result, (ValueError, Skipped, httpx.HTTPError)):
+                skipped.append(f"{role} {paper_id}: {result}")
+            elif isinstance(result, BaseException):
+                raise result
+            else:
+                papers.append(result)
+        return papers, skipped
+
+    def _aliases(self, paper_ids: list[str]) -> set[str]:
+        """Every known ID of each paper, from the store; malformed IDs are ignored."""
+        aliases: set[str] = set()
+        for paper_id in paper_ids:
+            try:
+                stored = self.store.get(paper_id)
+                aliases |= set(stored.aliases()) if stored else {format_id(*parse_id(paper_id))}
+            except ValueError:
+                continue
+        return aliases
 
     async def _by_pmid(self, pmid: str) -> Paper | None:
         return next(iter(await pubmed.efetch(self.client, [pmid])), None)

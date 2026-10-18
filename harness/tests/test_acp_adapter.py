@@ -60,7 +60,7 @@ async def test_a_prompt_streams_the_plan_cards_from_sub_agents_and_the_answer(ca
         ],
         search=[
             call("search", query="exhausted CD8 T cells in melanoma", limit=10),
-            call("done", sub_query="exhausted CD8 T cells", candidates=[CANDIDATE], candidate_ids=["pmid:1"], notes=""),
+            call("done", sub_query="exhausted CD8 T cells", candidates=[CANDIDATE], seed_candidates=0, notes=""),
         ],
     )
     async with harness(env=env) as h:
