@@ -142,7 +142,6 @@ dialog.login h2{margin:0 0 4px;font-size:18px}
 dialog.login input{width:100%;border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;font:inherit;font-size:15px;margin:12px 0 14px}
 dialog.login .row{display:flex;justify-content:flex-end;gap:8px}
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#222;color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;z-index:60;max-width:min(560px,92vw)}
-.mockbar{background:#fff3c4;color:#5c4a00;text-align:center;font-size:12.5px;padding:6px}
 
 @media (max-width:820px){
   .nav{padding:14px 18px;gap:14px}

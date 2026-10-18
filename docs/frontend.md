@@ -24,7 +24,7 @@ Home ──(Catch me up)────▶ board /{id}?tour=1
 Board ──(‹ Boards)──────▶ Home
 ```
 
-Add `?mock=1` to any page to use sample data instead of the board service; a yellow bar says so. With sample data there's no real board to open, so every board link opens the demo board instead, and its **‹ Boards** button goes back to Home with sample data.
+Add `?mock=1` to any page to use sample data instead of the board service. With sample data there's no real board to open, so every board link opens the demo board instead, and its **‹ Boards** button goes back to Home with sample data.
 
 To try it: `cd client && pnpm dev`, then open `/landing/index.html?mock=1`. Use the full file name: `/landing/` falls through to the React app.
 

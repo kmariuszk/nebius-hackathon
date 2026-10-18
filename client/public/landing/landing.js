@@ -23,7 +23,6 @@
     <symbol id="ppLogo" viewBox="0 0 22 28"><path d="M11 15.5 L8.6 26.5" stroke="#9a9a9a" stroke-width="1.8" stroke-linecap="round"/><ellipse cx="11.4" cy="15.6" rx="4.4" ry="1.6" fill="#a8261f"/><circle cx="11" cy="8.5" r="7.5" fill="url(#ppGrad)"/><circle cx="8.4" cy="5.9" r="2" fill="#fff" opacity=".7"/></symbol>
   </defs></svg>`);
   $$('[data-repo]').forEach((a) => (a.href = C.repoUrl + (a.dataset.repo || '')));
-  if (API.mock) document.body.prepend(el('div', { class: 'mockbar', text: 'Sample data: the board service is not connected.' }));
 
   /* ---------- toast ---------- */
   let toastT;
