@@ -18,6 +18,9 @@ export interface ChatPanelProps {
 	memberId: string
 	/** Null until the canvas has mounted. */
 	editor: Editor | null
+	/** Opened and closed from the top bar's Chat button. */
+	open: boolean
+	onOpenChange: (open: boolean) => void
 }
 
 type Status = 'idle' | 'connecting' | 'ready' | 'closed'
@@ -26,8 +29,7 @@ const CANCELLED: RequestPermissionResponse = { outcome: { outcome: 'cancelled' }
 
 // The chat panel (T05): a column beside the canvas, a narrow rail when closed. The ACP connection
 // (and with it the harness process) starts the first time the panel opens, not on page load.
-export function ChatPanel({ boardId, memberId, editor }: ChatPanelProps) {
-	const [open, setOpen] = useState(false)
+export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOpen }: ChatPanelProps) {
 	const [status, setStatus] = useState<Status>('idle')
 	const [closeReason, setCloseReason] = useState('')
 	const [state, dispatch] = useReducer(chatReducer, initialChatState)

@@ -1,5 +1,6 @@
 import type { Editor, TLAnyBindingUtilConstructor, TLAnyShapeUtilConstructor, TLShape } from 'tldraw'
 import { NOTE_PIN_TYPE } from '../../shared/bindings'
+import { linkedCards } from '../pinboard/Strings'
 import { filters } from '../viewerState'
 import { NotePinBindingUtil } from './NotePinBindingUtil'
 import { PaperCardShapeUtil } from './PaperCardShapeUtil'
@@ -21,6 +22,8 @@ export function getShapeVisibility(shape: TLShape, editor?: Editor): 'visible' |
 	if (shape.type === 'arrow') {
 		if (shape.meta.hiddenByHuman === true) return 'hidden'
 		if (editor && boundToHidden(editor, shape, 'arrow')) return 'hidden'
+		// links between papers are drawn as strings (pinboard/Strings.tsx), not as arrows
+		if (editor && linkedCards(editor, shape)) return 'hidden'
 	}
 	if (shape.type === 'note' && editor && boundToHidden(editor, shape, NOTE_PIN_TYPE)) return 'hidden'
 	return 'inherit'
