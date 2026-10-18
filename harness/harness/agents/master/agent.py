@@ -83,7 +83,7 @@ sub-queries first; the next `rerank` ranks old and new candidates together.
 """
 
 # How many top-scored candidates go onto the board in a first run.
-PLACE = 12
+PLACE = 2
 
 BOARD_INSTRUCTION = f"""\
 You are the research assistant on a shared paper discovery board. You talk with one researcher about \
