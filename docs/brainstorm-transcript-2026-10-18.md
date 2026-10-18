@@ -1,6 +1,6 @@
 # Hackathon brainstorm: picking a track (Granola transcript)
 
-- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 16:01
+- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 16:17
 - **Source:** Granola note "New note", https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd
 - **Recorded by:** Ralph van Spanje (microphone only; speakers are not separated, so every line is labelled "Microphone")
 - **Note:** Verbatim auto-transcript. It has transcription errors (e.g. "Nematron"/"Nimotron" = Nemotron, "Free Blue and Brown" = 3Blue1Brown).
@@ -1473,3 +1473,115 @@ Microphone: Press papers.
 Microphone: Oh, by the way, also here's the rank list now.
 
 Microphone: Okay, top. Of the new, uh, things. Perfect.
+
+---
+
+*[Added in the 16:17 Granola sync]*
+
+---
+
+Microphone: Yeah, sure.
+
+Microphone: I know it's just a Jimmy.
+
+Microphone: So these are engineers.
+
+Microphone: How's Adrian?
+
+Microphone: I don't know if like the search is good or not. I have no idea what they're looking for.
+
+Microphone: Yeah, but it doesn't matter. It doesn't matter. Like, it doesn't.
+
+Microphone: You can do search on AI.
+
+Microphone: Yeah.
+
+Microphone: Can I ask you to run a little selection to review? Yeah, yes.
+
+Microphone: Okay.
+
+Microphone: Zambia.
+
+Microphone: That is mostly left-right rewarded.
+
+Microphone: Yeah, yeah, it's working very good right now.
+
+Microphone: I'm testing the search one right now. I'm also building the left one and the right one.
+
+Microphone: I will use also automatic.
+
+Microphone: Doing why we exclude this tool, so we will show them every demo before we record it.
+
+Microphone: And then we will explain technical background.
+
+Microphone: Sounds good.
+
+Microphone: It would be interesting if we were trying to say something about the mathematics breakthrough that has happened recently.
+
+Microphone: Yeah, I heard about it too.
+
+Microphone: Yeah, and we can see that there are so many papers being published right now. It's super hard to keep up.
+
+Microphone: It's not actually so good.
+
+Microphone: The portable AI model generating some scope.
+
+Microphone: Yeah, it's true, but it produced a counterexample, right?
+
+Microphone: Yeah, but it's not a complete It's not correct. Really? Yeah, so I mean, so researchers, real researchers went through, they found that the method which they have OpenAI used, it's not complete. So, so it's Well, but like there's lots of buzz around it, so we could say that this is about like— we can say something.
+
+Microphone: Yeah.
+
+Microphone: For example, someone thinks that this is pretty cool, or also someone is skeptical.
+
+Microphone: Catch their attention by saying that.
+
+Microphone: But actually it's not so that this is— yeah, it's not possible. And then they will start to look into what we are presenting, why we are presenting.
+
+Microphone: And what about the clusters, by the way? Do they get made by the AI at start?
+
+Microphone: Like the clusters.
+
+Microphone: Well, so we have a definition for a distance.
+
+Microphone: On the map between 2 papers.
+
+Microphone: But we don't— we haven't really thought about clusters, did we? I think I put something in the documentation about clusters.
+
+Microphone: You can build clusters.
+
+Microphone: Add some papers to use them.
+
+Microphone: We think they are
+
+Microphone: I want to link this article.
+
+Microphone: It's not sometimes related by the citations, it's related by the— some semantic connection between the papers.
+
+Microphone: Right now this is mostly semantic connection, the distance, the similarity.
+
+Microphone: It's cosine of embeddings plus citation overlap.
+
+Microphone: So it's going to be a thing, right? Then I prepare for that. And the user can— oh yeah, user, can he edit? What, clusters? Yeah.
+
+Microphone: It goes off from it. So yeah, it's difficult, right?
+
+Microphone: If he adds new node, it should be able to Well, because the graph is built as a spreadsheet, but we need Oh, in general, just a feature that also the user can drop a paper, of course.
+
+Microphone: But is it happening for chat or is it happening on the board? Both, I think, right? Again, that's suggesting You know, so first let the user do it, pop it into a section and stuff, and then the update suggestion like Claude design like this. So this No, it's like when you just know.
+
+Microphone: Did it post anything on your PR?
+
+Microphone: He's gonna post one comment with 6 critical things.
+
+Microphone: Size and voice.
+
+Microphone: A is an embedding for A.
+
+Microphone: I'm surprised of how good Opus 5.5 is and how quick, how quick especially, it's insane.
+
+Microphone: But everything would even say deep voice.
+
+Microphone: Investments that they're going for.
+
+Microphone: Recombination for concrete.
