@@ -1,5 +1,5 @@
 // The cluster tools against a real TLSocketRoom on a temp data dir: node --test server/clusterTools.test.ts
-import type { TLFrameShape, TLRecord, TLShape } from '@tldraw/tlschema'
+import type { TLBinding, TLFrameShape, TLRecord, TLShape } from '@tldraw/tlschema'
 import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -7,9 +7,9 @@ import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { clusterShapeId, paperShapeId } from '../shared/ids.ts'
 import type { PaperCardShape } from '../shared/shapes.ts'
-import { addPapers, getBoard, ToolError, type ToolContext } from './canvasTools.ts'
+import { addNote, addPapers, getBoard, ToolError, type ToolContext } from './canvasTools.ts'
 import { applyClusters, labelCluster } from './clusterTools.ts'
-import { isFree, shapeBoxes } from './layout.ts'
+import { centre, isFree, shapeBoxes } from './layout.ts'
 import type { ClusterResult, PapersClient } from './papersClient.ts'
 import { closeAllRooms, patchShapes, putShapes, readRoom, setRoomsDir } from './rooms.ts'
 
@@ -161,6 +161,33 @@ test('add_papers near a clustered paper, or near a cluster, joins it; a full fra
 	addPapers(ctx, { papers: Array.from({ length: 6 }, (_, i) => paper(`o${i}`, { near: 'a' })) })
 	assert.deepEqual(frame(ctx, 'c1').props, size)
 	assert.ok(['o0', 'o1', 'o2', 'o3', 'o4', 'o5'].some((id) => card(ctx, id).parentId !== c1.id))
+	assertNoOverlaps(ctx)
+})
+
+test('notes pinned to a clustered paper go beside it, outside the frame; a person’s note keeps its paper put', async () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: ['a', 'b', 'c'].map((id) => paper(id)) })
+	const { shapeId } = addNote(ctx, { text: 'Read the methods', paperId: 'a' })
+	const people = { ...card(ctx, 'c') }
+	putShapes(ctx.boardId, [
+		{ id: 'shape:their-note', type: 'note', x: people.x + 80, y: people.y, props: get<TLShape>(ctx, shapeId).props, meta: { author: 'm_ben' } },
+		{ typeName: 'binding', id: 'binding:their-pin', type: 'note-pin', fromId: 'shape:their-note', toId: people.id, props: { dx: 80, dy: 0 }, meta: {} },
+	])
+	clusters = { clusters: [{ clusterId: 'c1', paperIds: ['a', 'b', 'c'], label: 'Methods' }], similarities: [] }
+
+	const result = await applyClusters(ctx, {})
+	assert.deepEqual(result.skipped, [{ paperId: 'c', reason: 'a person’s note is pinned to it' }])
+	assert.deepEqual(card(ctx, 'c'), people)
+
+	const boxes = shapeBoxes(all(ctx))
+	const note = boxes.get(shapeId)!
+	const frameBox = boxes.get(clusterShapeId('c1'))!
+	assert.ok(isFree([frameBox], note), 'the note sits outside the frame')
+	const pin = all(ctx).find((r) => r.typeName === 'binding' && r.type === 'note-pin' && r.fromId === shapeId) as TLBinding<'note-pin'>
+	const cardBox = boxes.get(card(ctx, 'a').id)!
+	assert.deepEqual({ dx: note.x - cardBox.x, dy: note.y - cardBox.y }, pin.props)
+	const [n, c] = [centre(note), centre(cardBox)]
+	assert.ok(Math.hypot(n.x - c.x, n.y - c.y) < 400, 'the note stays beside its paper')
 	assertNoOverlaps(ctx)
 })
 

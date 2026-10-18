@@ -1,8 +1,9 @@
 import type { TLFrameShape, TLShapeId } from '@tldraw/tlschema'
 import { getIndexBelow, type IndexKey } from '@tldraw/utils'
 import { z } from 'zod'
+import { NOTE_PIN_TYPE, type NotePinBinding } from '../shared/bindings.ts'
 import { clusterShapeId } from '../shared/ids.ts'
-import { isAgentShape } from '../shared/meta.ts'
+import { isAgentShape, isHumanTouched } from '../shared/meta.ts'
 import type { PaperCardShape } from '../shared/shapes.ts'
 import {
 	agentMeta,
@@ -20,7 +21,7 @@ import {
 } from './canvasTools.ts'
 import { centre, placeNear, shapeBoxes } from './layout.ts'
 import type { ClusterResult } from './papersClient.ts'
-import { readRoom, writeRoom, writer, type Txn } from './rooms.ts'
+import { readRoom, schema, writeRoom, writer, type Txn } from './rooms.ts'
 
 // The canvas MCP's cluster tools (T02 phase 2). Clusters come from data, not the agent's
 // judgement (Concept, Clustering and layout): apply_clusters asks the papers MCP's cluster_papers
@@ -51,6 +52,36 @@ function bySimilarity(cards: PaperCardShape[], similarities: ClusterResult['simi
 		.map((card, i) => ({ card, i, s: total.get(card.props.paperId) ?? 0 }))
 		.sort((x, y) => y.s - x.s || x.i - y.i)
 		.map((x) => x.card)
+}
+
+const pinsTo = (txn: Txn, cardId: string) =>
+	[...txn.values()].filter((r): r is NotePinBinding => r.typeName === 'binding' && r.type === NOTE_PIN_TYPE && r.toId === cardId)
+
+// Why a card can't move into a cluster, or null. Its pinned notes move with it (browsers keep
+// them at their offset), so a note a person made, moved or edited keeps the card where it is.
+function stuck(txn: Txn, card: PaperCardShape): string | null {
+	if (!isAgentShape(card.meta)) return 'made by a person'
+	if (card.meta.pinnedByHuman === true) return 'moved by a person'
+	for (const pin of pinsTo(txn, card.id)) {
+		const note = txn.get(pin.fromId)
+		if (!isShape(note) || !isAgentShape(note.meta) || isHumanTouched(note.meta)) return 'a person’s note is pinned to it'
+	}
+	return null
+}
+
+// A moved card's pinned notes would follow it at their old offset, onto its cluster's other
+// papers; put each beside the card again instead (outside the frame, which is in the way) and
+// update its pin, so every browser keeps it there.
+function replaceNotes(txn: Txn, card: TLShapeId) {
+	const w = writer(txn)
+	for (const pin of pinsTo(txn, card)) {
+		const records = [...txn.values()].filter((r) => r.id !== pin.fromId)
+		const cardBox = shapeBoxes(records).get(card)!
+		const { w: nw, h: nh } = shapeBoxes([txn.get(pin.fromId)!]).get(pin.fromId)!
+		const at = placeNear(records, { w: nw, h: nh }, centre(cardBox))
+		w.patchShape({ id: pin.fromId, parentId: w.pageId, ...at })
+		txn.set(pin.id, schema.types.binding.validate({ ...pin, props: { dx: at.x - cardBox.x, dy: at.y - cardBox.y } }))
+	}
 }
 
 // A new frame sized for its cards, centred where they were, under every other shape on the page
@@ -94,6 +125,7 @@ function newClusterFrame(txn: Txn, ctx: ToolContext, clusterId: string, label: s
 			y: Math.round(PAD + row * CELL.h + (CELL.h - LABEL_H - card.props.h) / 2),
 		})
 	})
+	for (const card of cards) replaceNotes(txn, card.id)
 	return frame as TLFrameShape
 }
 
@@ -115,24 +147,16 @@ export async function applyClusters(ctx: ToolContext, { paperIds }: z.infer<z.Zo
 		const clusters: { clusterId: string; label: string; paperIds: string[] }[] = []
 		const skipped: Skip[] = []
 		for (const { clusterId, paperIds, label } of found.clusters) {
+			let frame = findClusterFrame(txn, clusterId)
 			const cards: PaperCardShape[] = []
 			for (const paperId of paperIds) {
 				const card = findCard(txn, paperId)
-				const reason = !card
-					? 'no card on this board'
-					: !isAgentShape(card.meta)
-						? 'made by a person'
-						: card.meta.pinnedByHuman === true
-							? 'moved by a person'
-							: null
+				if (card && card.parentId === frame?.id) continue
+				const reason = card ? stuck(txn, card) : 'no card on this board'
 				if (reason || !card) skipped.push({ paperId, reason: reason ?? '' })
 				else cards.push(card)
 			}
-			let frame = findClusterFrame(txn, clusterId)
-			const moving = bySimilarity(
-				cards.filter((c) => c.parentId !== frame?.id),
-				found.similarities
-			)
+			const moving = bySimilarity(cards, found.similarities)
 			if (!frame) {
 				if (!moving.length) {
 					skipped.push({ clusterId, reason: 'none of its papers can be moved into it' })
@@ -143,9 +167,12 @@ export async function applyClusters(ctx: ToolContext, { paperIds }: z.infer<z.Zo
 				// an existing cluster keeps its place and size unless it is full; its papers stay put
 				const anchor = centre(shapeBoxes(txn.values()).get(frame.id)!)
 				for (const card of moving) {
-					const spot = spotInFrame(txn, frame.id, card.props, anchor)
+					const spot = spotInFrame(txn, frame.id, { w: card.props.w, h: card.props.h }, anchor)
 					if (!spot) skipped.push({ paperId: card.props.paperId, reason: 'no room left in its cluster' })
-					else w.patchShape({ id: card.id, parentId: frame.id, ...spot })
+					else {
+						w.patchShape({ id: card.id, parentId: frame.id, ...spot })
+						replaceNotes(txn, card.id)
+					}
 				}
 				if (label && !propsLocked(frame) && frame.meta.renamedByHuman !== true && frame.props.name !== label) {
 					w.patchShape({ id: frame.id, props: { name: label }, meta: { labelGenerated: true } })
@@ -188,11 +215,12 @@ export function labelCluster(ctx: ToolContext, { clusterId, label }: z.infer<z.Z
 export const clusterTools = [
 	tool(
 		'apply_clusters',
-		'Group the board\'s papers into clusters of similar papers, from the papers MCP\'s cluster_papers (abstract ' +
-			'embeddings and citations), so close papers sit together. Give paperIds to cluster only those (2 to 500); ' +
-			'by default every paper on the board. Each cluster becomes a frame named by discovery; papers you added ' +
-			'move into a grid inside a new frame, or into free space in a cluster already on the board. Papers people ' +
-			'added or moved stay where they are and come back in skipped, as do papers with no card. Run it after the ' +
+		'Group the board\'s papers into clusters of similar papers, as the papers MCP\'s cluster_papers finds them, ' +
+			'so close papers sit together. Give paperIds to cluster only those (2 to 500); by default every paper on ' +
+			'the board. Each cluster becomes a frame named by discovery; papers you added move into a grid inside a new ' +
+			'frame, or into free space in a cluster already on the board, and their notes stay beside them. Papers ' +
+			'people added or moved, or with a person\'s note pinned to them, stay where they are and come back in ' +
+			'skipped, as do papers with no card. Run it after the ' +
 			'first search, not after every paper: from then on add_papers with `near` puts new papers inside their ' +
 			'neighbour\'s cluster. Returns {clusters: [{clusterId, label, paperIds}], skipped: [{paperId or clusterId, ' +
 			'reason}]}; errors, writing nothing, if the papers MCP can\'t cluster them.',
