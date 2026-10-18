@@ -1,5 +1,5 @@
 import { NodeSqliteWrapper, SQLiteSyncStorage, TLSocketRoom } from '@tldraw/sync-core'
-import { createTLSchema, defaultShapeSchemas, type TLRecord, type TLShape } from '@tldraw/tlschema'
+import { createTLSchema, defaultBindingSchemas, defaultShapeSchemas, type TLRecord, type TLShape } from '@tldraw/tlschema'
 import { getIndexAbove, type IndexKey } from '@tldraw/utils'
 import { createReadStream, createWriteStream, existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
@@ -9,6 +9,9 @@ import type { Duplex } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { unfurl } from 'unfurl.js'
 import { WebSocketServer } from 'ws'
+import { customBindingSchemas } from '../shared/bindings.ts'
+import { customShapeSchemas } from '../shared/shapes.ts'
+import { handleAcpUpgrade } from './acpPipe.ts'
 import { publicFetch } from './netGuard.ts'
 
 // The sync server: one TLSocketRoom per room, each saved to its own SQLite file under DATA_DIR,
@@ -21,10 +24,10 @@ const DIST_DIR = resolve('dist')
 mkdirSync(ROOMS_DIR, { recursive: true })
 mkdirSync(UPLOADS_DIR, { recursive: true })
 
-// add custom shapes and bindings here if needed:
+// the browser registers the same custom shapes and bindings (client/shared), so their records sync
 const schema = createTLSchema({
-	shapes: { ...defaultShapeSchemas },
-	// bindings: { ...defaultBindingSchemas },
+	shapes: { ...defaultShapeSchemas, ...customShapeSchemas },
+	bindings: { ...defaultBindingSchemas, ...customBindingSchemas },
 })
 
 // room and upload ids come from URLs, so strip anything that could escape the data dir
@@ -282,6 +285,7 @@ const wss = new WebSocketServer({ noServer: true })
 server.on('upgrade', (req, socket, head) => {
 	try {
 		const url = parseUrl(req.url)
+		if (url?.pathname === '/api/acp') return handleAcpUpgrade(req, socket, head)
 		const roomId = url?.pathname.match(/^\/api\/connect\/([^/]+)$/)?.[1]
 		const sessionId = url?.searchParams.get('sessionId')
 		if (!roomId || !sessionId) return rejectUpgrade(socket, 400, 'Bad Request')

@@ -7,6 +7,7 @@ requires-python = ">=3.12,<3.14"
 # releases before (google/adk-python#4650). Bump both together, then rerun
 # `uv run python -m harness.check`.
 dependencies = [
+    "agent-client-protocol==0.12.1",
     "google-adk[mcp]==2.12.0",
     "httpx>=0.28",
     "litellm==1.106.0",
