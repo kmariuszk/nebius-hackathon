@@ -238,6 +238,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | Paper card ID | `shape:paper-<slug>`, where `<slug>` is the paper ID with every code point outside `[A-Za-z0-9_-]` replaced by `_` (an accented letter or an emoji is one `_`): `pmid:34290406` becomes `shape:paper-pmid_34290406`. Writing the same paper twice updates one card. Slugs are lossy, so read the paper ID from `props.paperId`, never from the shape ID. |
 | Link ID | `shape:link-<kind>-<slug(from)>--<slug(to)>`, for example `shape:link-cites-pmid_1--pmid_2`: one link per pair and kind (T02 sorts the pair for `similar`, which has no direction) |
 | Other agent shapes | `shape:agent-<kind>-<12 hex>`, for example `shape:agent-note-3f9a0c1d2e4b` |
+| Cluster frame ID | `shape:cluster-<slug(clusterId)>`: a built-in `frame` with `meta.clusterId`, `meta.labelGenerated` and `meta.renamedByHuman`, made by `apply_clusters` (T02); people's cluster frames (T14) may have any ID, so look clusters up by `meta.clusterId` |
 | Meta on every agent write | `createdBy: "agent"`, `onBehalfOf: <memberId>`, `runId: <run_…>` (or `null`), plus `paperId` on paper-related shapes; writes from external agents also carry `via: "external"` (T11) |
 | Meta on people's shapes | `author: <memberId>` (set by the browser on create) |
 | Human-touched | `meta.pinnedByHuman` (moved by a person), `meta.editedByHuman` (props edited by a person); set by the browser (T01); the canvas MCP never moves or overwrites such a shape |

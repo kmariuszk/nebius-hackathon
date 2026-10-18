@@ -93,7 +93,9 @@ The app is then at http://localhost:5858. Rooms and uploads are saved in the `bo
 
 ## Write to a board from another service
 
-Agents and other services change a board through the canvas MCP at `http://localhost:5858/api/mcp/canvas/<boardId>` (streamable HTTP, stateless). Send `Authorization: Bearer <memberId>` (an `m_…` ID) and optionally `X-Run-Id: run_<12 hex>` and `X-Model: <model>`. The tools are `get_board`, `add_papers`, `set_scores`, `set_card`, `add_quote`, `link_papers`, `mark_working` and `add_note`. Agents never give coordinates (each new paper is placed beside its neighbour), nothing is deleted, and shapes people moved or edited come back in `skipped`.
+Agents and other services change a board through the canvas MCP at `http://localhost:5858/api/mcp/canvas/<boardId>` (streamable HTTP, stateless). Send `Authorization: Bearer <memberId>` (an `m_…` ID) and optionally `X-Run-Id: run_<12 hex>` and `X-Model: <model>`. The tools are `get_board`, `add_papers`, `set_scores`, `set_card`, `add_quote`, `link_papers`, `mark_working` and `add_note`. Agents never give coordinates (each new paper is placed beside its neighbour, inside its neighbour's cluster if it has one), nothing is deleted, and shapes people moved or edited come back in `skipped`.
+
+`apply_clusters` and `label_cluster` are listed only while the papers MCP at `PAPERS_MCP_URL` lists `cluster_papers`; the board service checks its tool list at most every 30 seconds. `apply_clusters` asks `cluster_papers` for the board's clusters and draws each one as a frame holding its papers. Papers people added or moved stay where they are. `label_cluster` renames a cluster unless a person already has.
 
 The low-level option is the REST route below.
 
