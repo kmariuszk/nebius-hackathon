@@ -7,7 +7,7 @@
 | Depends on | — |
 | Unblocks | T02, T03 (both build on the code fixed here) |
 | Milestone | Before M1 |
-| Status | Done (Oct 18): code, config and tests on PR #6; `pnpm test` in `client/` runs `server/hardening.test.ts` |
+| Status | Done and merged ([PR #6](https://github.com/kmariuszk/nebius-hackathon/pull/6), merged Oct 18): code, config and tests; `pnpm test` in `client/` runs `server/hardening.test.ts`, with the `shared/` and `client/` tests since `feat/board-build` |
 | Owner | Igor |
 
 ## Goal

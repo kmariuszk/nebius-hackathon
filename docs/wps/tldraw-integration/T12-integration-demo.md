@@ -12,7 +12,7 @@
 
 ## Goal
 
-One test proves the whole chain works with no API keys, from a WebSocket in a test client, through the real pipe and a real harness process, to a card in the real room and a focus back. The same test then runs live on Nemotron 3.5 Super VL, and one live run with keys does the demo uncut, with the agent reading the board and a paper figure from pictures.
+One test proves the whole chain works with no API keys, from a WebSocket in a test client, through the real pipe and a real harness process, to a paper in the real room and a focus back. The same test then runs live on Nemotron 3.5 Super VL, and one live run with keys does the demo uncut, with the agent reading the board and a paper figure from pictures.
 
 ## Context
 
@@ -48,10 +48,10 @@ The scripted turns live in the harness repo folder, next to the adapter's own te
 | --- | --- |
 | Live tests | `uv run pytest -m live` in `harness/` and the live end-to-end above pass on Super VL |
 | Discovery run | A discovery prompt places the first card within 60 s and finishes within 90 s; every tool card names its Nemotron model |
-| The agent looks | "How is the board organised?" and "what does the figure on page N show?" are answered from snapshots (T07; T10 criterion 7 if the PDF reader is built) |
-| Two browsers | T06 criteria 1 and 2; T10 criteria 1, 3 and 4; T14 criteria 1, 3 and 5; T08 criterion 1 |
-| Catch me up | On a board prepared earlier, "Catch me up" runs the tour inside the card (T06 criterion 6), in Ana's view only |
-| Looks like v4 | Side by side with `docs/mockups/flashcard-v4.html`: nodes, card, ranked list, filter, top and bottom bars (T01, T09, T10, T13) |
+| The agent looks | "How is the board organised?" and "what does the figure on page N show?" are answered from snapshots (T07; T10 criterion 9 if the PDF reader is built) |
+| Two browsers | T06 criteria 1 and 2; T10 criteria 1, 3, 4 and 8; T14 criteria 1, 3 and 5; T08 criterion 1 |
+| Catch me up | On a board prepared earlier, "Catch me up" walks through the new papers in their widgets, with the agent's line under each node (T06 criterion 6), in Ana's view only |
+| Looks like v5 | Side by side with `docs/mockups/flashcard-v5.html` (and `flashcard-v4.html` for what v5 doesn't change): nodes, the widgets around an opened paper, ranked list, filter, top and bottom bars (T01, T09, T10, T13) |
 | External agent | T11 criterion 2 |
 | Docker | `docker build -f client/Dockerfile .` and `docker run` with keys serve the app and a working chat |
 | Memory | Peak memory of one idle and one busy harness recorded; `MAX_HARNESSES` default set from it against the [team limits](../../team-limits.md) |
@@ -59,11 +59,11 @@ The scripted turns live in the harness repo folder, next to the adapter's own te
 **Demo beats** (Concept's demo plan, with what each needs):
 
 1. Question and seeds, the board fills itself; nodes appear with "Agent is reading…" and colour in by fit: T01, T02, T04, T05, the master and discovery.
-2. Open a paper: the board fades to what it's linked to, the card shows a real figure, one sentence with hover quotes, and "Compared with your seeds"; Keep: T10.
+2. Open a paper: the board fades to what it's linked to and the paper splits into widgets around its node: the title, why it matters to you with hover quotes, the paper at a glance compared with the seeds, and a real figure; Keep: T10.
 3. Switch "Looking for" to Methods to reuse and filter by quality; the board recolours and the ranked list re-ranks: T09, T13.
 4. Ask the chat a question; the papers behind the answer light up; ask how the board is organised and the agent looks at it: T06, T07.
-5. Pin a note to a paper and name a link; "2 changes · the agent is waiting" → Update suggestions: T13, T14.
-6. Switch to a board prepared earlier, "Catch me up 3": the tour runs inside the card: T06, T08, the master's tour.
+5. Drop a note on a paper's widget to pin it, and name a link; "2 changes · the agent is waiting" → Update suggestions: T10, T13, T14.
+6. Switch to a board prepared earlier, "Catch me up 3": each paper's widgets grow out of its node, with the agent's line under it: T06, T08, T10, the master's tour.
 7. Optional: an external agent (Claude Code or Cursor) adds a note to the same board: T11.
 
 **Documentation.** Root `README.md` gets one "Run everything" section (discovery, board service with the harness, browser) and links to this folder. Concept's protocol paths gain the `/api` prefix (decision D4), and the `.env.example` comments match the final routes.
@@ -85,7 +85,7 @@ The scripted turns live in the harness repo folder, next to the adapter's own te
 
 ## Risks
 
-- **The full discovery run depends on other owners' work:** beats 2, 3 and 5 don't, so the demo can be rehearsed early with `board_assistant` and seeded cards.
+- **The full discovery run depends on other owners' work:** beats 2, 3 and 5 don't, so the demo can be rehearsed early with `board_assistant` and seeded papers (the demo seed script writes papers, links and pinned notes through `POST /api/rooms/:room/shapes`, T02).
 - **Flaky timing in the end-to-end test:** generous timeouts (30 s for the first update, since `uv run` may sync on first start), and step 7 uses a scripted tool that sleeps on purpose.
 
 ## References

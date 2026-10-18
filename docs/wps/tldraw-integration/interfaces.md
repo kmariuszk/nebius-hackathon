@@ -65,17 +65,19 @@ These rules are enforced by the canvas MCP (T02), but agents that follow them ge
 - Use the viewer tools (`focus`, `highlight`, `open_paper`, `tour`, `look_at_board`, `look_at_paper`) to point at, walk through or look at things for the person you are talking to; they never change the shared board.
 - Mention papers in answers as `[Title](paper:<paperId>)` so the chat panel can make them clickable.
 
-What the v4 board ([mockup](../../mockups/README.md)) needs from agents. Most of it goes through T02's canvas MCP tools, which any agent can call; `tour` is a session-bound viewer tool from T06 that only our harness has (external agents can't call it):
+What the v5 board ([mockup](../../mockups/README.md)) needs from agents. Most of it goes through T02's canvas MCP tools, which any agent can call; `tour` is a session-bound viewer tool from T06 that only our harness has (external agents can't call it):
 
-| v4 element | Tool | Notes |
+| v5 element | Tool | Notes |
 | --- | --- | --- |
 | Node colour and ranking per "Looking for" goal | `set_scores` | One `{score, fit, why}` per board goal (`goals` in `get_board`); `why` is the ranked list's line |
-| Card first view | `set_card` (`oneLine`, `claims`, `facets`, `figure`) and `add_quote` | Add quotes first, then claims that point at their IDs; a claim citing "three of your seeds" uses evidence `seeds`; facets are disease, cells and method, each `same`, `adds`, `other` or `unclear` with a quote ID |
-| Card Details | `set_card` (`tldr`, `summary`, `gaps`) | Short; the summary sits next to the original abstract |
-| "Agent is reading…" | `mark_working` | On when reading starts, off when the card is filled |
+| "Why it matters to you" | `set_card` (`oneLine`, `claims`) and `add_quote` | `oneLine` is the summary written for the board's question, a sentence or two. Add quotes first, then claims that point at their IDs; each claim's `text` appears verbatim in `oneLine`; a claim citing "three of your seeds" uses evidence `seeds` |
+| "The paper at a glance" | `set_card` (`glance`) and `add_quote` | 3–4 steps from the abstract (samples, method, readout, finding), each `{label, text, quoteId, relation}`: `quoteId` names the quote for the sentence it comes from, `relation` is `same`, `adds` or `other` compared with the seeds, or null (usually the finding). Quote IDs must exist on the card, as for claims |
+| Figure | `set_card` (`figure`) | A real figure from the paper, never generated: `{imageUrl, label, caption, captionByAi}`, with `captionByAi` true when you wrote the caption |
+| Under More | `set_card` (`summary`, `gaps`); `add_papers` (`foundBy`) | Short; `gaps` is what you couldn't check; `foundBy` is how discovery found the paper |
+| "Agent is reading…" | `mark_working` | On when reading starts, off when the widgets are filled |
 | Links | `link_papers` with `kind: "cites"` (from PubMed) or `"similar"` (your judgement) | Never relabel, unhide or redraw links people changed; skipped ones come back in `skipped` |
-| Notes | `add_note` with `paperId` | Pinned to the paper, shown in its card |
-| Catch me up | `tour` (viewer tool, T06; not on the canvas MCP) | Ordered steps, one line per paper (strongest first), sent once; the card runs it |
+| Notes | `add_note` with `paperId` | Pinned to the paper, shown in its Team notes widget |
+| Catch me up | `tour` (viewer tool, T06; not on the canvas MCP) | Ordered steps, one line per paper (strongest first), sent once; the browser shows each line in the actions widget under the paper's node |
 | "Update suggestions" | — | The prompt carries `<board-changes>`; treat each change as the researcher's decision: re-rank and search around changed papers, and never undo a change |
 
 ## I5. What the board service needs from the papers MCP
@@ -84,12 +86,12 @@ The board service is an MCP client of the papers MCP for paper details (T08) and
 
 | Tool | Status on `main` | We read | Used by |
 | --- | --- | --- | --- |
-| `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type`, and (wanted, [I9](#i9-discovery-data-the-v4-card-shows)) `citedBy`, `peerReviewed`, `retracted` | T08 paper record, T02 `add_quote` check against the abstract, T10 card |
+| `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type`, and (wanted, [I9](#i9-discovery-data-the-v5-widgets-show)) `citedBy`, `peerReviewed`, `retracted` | T08 paper record, T02 `add_quote` check against the abstract, T10 widgets |
 | `get_fulltext(paper_id)` | Planned (Concept) | `sections[{title, text, page}]`, `source` | T02 `add_quote` check against full text, T10 |
-| `get_figures(paper_id)` | Planned | `[{figureId, caption, imageUrl, page, bbox}]` | The card's figure via `set_card` (T10) |
+| `get_figures(paper_id)` | Planned | `[{figureId, caption, imageUrl, page, bbox}]` | The figure widget via `set_card` (T10) |
 | `cluster_papers` | Planned | `clusters`, `similarities` | T02 `apply_clusters` |
 
-Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the card shows no figure, `apply_clusters` isn't listed.
+Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the widgets show no figure, `apply_clusters` isn't listed.
 
 ## I6. Which model slots take images
 
@@ -120,18 +122,19 @@ Found while checking the model on Oct 18 (`uv run python -m harness.check` and s
 | **Rate limits start at 60 requests and 400,000 tokens a minute** and scale up with sustained use; over the limit gives HTTP 429 with `Retry-After` ([docs](https://docs.tokenfactory.nebius.com/ai-models-inference/rate-limits)) | Bulk scoring (hundreds of Lightning calls) will hit 429 | Concurrency limit and `Retry-After` handling in the discovery service's scoring; Token Factory also offers a Batch API with higher limits |
 | **Images are cheap**: about 1,400 prompt tokens for a 275 KB board screenshot | Visual context is affordable | The reader agent can look at page images and figures as well as Parse's text |
 
-## I9. Discovery data the v4 card shows
+## I9. Discovery data the v5 widgets show
 
-v4's "What the UI needs from the backend" lists fields the discovery service supplies and the agent writes to the card. From the board's side:
+v4's "What the UI needs from the backend" lists fields the discovery service supplies and the agent writes to the card; v5 adds `glance[]` and drops `facets` ([mockups README](../../mockups/README.md)). From the board's side:
 
 | Field | Shown in | Source we expect |
 | --- | --- | --- |
-| `scores` per goal | Node colour, ranked list, card fit line | `score_candidates` per board goal (Concept), written with `set_scores` |
-| `citedBy` | Card byline, quality filter | Semantic Scholar counts (v4 used them), on the paper record and in `add_papers` |
-| `type`, `peerReviewed` | Ranked list status, type and quality filters | As discovery emits it today (`article`, `review`, `preprint`, or OpenAlex's raw `work.type`); T02 normalises to `article`, `review`, `preprint` or `other` (T01). Preprints mean not peer reviewed |
+| `scores` per goal | Node colour, ranked list, the fit line in "Why it matters to you" | `score_candidates` per board goal (Concept), written with `set_scores` |
+| `glance[]` | "The paper at a glance" | The agent (reader or context agent) extracts 3–4 steps from the abstract (samples, method, readout, finding), each with a label, a short text, the ID of the quote it comes from, and `same`, `adds` or `other` against the seeds; written with `set_card`. The app draws the diagram, so no image model is involved |
+| `citedBy` | Under More ("What supports this"), quality filter | Semantic Scholar counts (v4 used them), on the paper record and in `add_papers` |
+| `foundBy` | Under More, how the paper was found | Discovery's own account per candidate (for example `pubmed`, `cites 3 seeds`), in `add_papers` |
+| `type`, `peerReviewed` | Preprint or Review flag on the title, ranked list status, type and quality filters | As discovery emits it today (`article`, `review`, `preprint`, or OpenAlex's raw `work.type`); T02 normalises to `article`, `review`, `preprint` or `other` (T01). Preprints mean not peer reviewed; `peerReviewed` is null when unknown |
 | `retracted` | Never shown | PubMed marks retractions; `add_papers` skips them |
-| `figures[]` with the figure picked per goal | Card figure, ranked list thumbnail | PMC figures (v4: `efetch db=pmc` captions, images from the article page); written with `set_card` |
-| `facets` | "Compared with your seeds" | The reader or context agent, with supporting quotes |
-| Model and time per step | "AI" labels, chat steps | `X-Model` header (T02) and the trace plugin (T04) |
+| `figures[]` with the figure picked per goal | Figure widget, ranked list thumbnail | PMC figures (v4: `efetch db=pmc` captions, images from the article page); written with `set_card` |
+| Model and time per step | Chat steps only | The trace plugin (T04); the widgets carry a plain "AI" tag, and the `X-Model` header (T02) fills each field's `provenance` |
 
 v4's notes from building the mockup also apply: OpenAlex's shared keyless budget runs out at a venue (use a key, or PubMed's `elink` citations); PMC figure pages sometimes return a block page (retry slowly); remove seeds before ranking; show all-capital titles in sentence case (T01 does this on display).

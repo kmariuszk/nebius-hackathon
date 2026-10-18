@@ -16,7 +16,7 @@ The brief's deliverable, always in step with the board, as in the v4 mockup: a r
 
 ## Context
 
-- **Visual spec:** [v4 mockup](../../mockups/README.md): "Looking for" in the top bar switches between New findings and Methods to reuse, recolouring the board and re-ranking; "Ranked list" at the top left follows the ranking and the filters, and clicking a row flies to the card; "Filter" at the bottom right has fit, type, quality (peer reviewed, cited at least 10× or 50×), year, and discarded papers. Screenshots: `shots-v4/7-rank-top.png`, `shots-v4/8-filter-quality.png`.
+- **Visual spec:** [v4 mockup](../../mockups/README.md), unchanged in v5: "Looking for" in the top bar switches between New findings and Methods to reuse, recolouring the board and re-ranking; "Ranked list" at the top left follows the ranking and the filters, and clicking a row flies to the paper and opens its widgets (T10); "Filter" at the bottom right has fit, type, quality (peer reviewed, cited at least 10× or 50×), year, and discarded papers. Screenshots: `shots-v4/7-rank-top.png`, `shots-v4/8-filter-quality.png`, and `shots-v5/9-narrow.png` (the list open next to a paper's widgets).
 - The brief asks for "a ranked list of new papers with metadata, source links and relevance explanations" ([Concept: Overview](../../Concept.md#overview)); [Concept: Feature triage](../../Concept.md#product-scope) has "Rank for" and "Filters".
 - Decision D11 in the group README: the list is derived from the synced paper cards.
 
@@ -30,9 +30,9 @@ The brief's deliverable, always in step with the board, as in the v4 mockup: a r
 
 **Files** (`client/client/ranked/`): `rankedRows.ts` (pure: cards, goal and filters to rows), `RankedList.tsx`, `FilterPanel.tsx`, `filters.ts` (pure predicates), `goal.ts`.
 
-**"Looking for".** The board's goals come from `GET /boards/:id` (T08), with labels ("New findings", "Methods to reuse"). The current goal is T01's per-viewer `currentGoal` atom, remembered per board in `localStorage`. Switching it recolours suggestion nodes (`scores[goal].fit`), re-ranks the list, and changes the "why" line shown in rows and the card.
+**"Looking for".** The board's goals come from `GET /boards/:id` (T08), with labels ("New findings", "Methods to reuse"). The current goal is the per-viewer `currentGoal` atom (`client/client/viewerState.ts`, default `new-findings`), remembered per board in `localStorage`. Switching it recolours suggestion nodes (`scores[goal].fit`), re-ranks the list, and changes the "why" line in rows and the fit line in an open paper's "Why it matters to you" (T10).
 
-**Data.** `useValue('ranked rows', () => toRows(editor.getCurrentPageShapes(), currentGoal.get(), filters.get()), [editor])`, so the list updates the moment a card is added, scored, voted on or edited, by anyone, and when this viewer changes goal or filters.
+**Data.** `useValue('ranked rows', () => toRows(editor.getCurrentPageShapes(), currentGoal.get(), filters.get()), [editor])`, so the list updates the moment a paper is added, scored, voted on or edited, by anyone, and when this viewer changes goal or filters. The `filters` atom holds `fit`, `types` (the normalised values), `peerReviewedOnly`, `minCitedBy`, `yearFrom` and `showDiscarded`.
 
 **Ranked list** (top left, "Ranked list 4" button opens it):
 
@@ -40,20 +40,20 @@ The brief's deliverable, always in step with the board, as in the v4 mockup: a r
 | --- | --- |
 | Header | "Ranked for new findings", "2 of 4 suggestions · filtered · clear" |
 | Rank | Position by `scores[goal].score`, highest first; unscored last |
-| Status line | Fit dot and label, then "Split vote" (contested), "New", "Review" (type) |
+| Status line | Fit dot and label, then "Split vote" (contested), "New", "Preprint" or "Review" (type) |
 | Title, byline | Title in sentence case; "Liu et al. · Immunity · 2022 · cited 122×" |
 | Why | `scores[goal].why`, two lines at most |
 | Thumbnail | `figure.imageUrl`, or a "no figure" placeholder |
 
-Only suggestions are listed (seeds and kept papers are the collection). Clicking a row runs T06's local focus and opens the card (T10). Up and Down move between rows and Enter opens; the panel keeps its own keyboard focus so tldraw shortcuts don't fire.
+Only suggestions are listed (seeds and kept papers are the collection). Clicking a row runs T06's local focus and opens the paper's widgets (T10's `openPaper`). Up and Down move between rows and Enter opens; the panel keeps its own keyboard focus so tldraw shortcuts don't fire.
 
 **Filters** (bottom right, "Filter" button with a count of active filters):
 
-| Section | Options | Predicate on the card |
+| Section | Options | Predicate on the paper's props |
 | --- | --- | --- |
 | Fit | High, Medium, Low (multi-select) | `scores[goal].fit` |
 | Type | Research, Review (multi-select) | `type`: Research is `article`, `preprint` and `other`; Review is `review` (T01's normalised values) |
-| Quality | "Peer reviewed only (hides preprints)"; "Cited at least" Any, 10×, 50× | `peerReviewed`, `citedBy` |
+| Quality | "Peer reviewed only (hides preprints)"; "Cited at least" Any, 10×, 50× | `peerReviewed` (hides `false`; unknown, `null`, stays), `citedBy` |
 | Published | Any time, Since 2023, Since 2025 | `year` |
 | Discarded | "Show discarded papers" | `status === "discarded"` (T01's visibility rule) |
 
@@ -74,12 +74,12 @@ The panel footer shows "Showing 2 of 4 suggestions" and Clear. Under "Cited at l
 2. Switching "Looking for" from New findings to Methods to reuse re-ranks the list and recolours nodes in this browser only (in the v4 data, Liu 2022 goes from low to high fit).
 3. Each row shows status, title, byline with citation count, a why line and a thumbnail or "no figure".
 4. "Cited at least 50×" hides the papers below 50 citations from the list and fades them on this viewer's board; "Showing N of M" is right; Clear restores everything.
-5. Clicking a row flies to the paper and opens its card; nobody else's view moves.
+5. Clicking a row flies to the paper and opens its widgets; nobody else's view moves.
 6. "Show discarded papers" shows discarded papers, greyed, in this browser only.
 
 ## Tests
 
-- `client/client/ranked/filters.test.ts`: each predicate, combinations, preprints under "peer reviewed only", missing `citedBy`, and `type: "other"` (an OpenAlex book chapter) counting as Research.
+- `client/client/ranked/filters.test.ts`: each predicate, combinations, preprints and `peerReviewed: null` under "peer reviewed only", missing `citedBy`, and `type: "other"` (an OpenAlex book chapter) counting as Research.
 - `client/client/ranked/rankedRows.test.ts`: ranking per goal with ties and unscored papers, seeds excluded, counts.
 
 ## References

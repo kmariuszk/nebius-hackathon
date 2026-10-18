@@ -77,7 +77,7 @@ async def run(self) -> None:
 **One prompt.**
 
 - `run_id = new_run_id()`; `runner.run_async(user_id, session_id, new_message=to_genai_content(blocks), state_delta={"run_id": run_id}, run_config=RunConfig(streaming_mode=StreamingMode.SSE), abort_signal=job.abort)`.
-- The canvas toolset is an `McpToolset` with `header_provider=lambda ctx: {**auth, "X-Run-Id": ctx.state.get("run_id"), "X-Model": model_of(ctx.agent_name)}`, so every canvas call in this turn carries the run ID and the calling agent's model, and the model never sees either (decision D7). The card's "AI" labels use `X-Model` (T10).
+- The canvas toolset is an `McpToolset` with `header_provider=lambda ctx: {**auth, "X-Run-Id": ctx.state.get("run_id"), "X-Model": model_of(ctx.agent_name)}`, so every canvas call in this turn carries the run ID and the calling agent's model, and the model never sees either (decision D7). T02 records `X-Model` in each card field's `provenance`.
 - `cancel(session_id)` sets `job.abort`; the prompt returns `stop_reason="cancelled"`, and the trace plugin marks any open tool card `failed` with "cancelled". Otherwise `end_turn`; an exception becomes an agent message "Something went wrong: …" plus `end_turn`, and the full traceback goes to stderr.
 
 **ADK events to ACP updates** (`EventMapper`, one per prompt):
@@ -135,7 +135,7 @@ Assertions are about behaviour (which tool was called, which names appear), not 
 
 ## Tasks
 
-- [ ] `harness/pyproject.toml`: `agent-client-protocol==0.12.1`; `uv lock` (agree with the harness owner first).
+- [x] `harness/pyproject.toml`: `agent-client-protocol==0.12.1`; `uv lock` (on `feat/board-build`).
 - [ ] `board/ids.py` and `tests/test_board_ids.py` against `client/shared/fixtures/paper-ids.json`.
 - [ ] `board/echo.py`, `acp/adapter.py` and `__main__.py` with the stdout guard: echo mode end to end (unblocks T03 and T05).
 - [ ] `acp/worker.py`, `acp/mapping.py`, `acp/trace.py`, `acp/scripted.py`.

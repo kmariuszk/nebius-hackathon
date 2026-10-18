@@ -33,7 +33,7 @@ The agent understands the board the way a person does: from what's selected, fro
 Built when the user presses Send:
 
 1. **Text block:** what they typed.
-2. **Selected shapes:** up to 20 from `editor.getSelectedShapes()`, each a `resource` block with `uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json` and compact JSON: `{shapeId, type, paperId?, title?, year?, status?, fit?, why?, text?, pinnedTo?, author? | createdBy?}` (`fit` and `why` for the viewer's current goal). Note, text and geo shapes get `text` from `editor.getShapeUtil(shape).getText(shape)`; frames carry their label and the paper IDs inside. Over 20: the first 20 plus "and N more selected".
+2. **Selected shapes:** up to 20 from `editor.getSelectedShapes()`, each a `resource` block with `uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json` and compact JSON: `{shapeId, type, paperId?, title?, year?, status?, fit?, why?, text?, pinnedTo?, author? | createdBy?}` (`fit` and `why` for the viewer's current goal). Note, text and geo shapes get `text` from `editor.getShapeUtil(shape).getText(shape)`; frames carry their label and the paper IDs inside. Over 20: the first 20 plus "and N more selected". The open paper (`openPaperId`, T10) is added the same way when it isn't selected, shown as a "Context: Liu 2022" chip with × to leave it out (v5, `shots-v5/9-narrow.png`).
 3. **Viewport summary:** a `resource` block `tldraw://<boardId>/viewport` with `{visiblePaperIds, visibleNoteCount, zoom}`.
 4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the researcher's current view of the board:", then an `image` block from the shared renderer (section 3, target `viewport`).
 5. **From the PDF reader** (T10 Phase B): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
@@ -74,6 +74,7 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 | `paper_page` | pdf.js renders the page from `GET /papers/:paperId/pdf` (T08) to an offscreen canvas; reuses the PDF reader's document if it has the same paper open (T10) |
 
 - Size: `scale` is chosen so the long side is at most 1,600 px (the measured cost of such an image is about 1,400 tokens); `maxSide` in the request can lower it.
+- T10's widgets are HTML over the canvas, outside `<Tldraw>`, so `editor.toImage` leaves them out: a `viewport` snapshot with a paper open shows the board and the node only, and its caption names the open paper ("Liu 2022 is open").
 - Errors: no PDF, a page out of range, an empty board, or a hidden tab (`document.visibilityState !== 'visible'` can't render reliably) answer with a JSON-RPC error and a reason the agent can repeat to the person.
 - The caption says what and where: "Whole board, 63 cards in 5 clusters" or "Page 5 of 14, Lindqvist 2024".
 - Snapshots only happen on a prompt or an agent request in a live chat; nothing is captured in the background.

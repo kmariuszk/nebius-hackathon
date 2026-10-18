@@ -18,7 +18,8 @@ A panel slides in on the right of the board. The researcher types, and the agent
 
 - [Architecture diagram 1](../../architecture.html#components): "Chat panel, ACP client" talking ACP over a WebSocket to the ACP pipe.
 - [Concept: Product scope, flow 6 "Toggling chat"](../../Concept.md#product-scope) and the event table in [Protocols](../../Concept.md#acp-one-researchers-conversation).
-- **Visual spec:** the chat in the [v4 mockup](../../mockups/README.md) (`docs/mockups/flashcard-v4.html`): top right, "each step shows its model, time and cost", paper names are clickable, and asking a question highlights papers on the board (T06). The v1 shot `docs/mockups/shots/chat.png` is older.
+- **Visual spec:** the chat in the [v4 mockup](../../mockups/README.md) (`docs/mockups/flashcard-v4.html`), unchanged in v5 (`flashcard-v5.html`, `shots-v5/9-narrow.png`): top right, "each step shows its model, time and cost", paper names are clickable, and asking a question highlights papers on the board (T06). In v5 the model and time labels stay in the chat; the paper widgets (T10) show none. The v1 shot `docs/mockups/shots/chat.png` is older.
+- **Hook in place** on `feat/board-build`: `Room.tsx` mounts `ChatPanel` from `client/client/chat/ChatPanel.tsx` (a stub that renders nothing) beside the canvas, with `{boardId, memberId, editor}`; `editor` is null until the canvas has mounted.
 
 ## Scope
 
@@ -93,15 +94,16 @@ Tool card details show `rawInput` and `rawOutput` as pretty JSON, truncated in t
 
 **Disconnects.** If the socket closes (harness crashed, idle timeout, server restart), a banner says so with Reconnect, which opens a new connection and a new session. The banner says the conversation starts fresh, since v0 has no resume.
 
-**Layout.** `RoomWrapper-content` becomes a row: the canvas (flex 1) and the panel (380 px, collapsible from a header button labelled "Agent"). tldraw follows its container's size on its own. The panel sits outside the `<Tldraw>` element, so typing in it never triggers canvas shortcuts. The streaming message area is an `aria-live="polite"` region.
+**Layout.** `Room.tsx` already lays out `.Board` as a row: `.Board-canvas` (flex 1, holding `<Tldraw>` and T10's widgets) and `ChatPanel` beside it. The panel is 380 px, collapsible from a header button labelled "Agent". tldraw follows its container's size on its own, and T10's widgets switch to two columns when the panel and the ranked list leave too little room. The panel sits outside the `<Tldraw>` element, so typing in it never triggers canvas shortcuts. The streaming message area is an `aria-live="polite"` region.
 
 ## Tasks
 
-- [ ] `client/package.json`: the three dependencies above.
+- [x] `client/package.json`: the three dependencies above (on `feat/board-build`).
 - [ ] `client/shared/acpExt.ts`.
 - [ ] `client/client/chat/connection.ts`, tried first against `HARNESS_AGENT=echo`.
-- [ ] `chatState.ts` with tests; the components; `chat.css` matching the existing `index.css` look.
-- [ ] `client/client/pages/Room.tsx`: panel next to the canvas, header toggle.
+- [ ] `ChatPanel.tsx` (replacing the stub), `chatState.ts` with tests; the components; `chat.css` matching the existing `index.css` look.
+- [x] `client/client/pages/Room.tsx`: panel next to the canvas (mounted, with `editor` passed in).
+- [ ] Header toggle.
 - [ ] Root `README.md`: "Chat with the agent" (shared with T03).
 
 ## Acceptance criteria
