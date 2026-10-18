@@ -12,6 +12,8 @@
     for (const k of kids) if (k != null) n.append(k);
     return n;
   };
+  // add a query part to a URL that may already have one
+  const withQuery = (url, q) => url + (url.includes('?') ? '&' : '?') + q;
 
   /* ---------- shared SVG: pin gradient, blur, tape shadow, logo ---------- */
   document.body.insertAdjacentHTML('afterbegin', `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
@@ -188,7 +190,8 @@
         }
         setHint('Starting the agent…');
         await API.startRun(board.id, 'onboarding');
-        if (API.mock) { busy = false; render(); toast(`Sample data: board ${board.id} created. With the board service connected, it opens now.`); return; }
+        // with sample data there's no real board to open, so the demo board stands in for it
+        if (API.mock) { toast(`Sample data: board ${board.id} created. Opening the demo board instead.`); setTimeout(() => (location.href = C.boardUrl(board.id)), 1200); return; }
         location.href = C.boardUrl(board.id);
       } catch (e) {
         busy = false; render();
@@ -198,7 +201,7 @@
 
     // the demo board link only shows once a board is configured
     const demo = $('#demoLink');
-    if (C.demoBoardUrl) { $('a', demo).href = C.demoBoardUrl; demo.hidden = false; }
+    if (C.demoBoardUrl) { $('a', demo).href = API.mock ? withQuery(C.demoBoardUrl, 'mock=1') : C.demoBoardUrl; demo.hidden = false; }
 
     // red marker circle around "missing", drawn once, then a string down to the box
     let drawn = false;
@@ -234,7 +237,7 @@
     lead.textContent = boards.length === 0 ? 'Start your first board from a question or a few papers.'
       : totalNew ? `The agent found ${totalNew} new paper${totalNew === 1 ? '' : 's'} on your boards since your last visit.` : 'Nothing new since your last visit.';
     const withNew = boards.filter((b) => b.newCount > 0).sort((a, b) => b.newCount - a.newCount);
-    if (withNew.length) { all.hidden = false; all.href = `${C.boardUrl(withNew[0].id)}?${C.tourQuery}`; }
+    if (withNew.length) { all.hidden = false; all.href = withQuery(C.boardUrl(withNew[0].id), C.tourQuery); }
     list.replaceChildren(...boards.map((b) => {
       const url = C.boardUrl(b.id), others = memberNames(b);
       const meta = [b.seedCount != null && `${b.seedCount} seeds`, b.paperCount != null && `${b.paperCount} papers`, others.length ? `with ${others.join(', ')}` : 'only you'].filter(Boolean).join(' · ');
@@ -247,7 +250,7 @@
         el('div', { class: 'row' },
           b.newCount > 0 ? el('span', { class: 'badge', text: `${b.newCount} new` }) : null,
           el('span', { style: 'flex:1' }),
-          el('a', { class: 'btn sm', href: b.newCount > 0 ? `${url}?${C.tourQuery}` : url, text: b.newCount > 0 ? 'Catch me up' : 'Open' })));
+          el('a', { class: 'btn sm', href: b.newCount > 0 ? withQuery(url, C.tourQuery) : url, text: b.newCount > 0 ? 'Catch me up' : 'Open' })));
     }), newCard);
   }
 
