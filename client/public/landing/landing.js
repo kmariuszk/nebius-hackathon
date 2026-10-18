@@ -190,7 +190,7 @@
         setHint('Starting the agent…');
         await API.startRun(board.id, 'onboarding');
         // with sample data there's no real board to open, so the demo board stands in for it
-        if (API.mock) { toast(`Sample data: board ${board.id} created. Opening the demo board instead.`); setTimeout(() => (location.href = C.boardUrl(board.id)), 1200); return; }
+        if (API.mock) { toast('Opening the board…'); setTimeout(() => (location.href = C.boardUrl(board.id)), 1200); return; }
         location.href = C.boardUrl(board.id);
       } catch (e) {
         busy = false; render();
