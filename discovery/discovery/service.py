@@ -16,14 +16,17 @@ from dataclasses import asdict
 from typing import Any, Literal
 
 import httpx
+import numpy as np
 
 from discovery import fulltext
 from discovery import rerank as listwise
 from discovery import rerank_vl
+from discovery.embeddings import Embedder
 from discovery.fulltext import FullText
 from discovery.papers import Paper, default_url, format_id, ids_from_url, parse_id
 from discovery.sources import Skipped, arxiv, openalex, pubmed, semantic_scholar, tavily
 from discovery.store import Store
+from discovery.vectors import VectorStore
 
 log = logging.getLogger(__name__)
 
@@ -39,9 +42,10 @@ SIMILAR_PER_SEED = 20
 
 
 class Discovery:
-    def __init__(self, client: httpx.AsyncClient, store: Store) -> None:
+    def __init__(self, client: httpx.AsyncClient, store: Store, vectors: VectorStore) -> None:
         self.client = client
         self.store = store
+        self.vectors = vectors
 
     async def search(
         self,
@@ -158,6 +162,62 @@ class Discovery:
             result = await listwise.rerank(self.client, goal, seeds, unique, k)
         skipped += result.pop("warnings")
         return {**result, "backend": backend, "candidates": len(unique), "skipped": skipped}
+
+    async def score_candidates(
+        self,
+        question: str,
+        candidate_ids: list[str],
+        seed_ids: list[str] | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Rank candidates by embedding similarity to the question and the closest seed.
+
+        The score is the mean of the two cosine similarities, or the question's alone
+        without seeds. It is the first part of the scoring step in docs/Concept.md;
+        citation overlap, recency and Lightning verdicts come later.
+        """
+        embedder = Embedder.from_env(self.client)
+        seeds, skipped = await self._papers(seed_ids or [], "seed")
+        candidates, failed = await self._papers(candidate_ids, "candidate")
+        skipped += failed
+        # Seeds are never scored, and a paper under two IDs is scored once.
+        seen = {seed.paper_id for seed in seeds}
+        unique = []
+        for paper in candidates:
+            if paper.paper_id not in seen:
+                seen.add(paper.paper_id)
+                unique.append(paper)
+        candidates = unique
+        if not candidates:
+            return {"top": [], "scored": 0, "skipped": skipped}
+
+        vectors = await self._paper_vectors(embedder, seeds + candidates)
+        question_vector = _unit(np.asarray(await embedder.query(question), dtype=np.float32))
+        matrix = np.stack([vectors[paper.paper_id] for paper in candidates])
+        question_similarity = matrix @ question_vector
+        if seeds:
+            seed_similarity = matrix @ np.stack([vectors[seed.paper_id] for seed in seeds]).T
+            closest = seed_similarity.argmax(axis=1)
+            best_seed = seed_similarity.max(axis=1)
+            scores = (question_similarity + best_seed) / 2
+        else:
+            scores = question_similarity
+
+        top = []
+        for i in np.argsort(-scores)[:limit]:
+            paper = candidates[i]
+            top.append(
+                {
+                    "paperId": paper.paper_id,
+                    "title": paper.title,
+                    "year": paper.year,
+                    "score": round(float(scores[i]), 4),
+                    "questionSimilarity": round(float(question_similarity[i]), 4),
+                    "seedSimilarity": round(float(best_seed[i]), 4) if seeds else None,
+                    "closestSeed": seeds[closest[i]].paper_id if seeds else None,
+                }
+            )
+        return {"top": top, "scored": len(candidates), "skipped": skipped}
 
     async def resolve_seed(
         self, doi: str | None = None, pmid: str | None = None, title: str | None = None
@@ -372,6 +432,20 @@ class Discovery:
             raise Skipped("no seed found in OpenAlex")
         return await openalex.citing(self.client, work_ids, limit, since)
 
+    async def _paper_vectors(self, embedder: Embedder, papers: list[Paper]) -> dict[str, np.ndarray]:
+        """Unit vectors for the papers, embedding only those not stored for their current text."""
+        texts = {paper.paper_id: paper.embedding_text() for paper in papers}
+        vectors = self.vectors.get(embedder.model, texts)
+        missing = [paper_id for paper_id in texts if paper_id not in vectors]
+        if missing:
+            embedded = await embedder.documents([texts[paper_id] for paper_id in missing])
+            self.vectors.put(
+                embedder.model,
+                {paper_id: (texts[paper_id], vector) for paper_id, vector in zip(missing, embedded)},
+            )
+            vectors |= {paper_id: np.asarray(v, dtype=np.float32) for paper_id, v in zip(missing, embedded)}
+        return {paper_id: _unit(vector) for paper_id, vector in vectors.items()}
+
     def _save_all(self, found: Iterable[tuple[str, Paper]]) -> dict[str, tuple[Paper, list[str]]]:
         """Save each paper; returns paper ID → (stored paper, sources that found it)."""
         papers: dict[str, tuple[Paper, list[str]]] = {}
@@ -405,6 +479,10 @@ def _round_robin(found: dict[str, list[Paper]]) -> list[tuple[str, Paper]]:
     for rank in range(max((len(papers) for papers in found.values()), default=0)):
         merged += [(name, papers[rank]) for name, papers in found.items() if rank < len(papers)]
     return merged
+
+
+def _unit(vector: np.ndarray) -> np.ndarray:
+    return vector / (np.linalg.norm(vector) or 1.0)
 
 
 def _in_order(papers: list[Paper], kind: str, order: list[str]) -> list[Paper]:

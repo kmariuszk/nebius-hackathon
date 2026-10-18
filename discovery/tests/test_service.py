@@ -12,6 +12,7 @@ from discovery.papers import Paper
 from discovery.server import build_server
 from discovery.service import Discovery
 from discovery.store import Store
+from discovery.vectors import VectorStore
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "pubmed_34290406.xml").read_text()
 
@@ -110,7 +111,7 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
 
 
 @pytest.fixture
-def discovery(monkeypatch):
+def discovery(monkeypatch, tmp_path):
     for name in (
         "OPENALEX_API_KEY", "TAVILY_API_KEY", "NCBI_API_KEY", "SEMANTIC_SCHOLAR_API_KEY",
         "SUPER_VL_MODEL", "TF_BASE_URL", "RERANK_BACKEND", "NVIDIA_API_KEY", "NVIDIA_BASE_URL",
@@ -120,7 +121,7 @@ def discovery(monkeypatch):
     monkeypatch.setenv("TF_API_KEY", "test-key")
     monkeypatch.setattr("discovery.sources.pubmed._throttle.interval", 0)
     monkeypatch.setattr("discovery.sources.semantic_scholar._throttle.interval", 0)
-    return Discovery(httpx.AsyncClient(transport=httpx.MockTransport(fake_apis)), Store())
+    return Discovery(httpx.AsyncClient(transport=httpx.MockTransport(fake_apis)), Store(), VectorStore(tmp_path))
 
 
 async def test_search_reports_sources_without_keys_as_skipped(discovery):
@@ -261,7 +262,8 @@ async def test_tools_over_mcp(discovery):
     async with Client(build_server(discovery)) as client:
         tools = {tool.name for tool in (await client.list_tools()).tools}
         assert tools == {
-            "search", "find_candidates", "rerank", "resolve_seed", "get_paper", "get_fulltext", "check_quotes",
+            "search", "find_candidates", "score_candidates", "rerank", "resolve_seed", "get_paper",
+            "get_fulltext", "check_quotes",
         }
         rerank_tool = next(t for t in (await client.list_tools()).tools if t.name == "rerank")
         assert "rerank_vl" in json.dumps(rerank_tool.input_schema["properties"]["backend"])

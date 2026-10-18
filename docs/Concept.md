@@ -648,7 +648,7 @@ The fields follow what the card mockup needs (`docs/mockups/README.md`): every c
 | `verdicts` | `board_id`, `paper_id`, `score`, `verdict`, `reason`, `quote`, `quote_verified`, `model`, `run_id` | Discovery service |
 | `fulltext` | `paper_id`, `section`, `page`, `text` | Discovery service |
 | `figures` | `paper_id`, `figure_id`, `caption`, `image_path`, `page`, `bbox` | Discovery service |
-| `paper_vectors` (LanceDB) | `paper_id`, `vector`, `text` | Discovery service |
+| `paper_vectors` (LanceDB) | `paper_id`, `model`, `text`, `vector` | Discovery service |
 
 The board service owns everything about the board and its people; the discovery service owns everything about papers. Each runs on its own SQLite, so the two Endpoints share no database.
 
@@ -750,7 +750,7 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 - [ ] Run tool calling through ADK `LiteLlm` with Super VL and Lightning on Token Factory
 - [ ] Stand up one `TLSocketRoom` with two browsers and one server-side write
 - [ ] Confirm with the organisers that Parse and rerank via NVIDIA's hosted API are allowed
-- [ ] Check the Token Factory catalogue for a Nemotron embedding model, and whether a rerank model can run there (a dedicated endpoint with custom weights)
+- [x] Check the Token Factory catalogue for a Nemotron embedding model: none; it serves only `Qwen/Qwen3-Embedding-8B` (4096 dimensions), which we use. It serves no rerank model either; a dedicated endpoint with custom weights is still unchecked
 - [ ] Run our seed papers through OpenAlex and check the candidate count
 - [ ] Ask the organisers whether a PubMed MCP exists; otherwise wrap ESearch, EFetch and ELink as papers MCP tools
 - [ ] Connect Tavily's remote MCP server to the ADK harness and run one sub-query through it
