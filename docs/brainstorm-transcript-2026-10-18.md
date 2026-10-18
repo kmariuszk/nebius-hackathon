@@ -1,10 +1,10 @@
 # Hackathon brainstorm: picking a track (Granola transcript)
 
-- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:03
+- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:32
 - **Source:** Granola note "New note", https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd
 - **Recorded by:** Ralph van Spanje (microphone only; speakers are not separated, so every line is labelled "Microphone")
 - **Note:** Verbatim auto-transcript. It has transcription errors (e.g. "Nematron"/"Nimotron" = Nemotron, "Free Blue and Brown" = 3Blue1Brown).
-- **Edited:** German (and garbled Dutch, plus a few Turkish/Chinese) speech from other people in the room has been removed, along with a few English fragments that were clearly part of their conversation.
+- **Edited:** German (and garbled Dutch, plus a few Turkish/Chinese/French) speech from other people in the room has been removed, along with a few English fragments that were clearly part of their conversation.
 
 ---
 
@@ -709,3 +709,291 @@ Microphone: Are you still recording us, Ralph? Yes.
 Microphone: Maybe you would like to put the transcription for the conversation that we had. And also, are you just putting screenshots of Miro into the conversation? You can connect it fluency as well. So then you just post the link to the board and then it's pretty— whatever.
 
 Microphone: The transcript is in the GitHub, but I will refresh it one more time.
+
+---
+
+*[Added in the 14:32 Granola sync]*
+
+---
+
+Microphone: So it's basically What is LaunchDB? It's a database.
+
+Microphone: That's what we need to have.
+
+Microphone: Yeah, I thought about the flow like this.
+
+Microphone: Did you have somewhere here also walk me through the new papers if you have multiple ones? And I still, I think this is relevant to show also where it is in the graph.
+
+Microphone: Somehow not so, not pure Tinder that you have one sentence, but a combination. Excellent.
+
+Microphone: Isn't the old row given by default?
+
+Microphone: Okay, I'm gonna look it up.
+
+Microphone: Now we start free.
+
+Microphone: One shot in Oakwood.
+
+Microphone: Yeah, you're right. It's not multi-player, but you have to set up.
+
+Microphone: You already got all the access from the partners, or
+
+Microphone: We definitely open part 3, right?
+
+Microphone: What is the welcome?
+
+Microphone: Yeah, we don't need it.
+
+Microphone: We need to have it for sure.
+
+Microphone: What, really?
+
+Microphone: Yeah, yeah, it was up there. Yeah.
+
+Microphone: No, he was just chilling. That was— I was so surprised. I saw it.
+
+Microphone: I thought it was maybe a different thing.
+
+Microphone: I guess we were going to use it though.
+
+Microphone: Yeah.
+
+Microphone: I'm gonna ferment these first.
+
+Microphone: Really good for film.
+
+Microphone: I'm gonna open a team for us because we need it for some of the partners.
+
+Microphone: What's our team name?
+
+Microphone: Do we want to connect it to the project?
+
+Microphone: Yeah.
+
+Microphone: The funnier is the better.
+
+Microphone: Okay, what?
+
+Microphone: Career research and science. Okay.
+
+Microphone: Science as a service.
+
+Microphone: Yeah.
+
+Microphone: No, that's all right. I'm just trying artificial research. I'm just making fun of Big Young. Do the super then, right? Do the super then. That's better. Yeah. Super artificial. Yeah, super artificial research.
+
+Microphone: It's not fun at all, guys.
+
+Microphone: I think we can do better than that.
+
+Microphone: What about a team name? We're just here for the free tokens.
+
+Microphone: Or, um,
+
+Microphone: Yes, we decided to get the dice.
+
+Microphone: I'm thinking more of the boards. How can we do that? The boards and translating it into this. We are in disguise, camouflaged version. That's Miro for research or like Secret Service research, research in a FBI
+
+Microphone: It's next level of research information and collaboration.
+
+Microphone: I thought I was pretty sure.
+
+Microphone: People are saying that we are not reaching AGI because we don't have AI that you can deploy and it's going to learn on its own.
+
+Microphone: Yeah, and that's why we're saying that we cannot have like AI researchers to connect the stuff we don't have AI research because it is really bad at connect, like getting different from different fields sort of. And that's where we are the bridge, the bridge to AGI. Missing, missing piece.
+
+Microphone: Missing piece. That's also missing piece because that's also the board.
+
+Microphone: It's like the missing piece.
+
+Microphone: It's not funny though. It's the missing piece to AGI, maybe.
+
+Microphone: It is a good word, but maybe in general as a— yeah, or company name is missing piece.
+
+Microphone: I will save it.
+
+Microphone: Yeah, but we can still
+
+Microphone: Can only— hey, what are you doing? This is the code you have to use. Okay.
+
+Microphone: You're such a power user.
+
+Microphone: For what? For all those things, right?
+
+Microphone: Yeah, join when I could.
+
+Microphone: Yeah, did you send a message?
+
+Microphone: Email.
+
+Microphone: Where's the team then?
+
+Microphone: Setting up your project though.
+
+Microphone: Open the website.
+
+Microphone: This one?
+
+Microphone: Thanks.
+
+Microphone: Cool. Good website. First decent website that I've seen for an hackathon. Not a 5-coded shitty one that's like, oh man, it's so difficult.
+
+Microphone: This is nice. This is really nice.
+
+Microphone: They should.
+
+Microphone: And here you see Gwen, the partner in it.
+
+Microphone: Under.
+
+Microphone: And I'm thinking of just having a, yeah.
+
+Microphone: A sticky stick for the notes.
+
+Microphone: I wouldn't copy that directly.
+
+Microphone: I think it's risky. Yeah. It's not risky. No. Okay. Yeah, it's true. But what, yeah.
+
+Microphone: They use stickies on those boards, literally.
+
+Microphone: All right, that didn't tell me, so I'm gonna take a look on that.
+
+Microphone: Uh, in the GitHub.
+
+Microphone: Is it not there yet?
+
+Microphone: Maybe need to commit and push to branch.
+
+Microphone: Do you see now?
+
+Microphone: In the docs, brainstorm transcript.
+
+Microphone: I also don't see it.
+
+Microphone: Okay, create a menu branch.
+
+Microphone: So let's go to From the day before the music.
+
+Microphone: Should I merge and push?
+
+Microphone: If you want to, but I already copied it from your branch. Yeah, but I will just— You're pushing it to me? I just sent the link so you can install it in your branch. I don't know if we should share across from here. I think we can just push it straight to me. But you have it installed locally, right? So it wouldn't be easy for you. I can just install it as well.
+
+Microphone: Did you go through the features that are listed here?
+
+Microphone: I'm quite surprised with what I'm seeing here right now. It says cold start, the user picks 3 to 5 seeds from search hits. You can modify this, it's just
+
+Microphone: Do you understand this paper primarily with connection and figure?
+
+Microphone: It's, um, So you click on the paper, there is a pop-up.
+
+Microphone: Did you push your stuff on the GitHub? So the information around whole projects, I think.
+
+Microphone: Okay, thank you.
+
+Microphone: Of the work.
+
+Microphone: People have some shared chat with those participants and they can be very engaged.
+
+Microphone: So like you have comments and people can talk to each other with agents.
+
+Microphone: Yeah, that should be quite easy because then you just about put in the right context and letting the agent respond to it. Then the readability is a bit trickier because then when the agent needs to understand the context in the board, it also needs to catch comments, but it's a different idea.
+
+Microphone: We could also use, um,
+
+Microphone: Jeffrey, for example.
+
+Microphone: Because Jeff will see context, think I'm reaching should.
+
+Microphone: Yeah.
+
+Microphone: We need to declare it ourselves.
+
+Microphone: Yeah.
+
+Microphone: Jesus Christ, this document is super, super deep.
+
+Microphone: Your document.
+
+Microphone: Do you often do this when you create such a huge file? You create something I mean, did you test it before?
+
+Microphone: I, I test, but it still should be a bit more too.
+
+Microphone: Yeah, you can just write your idea.
+
+Microphone: Yeah, yeah, what I did for, for— I'm syncing it with the transcript if I'm wrong. So it should update certain things that are quite wrong here. I filtered the Germans out. What? I filtered the Germans out. Captured some of them too.
+
+Microphone: How feasible is it if the user is able to edit the notes and the links and also the name on the links?
+
+Microphone: And that it doesn't fuck up the AI. Should we do it like Claude design that you Edited and then it's just on a pause with the snapshot and then you do save with all your edits, maybe just one edit, and then it goes into it, he fixes it, and then you wait.
+
+Microphone: Yeah.
+
+Microphone: So do you agree with the mode of everything is on hold and only then you click one button and then it spawns an agent that responds to the comments?
+
+Microphone: Yeah, well, we can even select some content.
+
+Microphone: Add it as a context to the chat. So agent will see all pages we support. For example, you're talking about a great paper, agent will get from JSON or support.
+
+Microphone: If you see updates as well.
+
+Microphone: So no comments in that case.
+
+Microphone: Well, we can probably— we can get comments.
+
+Microphone: Because why do you guys think Cloud Design has that? What's the reason?
+
+Microphone: It makes sense. I think it's feasible to add that.
+
+Microphone: Editing notes, links, and link names. I think those 3 are the important ones.
+
+Microphone: And that's the most design extra.
+
+Microphone: We already need to start pushing something in a moment.
+
+Microphone: Okay, I think I can just push it and then start.
+
+Microphone: In that IPYNB, there is an API of PubMed and Token Factory cells handy as quick API checks.
+
+Microphone: In that one folder, a file that was like underneath, there is your— and Token Factory cells handy as quick API checks.
+
+Microphone: Is it useful for you?
+
+Microphone: I didn't understand the sentence. Not me neither. That's why I told him, then ignore it.
+
+Microphone: Sorry, should we start to include requests?
+
+Microphone: I guess we're gonna need to have some fun. Yeah, maybe when we start. Yeah.
+
+Microphone: I'm also sitting here with a teardrop of milk.
+
+Microphone: Okay, full for not just What do you mean? What do you say to that?
+
+Microphone: She's excited.
+
+Microphone: So negative is
+
+Microphone: Yeah, this is— we have a bit better one.
+
+Microphone: From here, RBS.
+
+Microphone: Made HTML.
+
+Microphone: Version of it.
+
+Microphone: Catch Me Up is quite cool.
+
+Microphone: Chat HTML version. It's already working. Yeah, catch me up.
+
+Microphone: But this is way too much text. I feel like this should highlight just things on the board. But you can always do a show more or something. Okay, what? Let's just now look at this. Super fucking boxy right now. Oh yeah, definitely, definitely. Yeah, well, also. There are so many connections and they are— Oh, there is a ranked list next to it. Oh, okay. That's not bad.
+
+Microphone: But I don't fully understand this ranked list concept in this context. Yeah, this is then a new one that came today. Okay.
+
+Microphone: These are the nodes.
+
+Microphone: Well, it's also nice. And so this is the ranking on the boards, the colors.
+
+Microphone: Medium, high, and bigger is more links.
+
+Microphone: Oh, you have voting to it. They don't, yeah, I don't understand this voting thing. I mean, either sites similar. Oh, that can also be a good one. Sites and similar indeed. Yeah. Yeah. But you had that already. I also think that, so this coloring should be rated by the model, which is looking for the paper. So it's classified. Yeah. Oh, definitely. Yeah. But what about the researcher themselves? Can they rank?
+
+Microphone: Can they adjust the ranking? Yeah, but let's leave that. I mean, yeah, how would they rank if they just see the paper for the first time, right? Like they could rank. Yeah, but after that, because then The agent also knows who really searched around that one maybe, or personal ranking. Ah, then you make it too complex. And yeah, I mean, you could, for example, you could just store data how often they open the paper.
