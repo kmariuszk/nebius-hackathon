@@ -5,7 +5,20 @@ Research canvas for the Nebius hackathon.
 - `client/`: the canvas app, from tldraw's Multiplayer starter kit ([tldraw-sync-cloudflare](https://github.com/tldraw/tldraw-sync-cloudflare)), with tldraw installed from npm.
   - `client/client/`: the React frontend. Each URL path is a room, so everyone on `/<room>` shares one live board with cursors and presence.
   - `client/worker/`: the sync server, a Cloudflare Worker with one Durable Object per room. Room state is saved in the Durable Object's SQLite storage, and images and videos go to an R2 bucket.
+- `harness/`: the agents, on Google ADK with Nemotron models on Nebius Token Factory. One folder per agent; see [harness/README.md](harness/README.md), including how to add an agent.
+- `discovery/`: the papers MCP the agents search with (PubMed, OpenAlex, Semantic Scholar, Tavily); see [discovery/README.md](discovery/README.md).
 - `board/`: Python scripts that generate SVG for the planning Miro board.
+
+## Run the agents
+
+You need [uv](https://docs.astral.sh/uv/). Copy `.env.example` to `.env` and fill in at least `TF_API_KEY` and `TAVILY_API_KEY`.
+
+```zsh
+cd discovery && uv run python -m discovery    # terminal 1: the papers MCP on :8001
+cd harness && uv run adk web harness/agents   # terminal 2: ADK's dev UI on http://localhost:8000
+```
+
+`cd harness && uv run python -m harness.check` checks the keys, both Nemotron models' tool calling and both MCP servers.
 
 ## Run the client
 
