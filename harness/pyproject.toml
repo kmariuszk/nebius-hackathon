@@ -1,0 +1,36 @@
+[project]
+name = "harness"
+version = "0.1.0"
+description = "Google ADK agents for the paper discovery canvas"
+requires-python = ">=3.12,<3.14"
+# Pinned on purpose: tool calling through LiteLLM has regressed between ADK
+# releases before (google/adk-python#4650). Bump both together, then rerun
+# `uv run python -m harness.check`.
+dependencies = [
+    "google-adk[mcp]==2.12.0",
+    "httpx>=0.28",
+    "litellm==1.106.0",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=1.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12,<0.13"]
+build-backend = "uv_build"
+
+[tool.uv.build-backend]
+module-root = ""
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    # ADK announces its own experimental features and deprecations on every run.
+    "ignore:\\[EXPERIMENTAL\\]:UserWarning",
+    "ignore:MCPTool class is deprecated:DeprecationWarning",
+]

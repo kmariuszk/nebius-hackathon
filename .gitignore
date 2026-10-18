@@ -9,3 +9,5 @@ dist/
 .env.local
 .claude/worktrees/
 .claude/settings.local.json
+discovery/data/
+.pytest_cache/
