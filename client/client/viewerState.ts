@@ -26,3 +26,9 @@ export const filters = atom<BoardFilters>('filters', {
 
 /** The paper whose widgets are open around its node (T10), or null. */
 export const openPaperId = atom<string | null>('openPaperId', null)
+
+/** Whether the open paper shows "More" (what supports it, and the rest); clicking its node again toggles it. */
+export const paperMoreOpen = atom<boolean>('paperMoreOpen', false)
+
+/** Papers lit up on this screen only: hovering "three of your seeds", or `_canvas/highlight` (T06). */
+export const litPaperIds = atom<string[]>('litPaperIds', [])
