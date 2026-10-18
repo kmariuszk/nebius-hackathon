@@ -18,7 +18,7 @@ async def run(agent, text: str) -> list:
 
 
 async def test_search_agent_calls_the_papers_mcp_and_answers_in_json(papers_mcp):
-    answer = {"subQuery": "melanoma T cells", "candidates": [], "candidateIds": ["pmid:1", "pmid:2"], "notes": ""}
+    answer = {"subQuery": "melanoma T cells", "candidates": [], "seedCandidates": 1, "notes": ""}
     agent = search.build()
     agent.model = model = ScriptedLlm(
         turns=[

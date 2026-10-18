@@ -15,7 +15,7 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | --- | --- | --- |
 | `search` | `query`, `limit`, `sources` (pubmed, openalex, web), `since` | `papers` (summaries with `foundBy`), `countsBySource`, `skipped` |
 | `find_candidates` | `seed_ids`, `exclude_ids`, `strategies` (pubmed_links, citing, recommend, keyword, web), `since`, `limit`, `query` | `candidateIds` (found by most strategies first), `countsByStrategy`, `skipped` |
-| `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `k` | `ranked` (summary, `rank`, `score`, `reason`), `model`, `seconds`, `candidates`, `skipped` |
+| `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `exclude_ids`, `k` | `ranked` (summary, `rank`, `score`, `reason`), `model`, `seconds`, `candidates`, `skipped` |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
 

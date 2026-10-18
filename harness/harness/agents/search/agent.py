@@ -23,10 +23,11 @@ and paper IDs to exclude.
 to expand from the seeds through citations, similar articles and recommendations.
 3. Reply with one JSON object and nothing else:
 {"subQuery": "...", "candidates": [{"paperId": "...", "title": "...", "foundBy": ["..."], "why": "a short phrase"}], \
-"candidateIds": ["..."], "notes": "..."}
+"seedCandidates": 0, "notes": "..."}
 - `candidates`: up to 15 papers from `search` that look on-topic, with why each fits the sub-query.
-- `candidateIds`: every on-topic ID from `search` plus every ID from `find_candidates`.
+- `seedCandidates`: how many IDs `find_candidates` returned, or 0 if you didn't call it.
 - `notes`: sources that failed or were skipped, or "".
+Every ID the tools return is collected for ranking automatically, so don't list them all.
 
 Only report paper IDs and titles that a tool returned. Never invent them.
 """

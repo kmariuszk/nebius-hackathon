@@ -53,8 +53,8 @@ uv run pytest                    # offline tests
 
 | Agent | Model | Tools | Status |
 | --- | --- | --- | --- |
-| `master` | Super VL | `search` agent (as a tool), papers `resolve_seed`, `get_paper`, `rerank` | Built; chats with the researcher, runs about three sub-queries in parallel, merges and reranks the candidates and answers with a ranked list. No canvas tools yet |
-| `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with candidate IDs as JSON |
+| `master` | Super VL | `search` agent (as a tool, a fresh one per call), papers `resolve_seed`, `get_paper`, `rerank` | Built; chats with the researcher, runs about three sub-queries in parallel and reranks every candidate they found. Candidate IDs go from the tool results to `rerank` without a model retyping them (`agents/master/candidates.py`). No canvas tools yet |
+| `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with its picks as JSON; the IDs its tools return go to the master's candidate pool |
 | `reader`, `context` | see `docs/Concept.md` | | To do |
 
 ## Not built yet
