@@ -4,9 +4,13 @@ The master splits the research question into about three sub-queries and
 calls this agent once per sub-query (docs/Concept.md, Agent design). It only
 finds candidates; `score_candidates` judges them afterwards.
 
-Every turn must be a tool call, so the only way to finish is `done`, which
-checks the answer, saves it to session state under `search_result` and ends
-the run.
+The run finishes with `done`, which checks the answer, saves it to session
+state under `search_result` and ends the run.
+
+Tool calls are not forced. With `tool_choice: "required"`, Lightning on Token
+Factory never stopped after a call: every reply ran to the token cap with a
+search and dozens of `done` calls. Without it, Lightning makes one call per
+reply and reads each result before the next.
 """
 
 from __future__ import annotations
@@ -120,16 +124,8 @@ def build() -> LlmAgent:
         instruction=INSTRUCTION,
         tools=[toolsets.papers("search", "find_candidates"), done],
         after_model_callback=first_call_only,
-        # Forces a tool call every turn (tool_choice "required"), so a plain text
-        # reply cannot end the run early; only `done` does.
-        generate_content_config=types.GenerateContentConfig(
-            max_output_tokens=MAX_REPLY_TOKENS,
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(
-                    mode=types.FunctionCallingConfigMode.ANY
-                )
-            )
-        ),
+        # No forced tool choice (see the module docstring); the cap stays as a backstop.
+        generate_content_config=types.GenerateContentConfig(max_output_tokens=MAX_REPLY_TOKENS),
     )
 
 

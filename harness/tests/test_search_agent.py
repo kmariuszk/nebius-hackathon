@@ -98,9 +98,22 @@ def test_search_agent_replies_are_capped():
     assert search.build().generate_content_config.max_output_tokens == search.MAX_REPLY_TOKENS
 
 
-def test_search_agent_must_call_a_tool_every_turn():
-    config = search.build().generate_content_config.tool_config.function_calling_config
-    assert config.mode == types.FunctionCallingConfigMode.ANY
+async def test_search_agent_does_not_force_a_tool_call(papers_mcp):
+    # Under tool_choice "required", Lightning on Token Factory ran every reply to the token cap,
+    # a search followed by dozens of `done` calls. The model picks when to call a tool.
+    agent = search.build()
+    agent.model = model = ScriptedLlm(
+        turns=[
+            call("search", query="melanoma T cells", limit=10),
+            call("done", sub_query="melanoma T cells", candidates=[CANDIDATE], seed_candidates=0, notes=""),
+        ]
+    )
+
+    _, state = await run(agent, "Sub-query: melanoma T cells")
+
+    assert all(request.config.tool_config is None for request in model.requests)
+    assert len(model.requests) == 2
+    assert state[search.RESULT_KEY]["candidates"][0]["paperId"] == "pmid:1"
 
 
 def test_search_agent_runs_on_lightning():
