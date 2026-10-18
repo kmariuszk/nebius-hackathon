@@ -1,3 +1,11 @@
 __pycache__/
 *.pyc
 .DS_Store
+.vite/
+node_modules/
+dist/
+.venv/
+.env
+.env.local
+.claude/worktrees/
+.claude/settings.local.json
