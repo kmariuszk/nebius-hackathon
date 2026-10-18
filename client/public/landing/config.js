@@ -3,11 +3,13 @@ window.ML_CONFIG = {
   // Base URL of the board service's REST API (Concept.md, "REST API (board service)").
   apiBase: '/api/v1',
   // Where a board opens. The canvas route today is /:roomId (client/client/pages/Room.tsx).
-  boardUrl: (boardId) => `/${encodeURIComponent(boardId)}`,
+  // With sample data there's no real board yet, so the demo board stands in for every board.
+  boardUrl: (boardId) => (window.MLApi && window.MLApi.mock ? './demo-board.html?mock=1' : `/${encodeURIComponent(boardId)}`),
   // Added to the board URL to start "Catch me up" when the board opens.
   tourQuery: 'tour=1',
   // A prepared example board to explore without starting a run. The link is hidden while empty.
-  demoBoardUrl: '',
+  // demo-board.html is the board design (docs/mockups, v6) with real papers and stand-in agent output.
+  demoBoardUrl: './demo-board.html',
   // The 2-minute demo video (YouTube or Loom embed URL, or an .mp4). The section is hidden while empty.
   demoVideoUrl: '',
   repoUrl: 'https://github.com/kmariuszk/nebius-hackathon',

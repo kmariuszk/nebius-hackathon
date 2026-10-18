@@ -1,5 +1,7 @@
 # Landing pages
 
+For how these pages and the board fit together, start with [`frontend.md`](frontend.md).
+
 Three static pages in `client/public/landing/`. Vite copies `public/` into `dist/`, so the Node server serves them as they are. There's no React code and no build step, and they don't touch the board.
 
 | Page | URL | What it does |
@@ -34,10 +36,11 @@ Login is faked: the name is kept in the browser and sent as `X-Display-Name`. Er
 - **`apiBase`:** the REST base path.
 - **`boardUrl(id)`:** where a board opens.
 - **`tourQuery`:** what's added to a board URL to start "Catch me up" (`?tour=1`). The board needs to read it.
-- **`demoBoardUrl` and `demoVideoUrl`:** the demo-board link and the video section stay hidden until these are set.
+- **`demoBoardUrl`:** the demo-board link on Start. It points at `demo-board.html`, the board design with sample data.
+- **`demoVideoUrl`:** the video section stays hidden until it's set.
 - **`repoUrl`.**
 
-Add `?mock=1` to any page URL to use sample data instead of the board service. A yellow bar says so.
+Add `?mock=1` to any page URL to use sample data instead of the board service. A yellow bar says so. With sample data, every board link (Start's submit, Home's boards and Catch me up) opens `demo-board.html`.
 
 ## Making it the front door
 
