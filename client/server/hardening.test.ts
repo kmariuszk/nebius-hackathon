@@ -9,7 +9,13 @@ import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { WebSocket } from 'ws'
 
-const PORT = 5000 + Math.floor(Math.random() * 1000)
+// a port the OS says is free rather than a random guess: macOS's AirPlay holds 5000, and dev servers sit in 5xxx
+const PORT = await new Promise<number>((resolve) => {
+	const probe = net.createServer().listen(0, () => {
+		const { port } = probe.address() as net.AddressInfo
+		probe.close(() => resolve(port))
+	})
+})
 const BASE = `http://localhost:${PORT}`
 const dataDir = mkdtempSync(join(tmpdir(), 'board-test-'))
 let server: ChildProcess

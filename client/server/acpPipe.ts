@@ -76,6 +76,11 @@ function startHarness(ws: WebSocket, board: string, member: string, config: Retu
 	const tag = `[harness ${board}/${member} ${child.pid ?? '-'}]`
 	console.log(`${tag} started: ${config.cmd.join(' ')}`)
 	const out = createInterface({ input: child.stdout!, crlfDelay: Infinity })
+	// newer Node (seen on 25) throws ERR_USE_AFTER_CLOSE from resume() once stdout has ended,
+	// which happens whenever the harness exits before the socket closes
+	let outClosed = false
+	out.on('close', () => (outClosed = true))
+	const resumeOut = () => outClosed || out.resume()
 	const isOpen = () => ws.readyState === ws.CONNECTING || ws.readyState === ws.OPEN
 
 	let exited = false
@@ -89,7 +94,7 @@ function startHarness(ws: WebSocket, board: string, member: string, config: Retu
 		stop(code, reason) {
 			clearTimeout(idleTimer)
 			if (isOpen()) ws.close(code, reason)
-			out.resume() // nobody reads any more: let the harness flush and exit
+			resumeOut() // nobody reads any more: let the harness flush and exit
 			if (stopping || exited) return
 			stopping = true
 			child.stdin?.end()
@@ -137,7 +142,7 @@ function startHarness(ws: WebSocket, board: string, member: string, config: Retu
 		ws.send(line, () => {
 			if (paused && ws.bufferedAmount < HIGH_WATER) {
 				paused = false
-				out.resume()
+				resumeOut()
 			}
 		})
 		if (!paused && ws.bufferedAmount > HIGH_WATER) {
