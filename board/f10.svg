@@ -1,0 +1,230 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+<g id="f10" transform="translate(3400,6180)" data-frame="10 Ten non-obvious ideas">
+    <rect data-type="frame" x="0" y="0" width="3080" height="2957" fill="#ffffff" data-title="10 Ten non-obvious ideas" />
+    <text x="64" y="128" font-family="noto_sans" font-size="67" font-weight="bold" fill="#1a1a1a">10. Ten non-obvious ideas</text>
+    <textArea x="64" y="160" width="2952" font-family="noto_sans" font-size="22" fill="#595959">Five that would create a new category, and five that use the tools on the table in ways nobody expects. Same scores as before; totals are Claude's drafts.</textArea>
+    <text x="64" y="250" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">A. Revolutionizing: a new category, not a better version of something that exists</text>
+    <rect x="64" y="276" width="420" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Idea" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="494" y="276" width="220" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Best track" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="724" y="276" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Technical" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="994" y="276" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Design" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1264" y="276" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Impact" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1534" y="276" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Idea quality" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1804" y="276" width="140" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Total /20" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1976" y="276" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Buildable in 6h" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="2246" y="276" width="380" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="30-second magic moment" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="2636" y="276" width="380" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Biggest risk" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="64" y="366" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#15 Deal room&lt;/b&gt;&lt;br&gt;Your agent and the tradesperson's agent negotiate the renovation contract, each with private limits. Humans only sign." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="366" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Apps and Agentic AI&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="366" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Type your budget; two agents trade offers on screen for 20 seconds and land on a price, with both sides' reasons shown." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="366" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Judges ask why a tradesperson would run an agent. Answer: it stops them losing jobs to slow replies." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="366" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="744" y="422" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="744" y="442" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Two Nemotron agents, private state, Tavily prices</textArea>
+    <rect x="994" y="366" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1014" y="422" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1014" y="442" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Watching two agents haggle is live theatre</textArea>
+    <rect x="1264" y="366" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="422" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="442" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Every quote today is a slow email thread</textArea>
+    <rect x="1534" y="366" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1554" y="422" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1554" y="442" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Agent-to-agent commerce with a real use</textArea>
+    <rect x="1976" y="366" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1996" y="422" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1996" y="442" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Two prompts and a loop; no real counterparty</textArea>
+    <rect x="1804" y="366" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;18&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="576" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#16 Law as CI&lt;/b&gt;&lt;br&gt;Paste a law; Nemotron turns each obligation into a check that runs on every push. Tavily watches for amendments." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="576" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Apps and Agentic AI&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="576" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Push a commit that drops alt text; the pipeline fails, quotes the article of the law, and suggests the fix." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="576" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Most obligations can't be tested from code. Pick the five that can and say so up front." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="576" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="744" y="632" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="744" y="652" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Statute parsing, generated checks, GitHub Action</textArea>
+    <rect x="994" y="576" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1014" y="632" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1014" y="652" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Lives in CI; show a red check turning green</textArea>
+    <rect x="1264" y="576" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1284" y="632" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1284" y="652" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">AI Act obligations bite from August 2026</textArea>
+    <rect x="1534" y="576" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1554" y="632" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1554" y="652" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Regulation as code, generated from the text</textArea>
+    <rect x="1976" y="576" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1996" y="632" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1996" y="652" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Pick five obligations that are testable</textArea>
+    <rect x="1804" y="576" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;18&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="786" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#17 Film a room, get a robot job&lt;/b&gt;&lt;br&gt;Phone video of a warehouse aisle; the VL model lists objects and hazards, Nemotron writes the task plan a robot can run." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="786" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Vertical AI&lt;/b&gt;&lt;br&gt;physical AI and robotics&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="786" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Walk the phone through the venue's kitchen; 30 seconds later every object is labelled and a 'clear the table' plan appears step by step." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="786" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="VL misses small objects. Demo on a tidy scene you filmed in advance." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="786" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="744" y="842" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="744" y="862" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Nemotron 3.5 Super VL on frames, then a planner</textArea>
+    <rect x="994" y="786" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1014" y="842" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1014" y="862" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Video in, annotated plan out is vivid</textArea>
+    <rect x="1264" y="786" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="842" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="862" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Robot deployments start with a site survey</textArea>
+    <rect x="1534" y="786" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1554" y="842" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1554" y="862" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Scene to task spec is the missing step</textArea>
+    <rect x="1976" y="786" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1996" y="842" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1996" y="862" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Frames and VL are fine; skip the simulator</textArea>
+    <rect x="1804" y="786" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;17&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="996" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#18 Waiting room radar&lt;/b&gt;&lt;br&gt;Patients type symptoms on a tablet before the doctor; the doctor gets a structured intake, and across clinics an outbreak shows early." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="996" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Vertical AI&lt;/b&gt;&lt;br&gt;healthcare and life sciences&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="996" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Three fake patients type 'fever and rash'; the doctor's screen fills itself and a red dot grows on the Neukölln map." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="996" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Health data and GDPR. Nothing identifying leaves the clinic, and the screen says so." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="996" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="744" y="1052" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="744" y="1072" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Nemotron structures intake; Serverless aggregates</textArea>
+    <rect x="994" y="996" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1014" y="1052" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1014" y="1072" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Intake form plus a live city map</textArea>
+    <rect x="1264" y="996" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1284" y="1052" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1284" y="1072" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Public health sees outbreaks weeks late</textArea>
+    <rect x="1534" y="996" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1554" y="1052" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1554" y="1072" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Turns intake into surveillance; no audio</textArea>
+    <rect x="1976" y="996" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1996" y="1052" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1996" y="1072" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Text in, JSON out; simulate 200 patients</textArea>
+    <rect x="1804" y="996" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;17&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="1206" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#19 The handover interview&lt;/b&gt;&lt;br&gt;An agent interviews a leaving engineer, checks the repo and wiki for what's undocumented, and writes the handover nobody writes." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="1206" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Apps and Agentic AI&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="1206" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Point it at a repo; it asks 'why is the retry limit 7 in payments.py?', you answer, and the handover doc grows live." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="1206" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Needs a real repo with real quirks. Use one of yours, not a toy." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="1206" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="744" y="1262" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="744" y="1282" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Repo and wiki read, interview loop, gap finder</textArea>
+    <rect x="994" y="1206" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1014" y="1262" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1014" y="1282" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Questions get sharper as it finds gaps</textArea>
+    <rect x="1264" y="1206" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="1262" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="1282" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Every departure loses months of context</textArea>
+    <rect x="1534" y="1206" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1554" y="1262" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1554" y="1282" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">AI interviewing humans, not the reverse</textArea>
+    <rect x="1976" y="1206" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1996" y="1262" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1996" y="1282" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Text chat plus a repo; voice optional</textArea>
+    <rect x="1804" y="1206" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;17&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <text x="64" y="1503" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">B. Unconventional: the tools on the table, used the way nobody expects</text>
+    <rect x="64" y="1529" width="420" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Idea" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="494" y="1529" width="220" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Best track" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="724" y="1529" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Technical" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="994" y="1529" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Design" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1264" y="1529" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Impact" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1534" y="1529" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Idea quality" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1804" y="1529" width="140" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Total /20" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="1976" y="1529" width="260" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Buildable in 6h" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="2246" y="1529" width="380" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="30-second magic moment" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="2636" y="1529" width="380" height="80" rx="12" fill="#c6dcff" stroke="none" data-content="Biggest risk" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="middle" />
+    <rect x="64" y="1619" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#20 Thinking on a budget&lt;/b&gt;&lt;br&gt;Nano answers first and scores its own confidence; hard questions climb to Super, then Ultra. A live meter shows cost saved." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="1619" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Cloud and Serverless&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="1619" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Fire 50 mixed questions; most stop at Nano, hard ones climb, and the meter shows 80% saved at the same accuracy." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="1619" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Judges ask about accuracy. Run a small eval with answers you already know." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="1619" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="744" y="1675" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="744" y="1695" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Three Nemotron tiers, verifier, router endpoint</textArea>
+    <rect x="994" y="1619" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1014" y="1675" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1014" y="1695" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">A cost meter that ticks is a story</textArea>
+    <rect x="1264" y="1619" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="1675" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="1695" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Inference bills are every team's problem</textArea>
+    <rect x="1534" y="1619" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1554" y="1675" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1554" y="1695" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Cascades are known; the product and meter are new</textArea>
+    <rect x="1976" y="1619" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1996" y="1675" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1996" y="1695" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Three API calls and a chart</textArea>
+    <rect x="1804" y="1619" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;15&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="1829" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#21 Docs to MCP&lt;/b&gt;&lt;br&gt;Point it at any API docs site; Tavily maps and extracts it, Nemotron writes an MCP server with typed tools, Serverless hosts it." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="1829" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Apps and Agentic AI&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="1829" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Paste the Open-Meteo docs URL; 90 seconds later Claude Code asks for tomorrow's rain in Berlin through a server that didn't exist." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="1829" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Generated servers break on auth and odd formats. Demo on one public API you tested." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="1829" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="744" y="1885" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="744" y="1905" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Tavily map and extract, codegen, deploy, MCP</textArea>
+    <rect x="994" y="1829" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1014" y="1885" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1014" y="1905" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Dev tool; show Claude Code using the new tool</textArea>
+    <rect x="1264" y="1829" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="1885" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="1905" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Thousands of APIs have no MCP server</textArea>
+    <rect x="1534" y="1829" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1554" y="1885" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1554" y="1905" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Tavily as a crawler for codegen, not search</textArea>
+    <rect x="1976" y="1829" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1996" y="1885" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1996" y="1905" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Codegen is flaky; limit to REST with JSON</textArea>
+    <rect x="1804" y="1829" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;16&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="2039" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#22 Humans as tools&lt;/b&gt;&lt;br&gt;An MCP tool called ask_a_human: when the agent is unsure it messages a real person on Telegram, waits, and continues." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="2039" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Apps and Agentic AI&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="2039" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="The renovation agent hits 'which wall is load-bearing?', Ralph's phone buzzes, he replies, and the plan finishes." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="2039" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Looks like a gimmick if the question is trivial. Make it one only a human can know." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="2039" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="744" y="2095" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="744" y="2115" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">MCP tool, Telegram bot, async wait, Nemotron</textArea>
+    <rect x="994" y="2039" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1014" y="2095" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1014" y="2115" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">A phone buzzes mid-demo; the room gets it</textArea>
+    <rect x="1264" y="2039" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="2095" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="2115" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Stops agents guessing on the one unknown</textArea>
+    <rect x="1534" y="2039" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1554" y="2095" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1554" y="2115" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Inverts the usual human-in-the-loop</textArea>
+    <rect x="1976" y="2039" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1996" y="2095" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1996" y="2115" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Telegram bots are 20 lines; loop is simple</textArea>
+    <rect x="1804" y="2039" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;18&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="2249" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#23 Distill on the day&lt;/b&gt;&lt;br&gt;Super writes 500 labelled examples for your task; a Serverless job fine-tunes a small open model; it deploys and matches Super at a fifth of the cost." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="2249" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Cloud and Serverless&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="2249" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Pick a task; 500 examples stream past, the job runs, and a small model answers from a URL with the same score as Super." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="2249" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="The fine-tune doesn't finish. Kick one off at noon with a tiny set as insurance." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="2249" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="744" y="2305" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="744" y="2325" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">Synthetic data, fine-tune job, endpoint, eval</textArea>
+    <rect x="994" y="2249" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1014" y="2305" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1014" y="2325" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">A chart and a URL; make the chart clear</textArea>
+    <rect x="1264" y="2249" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="2305" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="2325" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Everyone wants Super quality at Nano prices</textArea>
+    <rect x="1534" y="2249" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1554" y="2305" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1554" y="2325" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Distillation as a one-click product</textArea>
+    <rect x="1976" y="2249" width="260" height="200" rx="12" fill="#adf0c7" stroke="none" />
+    <text x="1996" y="2305" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">3</text>
+    <textArea x="1996" y="2325" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Start the fine-tune by 13:00 or it won't finish</textArea>
+    <rect x="1804" y="2249" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;16&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="2459" width="420" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;#24 Hold the line&lt;/b&gt;&lt;br&gt;An agent calls the Bürgeramt hotline for you, waits in the queue, and when a human answers it handles the request or rings you to take over." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="494" y="2459" width="220" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="&lt;b&gt;Apps and Agentic AI&lt;/b&gt;&lt;br&gt;+ NVIDIA challenge" data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2246" y="2459" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Dial a mentor's phone; the agent sits through a fake hold loop, then books an appointment with the mentor playing the clerk." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="2636" y="2459" width="380" height="200" rx="12" fill="#f7f7f7" stroke="none" data-content="Never call a real public office from the stage. A mentor's phone is the office." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+    <rect x="724" y="2459" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="744" y="2515" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="744" y="2535" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Twilio call, speech model on Serverless, Nemotron</textArea>
+    <rect x="994" y="2459" width="260" height="200" rx="12" fill="#067429" stroke="none" />
+    <text x="1014" y="2515" font-family="noto_sans" font-size="33" font-weight="bold" fill="#ffffff">5</text>
+    <textArea x="1014" y="2535" width="220" font-family="noto_sans" font-size="22" fill="#ffffff">A phone call on stage is unforgettable</textArea>
+    <rect x="1264" y="2459" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1284" y="2515" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1284" y="2535" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Berlin's 115 line means long waits for everyone</textArea>
+    <rect x="1534" y="2459" width="260" height="200" rx="12" fill="#2dc75c" stroke="none" />
+    <text x="1554" y="2515" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">4</text>
+    <textArea x="1554" y="2535" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Old telephony as the agent's interface</textArea>
+    <rect x="1976" y="2459" width="260" height="200" rx="12" fill="#eaf9ef" stroke="none" />
+    <text x="1996" y="2515" font-family="noto_sans" font-size="33" font-weight="bold" fill="#1a1a1a">2</text>
+    <textArea x="1996" y="2535" width="220" font-family="noto_sans" font-size="22" fill="#1a1a1a">Telephony plus live speech is two risky parts</textArea>
+    <rect x="1804" y="2459" width="140" height="200" rx="12" fill="#c6dcff" stroke="none" data-content="&lt;b&gt;17&lt;/b&gt;" data-text-color="#305bab" data-font-family="noto_sans" data-font-size="33" data-text-align="center" data-text-align-vertical="middle" />
+    <rect x="64" y="2723" width="2952" height="170" rx="12" fill="#fff6b6" stroke="none" data-content="&lt;b&gt;What changes: #15 Deal room, #16 Law as CI and #22 Humans as tools tie with #2 at 18.&lt;/b&gt; #22 is as much a feature as an idea: bolt ask_a_human onto #3, #9 or #15 and it becomes the magic moment. #15 is the safest of the three to build. #16 is the most ambitious; only pick it if one of you knows GitHub Actions well. &lt;b&gt;Bonus for tonight, 30 minutes:&lt;/b&gt; a judge simulator. Paste the assumed rubric and your demo script; five Nemotron personas score it and ask the Q&amp;A questions. Rehearse against it before 09:00." data-text-color="#1a1a1a" data-font-family="noto_sans" data-font-size="22" data-text-align="left" data-text-align-vertical="top" />
+</g>
+</svg>
