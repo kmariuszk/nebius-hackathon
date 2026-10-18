@@ -1,18 +1,23 @@
 """The master agent: talks to the researcher and runs the discovery.
 
 It splits the question into about three sub-queries, calls the search agent
-once per sub-query, merges the candidates and ranks them with the papers MCP's
-`rerank` (docs/Concept.md, Agent design). It calls the reader agent when the
-researcher asks about one paper in depth. The canvas MCP isn't built yet, so
-for now it answers in the chat instead of placing papers on the board.
+once per sub-query and ranks every candidate they found with the papers MCP's
+`rerank` (docs/Concept.md, Agent design). The candidate IDs go from the search
+results to `rerank` without passing through a model (see `candidates.py`).
+It calls the reader agent when the researcher asks about one paper in depth.
+The canvas MCP isn't built yet, so for now it answers in the chat instead of
+placing papers on the board.
 """
 
 from __future__ import annotations
+
+from collections.abc import Callable
 
 from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 
 from harness import models, toolsets
+from harness.agents.master import candidates
 from harness.agents.reader import agent as reader
 from harness.agents.search import agent as search
 
@@ -34,16 +39,16 @@ Write each as a short keyword query of the kind PubMed handles well.
 Each request is plain text: "Sub-query: <query>". Add "Seed paper IDs: <ids>" to the first request only, \
 since expanding from the seeds doesn't depend on the sub-query, and add "Exclude: <ids>" to every request \
 when the researcher has dropped papers.
-4. Merge. Collect `candidateIds` from every search result. Drop duplicates, seeds and excluded papers, and put \
-papers that more than one sub-query found first. Keep at most 100.
-5. Rank. Call `rerank` with `goal` set to the researcher's question in their own words, plus anything they \
-have told you since about what they want; `paper_ids` set to the merged list; `seed_ids` set to the seeds; \
-and `k` set to the number of papers they asked for, or 10.
-6. Answer with the ranked papers as a numbered list, best first:
+4. Rank. Call `rerank` with `goal` set to the researcher's question in their own words, plus anything they \
+have told you since about what they want; `seed_ids` set to the seeds; `exclude_ids` set to every paper the \
+researcher has dropped; `k` set to the number of papers they asked for, or 10; and `paper_ids` set to []. \
+`paper_ids` is filled in for you with every candidate the searches in this conversation found, so never copy \
+IDs into it.
+5. Answer with the ranked papers as a numbered list, best first:
    **Title** (year, venue). The reason from `rerank`. [link](url)
-   Then one short line: how many candidates the sub-queries found, which sub-queries you ran, and any \
-sources or seeds that were skipped. Offer one or two useful next steps, such as narrowing to a method or \
-expanding from the top paper.
+   Then one short line: how many candidates were ranked (`candidates` in the `rerank` result), which \
+sub-queries you ran, and any sources or seeds that were skipped. Offer one or two useful next steps, \
+such as narrowing to a method or expanding from the top paper.
 
 ## Follow-ups
 
@@ -51,9 +56,10 @@ expanding from the top paper.
 - "Summarise this paper", "read #2", or a question the abstract can't answer: call the `reader` agent with \
 "Paper ID: <id>" plus what the researcher wants to know. Answer with its TL;DR and summary, then its quotes as \
 short blockquotes, each with its link, and its key figures by label. Say so when it read only the abstract.
-- "Drop this one", "more like that", "focus on X": remember dropped papers as excluded IDs for the rest of \
-the conversation. If the new focus is covered by candidates you already have, call `rerank` again on them \
-with the updated goal. If it needs new angles, run new sub-queries first, then rerank everything together.
+- "Drop this one", "more like that", "focus on X": remember each dropped paper's ID, as `rerank` returned it, \
+and pass all of them as `exclude_ids` for the rest of the conversation. If the new focus is covered by the \
+candidates you already have, call `rerank` again with the updated goal. If it needs new angles, run new \
+sub-queries first; the next `rerank` ranks old and new candidates together.
 - "Why is X ranked above Y": explain from the reasons and abstracts you have; don't make up a scoring rule.
 - If a question is too vague to search well, ask one short clarifying question first. Otherwise just start.
 - Plain conversation needs no tools.
@@ -66,7 +72,8 @@ with the updated goal. If it needs new angles, run new sub-queries first, then r
 """
 
 
-def build() -> LlmAgent:
+def build(search_agent: Callable[[], LlmAgent] = search.build) -> LlmAgent:
+    """The master; `search_agent` builds the search agent, once per sub-query."""
     return LlmAgent(
         name="master",
         description=(
@@ -77,10 +84,11 @@ def build() -> LlmAgent:
         model=models.super_vl(),
         instruction=INSTRUCTION,
         tools=[
-            AgentTool(agent=search.build()),
+            candidates.SearchTool(search_agent),
             AgentTool(agent=reader.build()),
             toolsets.papers("resolve_seed", "get_paper", "rerank"),
         ],
+        before_tool_callback=candidates.fill_rerank,
     )
 
 

@@ -53,8 +53,8 @@ uv run pytest                    # offline tests
 
 | Agent | Model | Tools | Status |
 | --- | --- | --- | --- |
-| `master` | Super VL | `search` and `reader` agents (as tools), papers `resolve_seed`, `get_paper`, `rerank` | Built; chats with the researcher, runs about three sub-queries in parallel, merges and reranks the candidates and answers with a ranked list. Calls `reader` when asked to summarise a paper. No canvas tools yet |
-| `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with candidate IDs as JSON |
+| `master` | Super VL | `search` agent (as a tool, a fresh one per call), `reader` agent (as a tool), papers `resolve_seed`, `get_paper`, `rerank` | Built; chats with the researcher, runs about three sub-queries in parallel and reranks every candidate they found. Candidate IDs go from the tool results to `rerank` without a model retyping them (`agents/master/candidates.py`). Calls `reader` when asked to summarise a paper. No canvas tools yet |
+| `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with its picks as JSON; the IDs its tools return go to the master's candidate pool |
 | `reader` | Super VL | papers `get_fulltext`, `check_quotes` | Built; reads one paper and answers with its artifacts as JSON: TL;DR, summary, plain-language abstract, categorised highlights, quotes with highlight links, and key figures by caption. Every highlight and quote is checked word for word against the text. About 25 to 35 s a paper |
 | `context` | see `docs/Concept.md` | | To do |
 

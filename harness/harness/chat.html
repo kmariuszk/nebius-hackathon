@@ -4,8 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Master agent chat</title>
-<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<!-- Pinned with SRI: DOMPurify is all that stands between model-written markdown and innerHTML. -->
+<script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"
+  integrity="sha384-/TQbtLCAerC3jgaim+N78RZSDYV7ryeoBCVqTuzRrFec2akfBkHS7ACQ3PQhvMVi" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js"
+  integrity="sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx" crossorigin="anonymous"></script>
 <style>
   :root {
     --bg: #f7f7f5; --panel: #fff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e3de;
@@ -86,9 +89,14 @@ const form = document.getElementById("form");
 const input = document.getElementById("input");
 const send = document.getElementById("send");
 let sessionId = null;
+let current = null;  // The AbortController of the answer being streamed, if any.
 
 document.getElementById("reset").onclick = () => {
+  // Stop the answer in flight so it can't write into the new chat or restore the old session.
+  current?.abort();
+  current = null;
   sessionId = null;
+  send.disabled = false;
   log.innerHTML = '<p class="status">New chat.</p>';
 };
 
@@ -128,13 +136,14 @@ function unwrap(result) {
 function describeCall(name, args) {
   if (name === "search") return `<b>search agent</b> ${esc(args.request ?? "")}`;
   if (name === "reader") return `<b>reader agent</b> ${esc(args.request ?? "")}`;
-  if (name === "rerank") return `<b>rerank</b> ${args.paper_ids?.length ?? 0} candidates, k=${args.k ?? 20}`;
+  // paper_ids is filled in from the search results after this call event, so it isn't shown.
+  if (name === "rerank") return `<b>rerank</b> k=${esc(args.k ?? 20)}${args.exclude_ids?.length ? `, excluding ${esc(args.exclude_ids.length)}` : ""}`;
   return `<b>${esc(name)}</b> ${esc(JSON.stringify(args))}`;
 }
 
 function describeResult(name, data) {
-  if (name === "search" && data?.candidateIds) return `<b>search agent</b> → ${data.candidateIds.length} candidates for “${esc(data.subQuery ?? "")}”`;
-  if (name === "rerank" && data?.ranked) return `<b>rerank</b> → ${data.ranked.length} ranked of ${data.candidates ?? "?"} by ${esc(data.model ?? "")} in ${data.seconds ?? "?"} s`;
+  if (name === "search" && data?.subQuery) return `<b>search agent</b> → ${esc(data.candidates?.length ?? 0)} picked, ${esc(data.seedCandidates ?? 0)} from seeds, for “${esc(data.subQuery)}”`;
+  if (name === "rerank" && data?.ranked) return `<b>rerank</b> → ${esc(data.ranked.length)} ranked of ${esc(data.candidates ?? "?")} by ${esc(data.model ?? "")} in ${esc(data.seconds ?? "?")} s`;
   if (name === "resolve_seed" && data?.title) return `<b>resolve_seed</b> → ${esc(data.paperId)} ${esc(data.title)}`;
   if (name === "get_paper" && data?.title) return `<b>get_paper</b> → ${esc(data.title)}`;
   if (name === "reader" && data?.tldr) return `<b>reader agent</b> → artifacts from ${esc(data.source ?? "?")} for ${esc(data.paperId ?? "")}`;
@@ -207,13 +216,17 @@ async function ask(text) {
   const started = Date.now();
   const timer = setInterval(() => { status.textContent = `Working… ${Math.round((Date.now() - started) / 1000)} s`; }, 1000);
   let answer = null, answerText = "";
+  const controller = new AbortController();
+  current = controller;
 
   try {
     const response = await fetch("/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ text, session_id: sessionId }),
+      signal: controller.signal,
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}: ${await response.text()}`);
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
@@ -249,11 +262,17 @@ async function ask(text) {
       }
     }
   } catch (err) {
-    add("p", "error", String(err));
+    if (err.name !== "AbortError") {
+      add("p", "error", String(err));
+      status.textContent = "Failed";
+    }
   } finally {
     clearInterval(timer);
-    send.disabled = false;
-    input.focus();
+    if (current === controller) {
+      current = null;
+      send.disabled = false;
+      input.focus();
+    }
   }
 }
 </script>

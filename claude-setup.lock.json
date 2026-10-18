@@ -1,0 +1,266 @@
+{
+  "schemaVersion": "1",
+  "kitVersion": "dc25620",
+  "installedAt": "2026-10-18T12:08:16.502Z",
+  "lastUpdated": "2026-10-18T12:08:16.502Z",
+  "selectedGroups": [
+    "essential",
+    "github",
+    "python",
+    "frontend",
+    "research",
+    "ml",
+    "diagrams",
+    "remotion",
+    "marketing",
+    "agent-skills",
+    "ponytail",
+    "headroom"
+  ],
+  "projectName": "nebius-hackathon",
+  "vcsProvider": "github",
+  "installedSkills": {
+    "git-operations": {
+      "assetHash": "b6dbd18a321ddc0e2be071b1c8977f6e71ccf22a5094be3d0a2653ce101d5ec5",
+      "installedHash": "b6dbd18a321ddc0e2be071b1c8977f6e71ccf22a5094be3d0a2653ce101d5ec5",
+      "installedAt": "2026-10-18T12:08:16.347Z",
+      "updatedAt": "2026-10-18T12:08:16.348Z"
+    },
+    "python-best-practices": {
+      "assetHash": "a856509d228b16c19e66a5be12ab29988de1018036fd79f25fa53d69db872c0a",
+      "installedHash": "a856509d228b16c19e66a5be12ab29988de1018036fd79f25fa53d69db872c0a",
+      "installedAt": "2026-10-18T12:08:16.350Z",
+      "updatedAt": "2026-10-18T12:08:16.350Z"
+    },
+    "python-docs": {
+      "assetHash": "ffce353065068b6864bef642c04f9d22df275fea224015bd461c214e9ce5222c",
+      "installedHash": "ffce353065068b6864bef642c04f9d22df275fea224015bd461c214e9ce5222c",
+      "installedAt": "2026-10-18T12:08:16.353Z",
+      "updatedAt": "2026-10-18T12:08:16.353Z"
+    },
+    "pydantic": {
+      "assetHash": "80ea080fdca5d5503d739e2ec7ba9b55864f2eba6b25eed1f4d5f6fc67c2315a",
+      "installedHash": "80ea080fdca5d5503d739e2ec7ba9b55864f2eba6b25eed1f4d5f6fc67c2315a",
+      "installedAt": "2026-10-18T12:08:16.355Z",
+      "updatedAt": "2026-10-18T12:08:16.355Z"
+    },
+    "pytorch-lightning": {
+      "assetHash": "1c67224586dc52801ce204028b3cc5d4158ed33ef99cfa72e5dad482acfee031",
+      "installedHash": "1c67224586dc52801ce204028b3cc5d4158ed33ef99cfa72e5dad482acfee031",
+      "installedAt": "2026-10-18T12:08:16.360Z",
+      "updatedAt": "2026-10-18T12:08:16.360Z"
+    },
+    "code-refactor": {
+      "assetHash": "f8943f59b0ddf416c75575d3c7db8c94ff4e867c1101690070845a3b1e121cbc",
+      "installedHash": "f8943f59b0ddf416c75575d3c7db8c94ff4e867c1101690070845a3b1e121cbc",
+      "installedAt": "2026-10-18T12:08:16.363Z",
+      "updatedAt": "2026-10-18T12:08:16.363Z"
+    },
+    "adapt": {
+      "assetHash": "a960b3dec6b096ee11a712f952c21a86c0d2856fe45588fe7486bfd482445438",
+      "installedHash": "a960b3dec6b096ee11a712f952c21a86c0d2856fe45588fe7486bfd482445438",
+      "installedAt": "2026-10-18T12:08:16.364Z",
+      "updatedAt": "2026-10-18T12:08:16.364Z"
+    },
+    "animate": {
+      "assetHash": "70b6be1e085beab81f5fe551f2766f54df0272c37f8d6e487bdf39f30366af4c",
+      "installedHash": "70b6be1e085beab81f5fe551f2766f54df0272c37f8d6e487bdf39f30366af4c",
+      "installedAt": "2026-10-18T12:08:16.364Z",
+      "updatedAt": "2026-10-18T12:08:16.364Z"
+    },
+    "arrange": {
+      "assetHash": "775f157cd6f0025de37e1264aac04f681b13a7ad3603046dd5ffe9f423b80de4",
+      "installedHash": "775f157cd6f0025de37e1264aac04f681b13a7ad3603046dd5ffe9f423b80de4",
+      "installedAt": "2026-10-18T12:08:16.365Z",
+      "updatedAt": "2026-10-18T12:08:16.365Z"
+    },
+    "audit": {
+      "assetHash": "3a475438b19d48dec53fe15e13f0e87d6584bfff81189b00f382a2c620ecf350",
+      "installedHash": "3a475438b19d48dec53fe15e13f0e87d6584bfff81189b00f382a2c620ecf350",
+      "installedAt": "2026-10-18T12:08:16.366Z",
+      "updatedAt": "2026-10-18T12:08:16.366Z"
+    },
+    "bolder": {
+      "assetHash": "855be81eca8f07172c5dcce7cdca30a462274bdf6ee46d32fcc7eb56600cbd12",
+      "installedHash": "855be81eca8f07172c5dcce7cdca30a462274bdf6ee46d32fcc7eb56600cbd12",
+      "installedAt": "2026-10-18T12:08:16.367Z",
+      "updatedAt": "2026-10-18T12:08:16.367Z"
+    },
+    "clarify": {
+      "assetHash": "cf9de9c30952ba929b08638b540a9dbc4f92e437986809a87d31e22278dcb735",
+      "installedHash": "cf9de9c30952ba929b08638b540a9dbc4f92e437986809a87d31e22278dcb735",
+      "installedAt": "2026-10-18T12:08:16.367Z",
+      "updatedAt": "2026-10-18T12:08:16.367Z"
+    },
+    "colorize": {
+      "assetHash": "5cf1a997868894926e5f6bdf5fc863e867be2f5fe9e8835d966a288981e3b7b8",
+      "installedHash": "5cf1a997868894926e5f6bdf5fc863e867be2f5fe9e8835d966a288981e3b7b8",
+      "installedAt": "2026-10-18T12:08:16.368Z",
+      "updatedAt": "2026-10-18T12:08:16.368Z"
+    },
+    "critique": {
+      "assetHash": "01dc72ed1960a0e3c5120a8fbab64b56d6557c570414bf7152bd78c4f68165c9",
+      "installedHash": "01dc72ed1960a0e3c5120a8fbab64b56d6557c570414bf7152bd78c4f68165c9",
+      "installedAt": "2026-10-18T12:08:16.371Z",
+      "updatedAt": "2026-10-18T12:08:16.371Z"
+    },
+    "delight": {
+      "assetHash": "d997a72e069d9e2757f59685d5336ada9165c8cc0e9d158fba139ddf94019bcc",
+      "installedHash": "d997a72e069d9e2757f59685d5336ada9165c8cc0e9d158fba139ddf94019bcc",
+      "installedAt": "2026-10-18T12:08:16.371Z",
+      "updatedAt": "2026-10-18T12:08:16.371Z"
+    },
+    "distill": {
+      "assetHash": "dffb5ad02d3fd8e4cdc7381cb3ecce1ec7d8048657e7a9eecf3a20c8097e280c",
+      "installedHash": "dffb5ad02d3fd8e4cdc7381cb3ecce1ec7d8048657e7a9eecf3a20c8097e280c",
+      "installedAt": "2026-10-18T12:08:16.372Z",
+      "updatedAt": "2026-10-18T12:08:16.372Z"
+    },
+    "extract": {
+      "assetHash": "b3c65112289c0f9d3815c605132e5792d32b71b1ab53a6596ca7e3a2a68ce88b",
+      "installedHash": "b3c65112289c0f9d3815c605132e5792d32b71b1ab53a6596ca7e3a2a68ce88b",
+      "installedAt": "2026-10-18T12:08:16.373Z",
+      "updatedAt": "2026-10-18T12:08:16.373Z"
+    },
+    "frontend-design": {
+      "assetHash": "2a43ac4549e0817082c2a298e51fd579c63a7a936321b10dbbefcc5003d441fc",
+      "installedHash": "2a43ac4549e0817082c2a298e51fd579c63a7a936321b10dbbefcc5003d441fc",
+      "installedAt": "2026-10-18T12:08:16.377Z",
+      "updatedAt": "2026-10-18T12:08:16.377Z"
+    },
+    "harden": {
+      "assetHash": "3b771a43bff6289c972835663013fd69f9437759cef69015ab182e0efce557f9",
+      "installedHash": "3b771a43bff6289c972835663013fd69f9437759cef69015ab182e0efce557f9",
+      "installedAt": "2026-10-18T12:08:16.377Z",
+      "updatedAt": "2026-10-18T12:08:16.377Z"
+    },
+    "normalize": {
+      "assetHash": "1321fb31e5b3f9ffe42039193927d2c72117f6968645a2c2fa6934211e60552b",
+      "installedHash": "1321fb31e5b3f9ffe42039193927d2c72117f6968645a2c2fa6934211e60552b",
+      "installedAt": "2026-10-18T12:08:16.378Z",
+      "updatedAt": "2026-10-18T12:08:16.378Z"
+    },
+    "onboard": {
+      "assetHash": "cd5ec9f3b925caae216e1b41ed66538f54e07b22333c7aee7dbd61e17aa4b41e",
+      "installedHash": "cd5ec9f3b925caae216e1b41ed66538f54e07b22333c7aee7dbd61e17aa4b41e",
+      "installedAt": "2026-10-18T12:08:16.378Z",
+      "updatedAt": "2026-10-18T12:08:16.378Z"
+    },
+    "optimize": {
+      "assetHash": "71caee1a977ed307df1fa74adb9b0e9c13ee168e6fda964f602f0b4dba6b7ea0",
+      "installedHash": "71caee1a977ed307df1fa74adb9b0e9c13ee168e6fda964f602f0b4dba6b7ea0",
+      "installedAt": "2026-10-18T12:08:16.379Z",
+      "updatedAt": "2026-10-18T12:08:16.379Z"
+    },
+    "overdrive": {
+      "assetHash": "a8369e35a7ef8c4fe3de21a2bc15e906bd8b051e4fa2388c52122870da214aec",
+      "installedHash": "a8369e35a7ef8c4fe3de21a2bc15e906bd8b051e4fa2388c52122870da214aec",
+      "installedAt": "2026-10-18T12:08:16.380Z",
+      "updatedAt": "2026-10-18T12:08:16.380Z"
+    },
+    "polish": {
+      "assetHash": "5f9af3783ad0ffff34ddaf3d95591e7044cbc0927c229340828e52103838b0ab",
+      "installedHash": "5f9af3783ad0ffff34ddaf3d95591e7044cbc0927c229340828e52103838b0ab",
+      "installedAt": "2026-10-18T12:08:16.380Z",
+      "updatedAt": "2026-10-18T12:08:16.380Z"
+    },
+    "quieter": {
+      "assetHash": "910d4b8bd48ebebbef5bde0e837a8154fecc598a8dead6a46342631fb5d9e6df",
+      "installedHash": "910d4b8bd48ebebbef5bde0e837a8154fecc598a8dead6a46342631fb5d9e6df",
+      "installedAt": "2026-10-18T12:08:16.381Z",
+      "updatedAt": "2026-10-18T12:08:16.381Z"
+    },
+    "teach-impeccable": {
+      "assetHash": "c421175bd7c4da4333755222a012913a894a8f1aaa2fb11dfe5c3b65b5f02211",
+      "installedHash": "c421175bd7c4da4333755222a012913a894a8f1aaa2fb11dfe5c3b65b5f02211",
+      "installedAt": "2026-10-18T12:08:16.381Z",
+      "updatedAt": "2026-10-18T12:08:16.381Z"
+    },
+    "typeset": {
+      "assetHash": "32108f34bbc76567fe563016c5327530a0d2669d603e7f9d4554a42285041fbb",
+      "installedHash": "32108f34bbc76567fe563016c5327530a0d2669d603e7f9d4554a42285041fbb",
+      "installedAt": "2026-10-18T12:08:16.382Z",
+      "updatedAt": "2026-10-18T12:08:16.382Z"
+    },
+    "industrial-ai-research": {
+      "assetHash": "60f135f8999f84b4a56c556c8d1e1622f9636d1fd790e6a25ac273edbdf3c739",
+      "installedHash": "60f135f8999f84b4a56c556c8d1e1622f9636d1fd790e6a25ac273edbdf3c739",
+      "installedAt": "2026-10-18T12:08:16.388Z",
+      "updatedAt": "2026-10-18T12:08:16.388Z"
+    },
+    "latex-paper-en": {
+      "assetHash": "f66086051e978ffbb2ee99e62a14845e72913b570b516b4a904033606c5e041a",
+      "installedHash": "f66086051e978ffbb2ee99e62a14845e72913b570b516b4a904033606c5e041a",
+      "installedAt": "2026-10-18T12:08:16.409Z",
+      "updatedAt": "2026-10-18T12:08:16.409Z"
+    },
+    "latex-thesis-zh": {
+      "assetHash": "ebb73696221c50397c62cf1dfae700ff68d28d5f7da9b1e8f29080b8cf497f97",
+      "installedHash": "ebb73696221c50397c62cf1dfae700ff68d28d5f7da9b1e8f29080b8cf497f97",
+      "installedAt": "2026-10-18T12:08:16.425Z",
+      "updatedAt": "2026-10-18T12:08:16.425Z"
+    },
+    "paper-audit": {
+      "assetHash": "7bd517df03e37ac72e09ff4700e6e5bd30fe7678dfbc13a0c3da429be0ac1828",
+      "installedHash": "7bd517df03e37ac72e09ff4700e6e5bd30fe7678dfbc13a0c3da429be0ac1828",
+      "installedAt": "2026-10-18T12:08:16.447Z",
+      "updatedAt": "2026-10-18T12:08:16.447Z"
+    },
+    "research-paper-writing": {
+      "assetHash": "1d55abfeb5203772879c4ae7332f08c672f3129a02de7cba8d07c7f1dff58ba9",
+      "installedHash": "1d55abfeb5203772879c4ae7332f08c672f3129a02de7cba8d07c7f1dff58ba9",
+      "installedAt": "2026-10-18T12:08:16.460Z",
+      "updatedAt": "2026-10-18T12:08:16.460Z"
+    },
+    "typst-paper": {
+      "assetHash": "ceb7a9b644c215d92b3c8741d03753f6153302e8b8c7ff14f2897e1b736dcb1d",
+      "installedHash": "ceb7a9b644c215d92b3c8741d03753f6153302e8b8c7ff14f2897e1b736dcb1d",
+      "installedAt": "2026-10-18T12:08:16.477Z",
+      "updatedAt": "2026-10-18T12:08:16.477Z"
+    },
+    "mermaid-diagrams": {
+      "assetHash": "79bca3c767a821a28aa7d83a9673010b2066afa4889923ea5946153c8967e824",
+      "installedHash": "79bca3c767a821a28aa7d83a9673010b2066afa4889923ea5946153c8967e824",
+      "installedAt": "2026-10-18T12:08:16.482Z",
+      "updatedAt": "2026-10-18T12:08:16.482Z"
+    },
+    "skill-creator": {
+      "assetHash": "b2e3d83f60425c2d0b9d4162efb8f9aa322b45843497340f2289f42be422801c",
+      "installedHash": "b2e3d83f60425c2d0b9d4162efb8f9aa322b45843497340f2289f42be422801c",
+      "installedAt": "2026-10-18T12:08:16.483Z",
+      "updatedAt": "2026-10-18T12:08:16.483Z"
+    },
+    "remotion-best-practices": {
+      "assetHash": "af627225edda7420907d4f66bc07d9a111ee5e276bd3e45705bf118fb8e7cdbb",
+      "installedHash": "af627225edda7420907d4f66bc07d9a111ee5e276bd3e45705bf118fb8e7cdbb",
+      "installedAt": "2026-10-18T12:08:16.497Z",
+      "updatedAt": "2026-10-18T12:08:16.497Z"
+    }
+  },
+  "enabledPlugins": [
+    "superpowers@claude-plugins-official",
+    "context7@claude-plugins-official",
+    "claude-md-management@claude-plugins-official",
+    "pr-review-toolkit@claude-plugins-official",
+    "code-review@claude-plugins-official",
+    "code-simplifier@claude-plugins-official",
+    "claude-mem@thedotmack",
+    "github@claude-plugins-official",
+    "frontend-design@claude-plugins-official",
+    "playwright@claude-plugins-official",
+    "ui-ux-pro-max@ui-ux-pro-max-skill",
+    "academic-research-skills@academic-research-skills",
+    "huggingface-skills@claude-plugins-official",
+    "marketing-skills@marketingskills",
+    "agent-skills@addy-agent-skills",
+    "ponytail@ponytail"
+  ],
+  "installedTemplates": [
+    "config.yaml",
+    "rules.md",
+    "allowlist.yaml",
+    "commit-message.md",
+    "mr-template.md",
+    "review-template.md"
+  ]
+}

@@ -7,6 +7,7 @@ import httpx
 import pytest
 from mcp import Client
 
+from discovery import rerank
 from discovery.papers import Paper
 from discovery.server import build_server
 from discovery.service import Discovery
@@ -90,7 +91,7 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
             {"index": 2, "score": 0.9, "reason": "Cites the seed."},
             {"index": 99, "score": 0.8, "reason": "Invented."},
             {"index": 2, "score": 0.7, "reason": "Repeated."},
-            {"index": 1, "score": 0.4, "reason": "Close to the seed."},
+            {"index": 1, "score": "40", "reason": "Close to the seed."},
         ]
         reply = {"role": "assistant", "content": json.dumps({"ranked": ranked})}
         return httpx.Response(200, json={"choices": [{"message": reply}]})
@@ -139,16 +140,18 @@ async def test_rerank_ranks_candidates_once_with_the_seeds_as_context(discovery)
 
     result = await discovery.rerank(
         "T cell exhaustion",
-        # pmid:100 and its DOI are one paper; the seed is never ranked; isbn:1 is not an ID kind.
-        ["pmid:100", "doi:10.1/similar", seed.paper_id, "pmid:200", "isbn:1"],
+        # pmid:100 and its DOI are one paper; the seed is never ranked; pmid:300 is excluded by
+        # its DOI; isbn:1 is not an ID kind.
+        ["pmid:100", "doi:10.1/similar", seed.paper_id, "pmid:300", "pmid:200", "isbn:1"],
         seed_ids=[seed.paper_id],
+        exclude_ids=["doi:10.1/keyword"],
         k=5,
     )
 
-    # Invented and repeated candidate numbers are dropped.
-    assert [(p["rank"], p["paperId"], p["reason"]) for p in result["ranked"]] == [
-        (1, "pmid:200", "Cites the seed."),
-        (2, "doi:10.1/similar", "Close to the seed."),
+    # Invented and repeated candidate numbers are dropped; "40" is read as 40%.
+    assert [(p["rank"], p["paperId"], p["score"], p["reason"]) for p in result["ranked"]] == [
+        (1, "pmid:200", 0.9, "Cites the seed."),
+        (2, "doi:10.1/similar", 0.4, "Close to the seed."),
     ]
     assert result["ranked"][0]["title"] == "Citing paper"
     assert result["backend"] == "super_vl" and result["candidates"] == 2
@@ -156,8 +159,30 @@ async def test_rerank_ranks_candidates_once_with_the_seeds_as_context(discovery)
 
 
 async def test_rerank_without_candidates_skips_the_model(discovery):
-    result = await discovery.rerank("anything", [])
-    assert result["ranked"] == [] and result["skipped"] == ["no candidates to rank"]
+    result = await discovery.rerank("anything", [], k=0)
+    assert result == {
+        "ranked": [],
+        "model": "nvidia/Nemotron-3.5-Super-VL",
+        "seconds": 0.0,
+        "backend": "super_vl",
+        "candidates": 0,
+        "skipped": ["no candidates to rank"],
+    }
+
+
+def test_rerank_reply_parsing_survives_prose_and_cut_off_replies():
+    whole = 'Sure {see below}: ```json\n{"ranked": [{"index": 2, "reason": "uses {braces}"}]}\n``` done.'
+    assert rerank.parse(whole) == ([{"index": 2, "reason": "uses {braces}"}], True)
+    cut_off = '{"ranked": [{"index": 3, "score": 0.9, "reason": "a"}, {"index": 1, "score": 0.5, "rea'
+    assert rerank.parse(cut_off) == ([{"index": 3, "score": 0.9, "reason": "a"}], False)
+    assert rerank.parse('{"ranked": null}') == ([], True)
+    assert rerank.parse("no json at all") == ([], False)
+
+
+def test_rerank_scores_are_kept_between_0_and_1():
+    assert [rerank.score(v) for v in (0.82, "0.5", 85, "high", None, True, -1, 250)] == [
+        0.82, 0.5, 0.85, None, None, None, None, None,
+    ]
 
 
 async def test_tools_over_mcp(discovery):

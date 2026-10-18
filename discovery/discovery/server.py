@@ -78,7 +78,11 @@ def build_server(discovery: Discovery) -> MCPServer:
 
     @server.tool()
     async def rerank(
-        goal: str, paper_ids: list[str], seed_ids: list[str] | None = None, k: int = 20
+        goal: str,
+        paper_ids: list[str],
+        seed_ids: list[str] | None = None,
+        exclude_ids: list[str] | None = None,
+        k: int = 20,
     ) -> dict[str, Any]:
         """Rank candidate papers for the researcher's goal, best first, with a reason for each.
 
@@ -89,13 +93,14 @@ def build_server(discovery: Discovery) -> MCPServer:
             goal: The research question, in the researcher's words.
             paper_ids: Candidate paper IDs, up to 100; later ones are not ranked.
             seed_ids: The researcher's seed papers, used as context and never ranked.
-            k: Most papers to return.
+            exclude_ids: Papers the researcher dropped; never ranked, under any of their IDs.
+            k: Most papers to return (at least 1).
 
         Returns ranked (rank, paper summary, score from 0 to 1, reason), the model and
         seconds it took, how many candidates were ranked, and what was skipped and why.
         Off-topic candidates are left out, so ranked can be shorter than k.
         """
-        return await discovery.rerank(goal, paper_ids, seed_ids, k)
+        return await discovery.rerank(goal, paper_ids, seed_ids, exclude_ids, k)
 
     @server.tool()
     async def resolve_seed(

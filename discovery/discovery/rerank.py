@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from typing import Any
 
@@ -68,10 +69,12 @@ def describe(label: str, paper: Paper) -> str:
 async def rerank(
     client: httpx.AsyncClient, goal: str, seeds: list[Paper], candidates: list[Paper], k: int
 ) -> dict[str, Any]:
-    """Rank `candidates` for `goal`; returns `{ranked, model, seconds}`.
+    """Rank `candidates` for `goal`; returns `{ranked, model, seconds, warnings}`.
 
-    Each ranked entry is the candidate's summary plus `rank`, `score` and
-    `reason`. Candidate numbers the model invents or repeats are dropped.
+    Each ranked entry is the candidate's summary plus `rank`, `score` (0 to 1,
+    or None if the model gave none) and `reason`. Candidate numbers the model
+    invents or repeats are dropped. If the reply is cut off or garbled, the
+    complete entries in it are kept and `warnings` says so.
     """
     base = os.environ.get("TF_BASE_URL", "").strip() or TOKEN_FACTORY_URL
     headers = {"Authorization": f"Bearer {key('TF_API_KEY', 'Nebius Token Factory')}"}
@@ -90,9 +93,17 @@ async def rerank(
         base.rstrip("/") + "/chat/completions", json=body, headers=headers, timeout=TIMEOUT
     )
     response.raise_for_status()
-    content = response.json()["choices"][0]["message"]["content"] or ""
+    choice = response.json()["choices"][0]
+    entries, complete = parse(choice["message"].get("content") or "")
+    warnings = []
+    if choice.get("finish_reason") == "length":
+        warnings.append(
+            f"Super VL's reply was cut off at the token limit; kept the {len(entries)} complete entries"
+        )
+    elif not complete:
+        warnings.append(f"Super VL's reply was not clean JSON; kept the {len(entries)} complete entries")
     ranked, seen = [], set()
-    for entry in parse(content).get("ranked", []):
+    for entry in entries:
         try:
             index = int(entry["index"])
         except (KeyError, TypeError, ValueError):
@@ -102,18 +113,53 @@ async def rerank(
         seen.add(index)
         summary = candidates[index - 1].to_summary([])
         del summary["foundBy"]
-        summary.update(rank=len(seen), score=entry.get("score"), reason=entry.get("reason", ""))
+        summary.update(
+            rank=len(seen), score=score(entry.get("score")), reason=str(entry.get("reason") or "")
+        )
         ranked.append(summary)
     return {
-        "ranked": ranked[:k],
+        "ranked": ranked[: max(1, k)],
         "model": model_id(),
         "seconds": round(time.monotonic() - started, 1),
+        "warnings": warnings,
     }
 
 
-def parse(content: str) -> dict[str, Any]:
-    """The JSON object in the reply, tolerating a code fence or text around it."""
-    start, end = content.find("{"), content.rfind("}")
-    if start == -1 or end < start:
-        raise ValueError(f"Super VL did not return JSON: {content[:200]!r}")
-    return json.loads(content[start : end + 1])
+def parse(content: str) -> tuple[list[dict[str, Any]], bool]:
+    """The ranked entries in the reply, and whether it held a whole `{"ranked": [...]}`.
+
+    Tolerates a code fence, prose or braces around the JSON. When no whole
+    object parses (a reply cut off mid-list, say), each complete entry object
+    is recovered on its own.
+    """
+    decoder = json.JSONDecoder()
+    for start in (i for i, char in enumerate(content) if char == "{"):
+        try:
+            value, _ = decoder.raw_decode(content, start)
+        except ValueError:
+            continue
+        if isinstance(value, dict) and "ranked" in value:
+            ranked = value["ranked"] if isinstance(value["ranked"], list) else []
+            return [entry for entry in ranked if isinstance(entry, dict)], True
+    entries = []
+    for match in re.finditer(r"\{[^{}]*\}", content):
+        try:
+            entry = json.loads(match.group())
+        except ValueError:
+            continue
+        if isinstance(entry, dict) and "index" in entry:
+            entries.append(entry)
+    return entries, False
+
+
+def score(value: Any) -> float | None:
+    """A 0-to-1 score from whatever the model wrote; a percentage is scaled down."""
+    if isinstance(value, bool):
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if 1 < number <= 100:
+        number /= 100
+    return round(number, 3) if 0 <= number <= 1 else None
