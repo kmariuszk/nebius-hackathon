@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your boards · Missing Links</title>
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./landing.css">
+</head>
+<body data-page="home">
+<header class="nav-wrap rule">
+  <nav class="nav">
+    <a class="logo" href="./index.html"><svg class="pp-logo" aria-hidden="true"><use href="#ppLogo"/></svg>Missing Links</a>
+    <span class="grow"></span>
+    <a href="./how-it-works.html">How it works</a>
+    <a href="#" data-login data-guest>Log in</a>
+    <a class="user" href="#" data-login data-user hidden title="Change your name"><span class="av" data-user-initial></span><span data-user-name></span> ▾</a>
+  </nav>
+</header>
+
+<main class="page">
+  <section class="sec">
+    <div class="welcome">
+      <div><h1 id="welcome">Welcome back</h1><p class="lead" id="lead"></p></div>
+      <span style="flex:1"></span>
+      <a class="btn primary" id="catchAll" hidden>Catch me up on everything →</a>
+    </div>
+    <div class="boards" id="boards"></div>
+  </section>
+</main>
+
+<script src="./config.js"></script>
+<script src="./api.js"></script>
+<script src="./landing.js"></script>
+</body>
+</html>
