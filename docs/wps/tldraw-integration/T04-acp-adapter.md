@@ -77,7 +77,7 @@ async def run(self) -> None:
 **One prompt.**
 
 - `run_id = new_run_id()`; `runner.run_async(user_id, session_id, new_message=to_genai_content(blocks), state_delta={"run_id": run_id}, run_config=RunConfig(streaming_mode=StreamingMode.SSE), abort_signal=job.abort)`.
-- The canvas toolset is an `McpToolset` with `header_provider=lambda ctx: {**auth, "X-Run-Id": ctx.state.get("run_id")}`, so every canvas call in this turn carries the run ID and the model never sees it (decision D7).
+- The canvas toolset is an `McpToolset` with `header_provider=lambda ctx: {**auth, "X-Run-Id": ctx.state.get("run_id"), "X-Model": model_of(ctx.agent_name)}`, so every canvas call in this turn carries the run ID and the calling agent's model, and the model never sees either (decision D7). The card's "AI" labels use `X-Model` (T10).
 - `cancel(session_id)` sets `job.abort`; the prompt returns `stop_reason="cancelled"`, and the trace plugin marks any open tool card `failed` with "cancelled". Otherwise `end_turn`; an exception becomes an agent message "Something went wrong: …" plus `end_turn`, and the full traceback goes to stderr.
 
 **ADK events to ACP updates** (`EventMapper`, one per prompt):
@@ -96,8 +96,10 @@ async def run(self) -> None:
 | Callback | ACP update |
 | --- | --- |
 | `before_tool_callback` | `tool_call` with `toolCallId = tool_context.function_call_id`, `title = "<agent>: <tool>"`, `kind` (below), `status = "in_progress"`, `rawInput = args`, `_meta: {agent, model, runId}` |
-| `after_tool_callback` | `tool_call_update`, `status = "completed"`, `rawOutput` (truncated to 8 KB) and a one-line text summary |
+| `after_tool_callback` | `tool_call_update`, `status = "completed"`, `rawOutput` (truncated to 8 KB), a one-line text summary, and `_meta: {seconds, tokens, costUsd}` for v4's "model, time and cost" line |
 | `on_tool_error_callback` | `tool_call_update`, `status = "failed"`, the error message |
+
+Time is the tool's wall-clock duration. Tokens and cost come from the plugin's `after_model_callback`, which sums `usage_metadata` of the model calls made inside the tool's span (so a sub-agent's card carries its whole cost), priced from a small table in `harness/harness/acp/prices.py` (USD per million input and output tokens per model, filled from Token Factory's price list, overridable with `MODEL_PRICES_JSON`). Each turn ends with a `usage_update` carrying the session's running `cost`.
 
 `kind`: canvas writes are `edit`; `get_*` tools are `read`; `search` and `find_candidates` are `search`; Tavily extract is `fetch`; sub-agents called as tools are `think`; anything else is `other`. Viewer tools and `update_plan` get no card. The `model` label comes from a name-to-model map built by walking the agent tree, including agents inside `AgentTool`, so each card names the Nemotron model that actually ran (Super VL or Lightning), which is what the Best use of Nemotron judging wants to see.
 

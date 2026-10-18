@@ -62,8 +62,21 @@ These rules are enforced by the canvas MCP (T02), but agents that follow them ge
 - Only add, or update your own shapes. People's shapes and shapes a person has moved or edited come back in `skipped` with a reason.
 - Never delete anything, never vote.
 - Use `get_board` for the board's state; it is a compact summary, never raw tldraw records.
-- Use the viewer tools (`focus`, `highlight`, `open_paper`) to point at things for the person you are talking to; they never change the shared board.
+- Use the viewer tools (`focus`, `highlight`, `open_paper`, `tour`, `look_at_board`, `look_at_paper`) to point at, walk through or look at things for the person you are talking to; they never change the shared board.
 - Mention papers in answers as `[Title](paper:<paperId>)` so the chat panel can make them clickable.
+
+What the v4 board ([mockup](../../mockups/README.md)) needs from agents, through T02's tools:
+
+| v4 element | Tool | Notes |
+| --- | --- | --- |
+| Node colour and ranking per "Looking for" goal | `set_scores` | One `{score, fit, why}` per board goal (`goals` in `get_board`); `why` is the ranked list's line |
+| Card first view | `set_card` (`oneLine`, `claims`, `facets`, `figure`) and `add_quote` | Add quotes first, then claims that point at their IDs; a claim citing "three of your seeds" uses evidence `seeds`; facets are disease, cells and method, each `same`, `adds`, `other` or `unclear` with a quote ID |
+| Card Details | `set_card` (`tldr`, `summary`, `gaps`) | Short; the summary sits next to the original abstract |
+| "Agent is reading…" | `mark_working` | On when reading starts, off when the card is filled |
+| Links | `link_papers` with `kind: "cites"` (from PubMed) or `"similar"` (your judgement) | Never relabel, unhide or redraw links people changed; skipped ones come back in `skipped` |
+| Notes | `add_note` with `paperId` | Pinned to the paper, shown in its card |
+| Catch me up | `tour` | Ordered steps, one line per paper (strongest first), sent once; the card runs it |
+| "Update suggestions" | — | The prompt carries `<board-changes>`; treat each change as the researcher's decision: re-rank and search around changed papers, and never undo a change |
 
 ## I5. What the board service needs from the papers MCP
 
@@ -71,12 +84,12 @@ The board service is an MCP client of the papers MCP for paper details (T08) and
 
 | Tool | Status on `main` | We read | Used by |
 | --- | --- | --- | --- |
-| `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type` | T08 paper record, T02 `add_quote` check against the abstract, T10 overlay |
+| `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type`, and (wanted, [I9](#i9-discovery-data-the-v4-card-shows)) `citedBy`, `peerReviewed`, `retracted` | T08 paper record, T02 `add_quote` check against the abstract, T10 card |
 | `get_fulltext(paper_id)` | Planned (Concept) | `sections[{title, text, page}]`, `source` | T02 `add_quote` check against full text, T10 |
-| `get_figures(paper_id)` | Planned | `[{figureId, caption, imageUrl, page, bbox}]` | T02 `add_figure`, T10 |
+| `get_figures(paper_id)` | Planned | `[{figureId, caption, imageUrl, page, bbox}]` | The card's figure via `set_card` (T10) |
 | `cluster_papers` | Planned | `clusters`, `similarities` | T02 `apply_clusters` |
 
-Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the overlay shows no figures, `apply_clusters` isn't listed.
+Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the card shows no figure, `apply_clusters` isn't listed.
 
 ## I6. Which model slots take images
 
@@ -106,3 +119,19 @@ Found while checking the model on Oct 18 (`uv run python -m harness.check` and s
 | **Reasoning can be turned off per call** with `chat_template_kwargs: {"enable_thinking": false}` | Faster, cheaper replies for simple steps | Expose it per slot in `models.py` (for example a `super_vl(thinking=False)` variant passing the extra body through `LiteLlm`), and use it where reasoning adds nothing |
 | **Rate limits start at 60 requests and 400,000 tokens a minute** and scale up with sustained use; over the limit gives HTTP 429 with `Retry-After` ([docs](https://docs.tokenfactory.nebius.com/ai-models-inference/rate-limits)) | Bulk scoring (hundreds of Lightning calls) will hit 429 | Concurrency limit and `Retry-After` handling in the discovery service's scoring; Token Factory also offers a Batch API with higher limits |
 | **Images are cheap**: about 1,400 prompt tokens for a 275 KB board screenshot | Visual context is affordable | The reader agent can look at page images and figures as well as Parse's text |
+
+## I9. Discovery data the v4 card shows
+
+v4's "What the UI needs from the backend" lists fields the discovery service supplies and the agent writes to the card. From the board's side:
+
+| Field | Shown in | Source we expect |
+| --- | --- | --- |
+| `scores` per goal | Node colour, ranked list, card fit line | `score_candidates` per board goal (Concept), written with `set_scores` |
+| `citedBy` | Card byline, quality filter | Semantic Scholar counts (v4 used them), on the paper record and in `add_papers` |
+| `type`, `peerReviewed` | Ranked list status, type and quality filters | OpenAlex type; preprint servers mean not peer reviewed |
+| `retracted` | Never shown | PubMed marks retractions; `add_papers` skips them |
+| `figures[]` with the figure picked per goal | Card figure, ranked list thumbnail | PMC figures (v4: `efetch db=pmc` captions, images from the article page); written with `set_card` |
+| `facets` | "Compared with your seeds" | The reader or context agent, with supporting quotes |
+| Model and time per step | "AI" labels, chat steps | `X-Model` header (T02) and the trace plugin (T04) |
+
+v4's notes from building the mockup also apply: OpenAlex's shared keyless budget runs out at a venue (use a key, or PubMed's `elink` citations); PMC figure pages sometimes return a block page (retry slowly); remove seeds before ranking; show all-capital titles in sentence case (T01 does this on display).

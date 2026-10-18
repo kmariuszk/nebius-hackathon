@@ -33,10 +33,11 @@ The agent understands the board the way a person does: from what's selected, fro
 Built when the user presses Send:
 
 1. **Text block:** what they typed.
-2. **Selected shapes:** up to 20 from `editor.getSelectedShapes()`, each a `resource` block with `uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json` and compact JSON: `{shapeId, type, paperId?, title?, year?, status?, rating?, text?, category?, note?, author? | createdBy?}`. Note, text and geo shapes get `text` from `editor.getShapeUtil(shape).getText(shape)`; frames carry their label and the paper IDs inside. Over 20: the first 20 plus "and N more selected".
+2. **Selected shapes:** up to 20 from `editor.getSelectedShapes()`, each a `resource` block with `uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json` and compact JSON: `{shapeId, type, paperId?, title?, year?, status?, fit?, why?, text?, pinnedTo?, author? | createdBy?}` (`fit` and `why` for the viewer's current goal). Note, text and geo shapes get `text` from `editor.getShapeUtil(shape).getText(shape)`; frames carry their label and the paper IDs inside. Over 20: the first 20 plus "and N more selected".
 3. **Viewport summary:** a `resource` block `tldraw://<boardId>/viewport` with `{visiblePaperIds, visibleNoteCount, zoom}`.
 4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the researcher's current view of the board:", then an `image` block from the shared renderer (section 3, target `viewport`).
-5. **From the paper overlay** (T10): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
+5. **From the PDF reader** (T10 Phase B): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
+6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last prompt, as JSON: `[{type: "moved" | "linked" | "link_named" | "link_hidden" | "link_deleted" | "note_added" | "note_pinned", paperIds, label?, text?}]`. The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
 
 Chips under the user's message show what was attached ("3 cards", "your view", "page 5"); clicking one focuses it locally (T06).
 
@@ -59,7 +60,7 @@ Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canv
 
 Because it's a plugin, it works for any agent in the runner, including the harness owner's `master`, with no change to their code (plugins reach `AgentTool` agents too, decision D8).
 
-**Prompt images.** `to_genai_content` (T04) maps each `image` block in the prompt to an `inline_data` part, keeping the preceding caption text. The harness drops images (and says so in a text part) only if the root agent's model isn't vision-capable ([I6](interfaces.md#i6-which-model-slots-take-images)); on Super VL that never happens.
+**Prompt blocks.** `to_genai_content` (T04) maps text resources to tagged text parts (`<selected-shape uri="…">`, `<viewport>`, `<board-changes>`), and each `image` block to an `inline_data` part, keeping the preceding caption text. The harness drops images (and says so in a text part) only if the root agent's model isn't vision-capable ([I6](interfaces.md#i6-which-model-slots-take-images)); on Super VL that never happens.
 
 ### 3. Rendering snapshots (browser, `client/client/canvas/snapshot.ts`)
 
@@ -70,7 +71,7 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 | `viewport` | `editor.toImage([...editor.getCurrentPageShapeIds()], { format: 'png', bounds: editor.getViewportPageBounds(), background: true, scale, pixelRatio: 1 })` |
 | `board` | Same, with `bounds: editor.getCurrentPageBounds()` |
 | `shapes` / `papers` | The named cards plus shapes bound to them by arrows, `bounds` = their union with a margin |
-| `paper_page` | pdf.js renders the page from `GET /papers/:paperId/pdf` (T08) to an offscreen canvas; reuses the open overlay's document if it's the same paper (T10) |
+| `paper_page` | pdf.js renders the page from `GET /papers/:paperId/pdf` (T08) to an offscreen canvas; reuses the PDF reader's document if it has the same paper open (T10) |
 
 - Size: `scale` is chosen so the long side is at most 1,600 px (the measured cost of such an image is about 1,400 tokens); `maxSide` in the request can lower it.
 - Errors: no PDF, a page out of range, an empty board, or a hidden tab (`document.visibilityState !== 'visible'` can't render reliably) answer with a JSON-RPC error and a reason the agent can repeat to the person.

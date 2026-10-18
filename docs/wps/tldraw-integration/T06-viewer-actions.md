@@ -1,4 +1,4 @@
-# T06: Per-viewer canvas actions: focus, highlight, open paper
+# T06: Per-viewer canvas actions: focus, highlight, open paper, catch-up tour
 
 | Field | Value |
 | --- | --- |
@@ -25,17 +25,20 @@ The agent can point at things for the person it is talking to: zoom their view t
 
 **In:** three harness tools that send the notifications; the browser handlers; local focus from chat paper links and tool cards; a "Follow the agent" switch; not interrupting someone mid-drag.
 
-**Out:** the catch-me-up prompt itself (harness owner; it just calls these tools between message chunks); the paper overlay's content (T10; until it lands, `open_paper` focuses the card and shows a toast).
+**Out:** the catch-me-up reasoning itself (harness owner: the master reads the activity since the researcher's last visit and calls `tour` with an ordered list and one line per paper); the "Catch me up (N)" button (T13, sends the prompt); the card's content (T10).
+
+**v4 change.** The [v4 mockup](../../mockups/README.md) puts the tour *inside the card* ("The controls and the agent's line sit inside the card. Keep or Discard moves on to the next paper"), instead of a chat-driven sequence of `focus` calls. The `tour` tool and `_canvas/tour` notification implement that; `focus` stays for pointing during normal chat.
 
 ## Design
 
-**Harness side** (`harness/harness/board/viewer.py`, returned by `BoardTools.viewer()`): three ADK function tools bound to one ACP session (a closure over `conn` and `session_id`):
+**Harness side** (`harness/harness/board/viewer.py`, returned by `BoardTools.viewer()`): four ADK function tools bound to one ACP session (a closure over `conn` and `session_id`):
 
 | Tool | Signature | Sends |
 | --- | --- | --- |
 | `focus` | `focus(paper_ids: list[str] = [], shape_ids: list[str] = [])` | `conn.ext_notification("canvas/focus", {sessionId, paperIds, shapeIds})`, on the wire `_canvas/focus` |
 | `highlight` | `highlight(paper_ids: list[str] = [], shape_ids: list[str] = [], seconds: int = 6)` | `_canvas/highlight` with `durationMs` |
 | `open_paper` | `open_paper(paper_id: str)` | `_canvas/open_paper` |
+| `tour` | `tour(steps: list[{paper_id, line}], title: str = "Catch-up")` | `_canvas/tour` with `{sessionId, title, steps: [{paperId, line}]}` |
 
 - Each returns `{"ok": true}` at once; the browser doesn't answer (notifications, not requests).
 - Docstrings tell the model when to use them: focus when walking someone through papers, highlight for "the cards behind this answer", open_paper when asked to show a paper. They change only the asker's screen and never the board.
@@ -50,7 +53,8 @@ The agent can point at things for the person it is talking to: zoom their view t
 | Resolve targets | `paperIds` become `paperShapeId(id)` (shared helper, T01); keep only shapes on the current page; if none remain, show a toast "That paper isn't on the board yet" |
 | `focus` | `editor.zoomToBounds(Box.Common(bounds), { inset: params.inset ?? 96, animation: { duration: 450 } })`; no animation if the user prefers reduced motion; for one small card, cap the zoom at 1 so it doesn't fill the screen |
 | `highlight` | `editor.setHintingShapes(ids)` and clear after `durationMs` (default 6 s) or on the next highlight; if hinting turns out too subtle, draw a pulsing outline per shape in `components.InFrontOfTheCanvas`, positioned with `editor.pageToViewport` |
-| `open_paper` | Focus the card, then call T10's `openPaper(paperId)`; until T10, a toast "Paper view coming soon" |
+| `open_paper` | Call T10's `openCard(paperId)` (which zooms and fades); until T10, focus the node and show a toast |
+| `tour` | The v4 catch-up: open the card on the first step with T10's tour header ("CATCH-UP · 1 OF 3", the agent's line, Previous, Next, Close). Keep or Discard votes (T08) and moves on; the last step closes the tour and zooms back out. The whole tour runs locally from one notification, so stepping through costs no model calls |
 | Busy user | If the user is dragging, resizing or editing text (the select tool isn't in `select.idle`, checked with `editor.isIn`), queue the action and run it when they're idle; drop queued focuses older than 5 s |
 | Follow the agent | A switch in the chat panel header (on by default). Off: `focus` becomes a "Show" chip in the chat instead of moving the camera; `highlight` still works |
 
@@ -58,7 +62,8 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 
 ## Tasks
 
-- [ ] `harness/harness/board/viewer.py`; `BoardTools.viewer()` returns the three tools; echo mode sends `_canvas/focus` for selected shapes.
+- [ ] `harness/harness/board/viewer.py`; `BoardTools.viewer()` returns the four tools; echo mode sends `_canvas/focus` for selected shapes.
+- [ ] `client/client/canvas/tour.ts`: tour state (steps, index), driving T10's card and tour header; the `_canvas/tour` schema in `client/shared/acpExt.ts`.
 - [ ] `harness/tests/test_viewer_tools.py`: scripted model calls `focus`; the test client receives `_canvas/focus` with the right `sessionId` and IDs, after the preceding message chunk.
 - [ ] `client/client/canvas/viewerActions.ts` with `resolveTargets` and the busy queue as pure, tested functions.
 - [ ] Hinting visibility check; the `InFrontOfTheCanvas` fallback only if needed.
@@ -71,6 +76,7 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 3. Clicking a paper link in the chat focuses the card, with no harness involved.
 4. With "Follow the agent" off, the agent's focus shows as a "Show" chip, and clicking it focuses.
 5. A focus that arrives while Ana is dragging a card waits until she lets go.
+6. "Catch me up" on a board with three new papers opens the first card with "CATCH-UP · 1 OF 3" and the agent's line; Keep moves to paper 2 and records the vote for everyone; Close ends the tour; Ben's view never moves.
 
 ## Tests
 

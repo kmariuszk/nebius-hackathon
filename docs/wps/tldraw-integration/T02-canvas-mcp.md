@@ -24,7 +24,7 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 
 **In:** MCP server over streamable HTTP; v1 tools below; attribution from headers; human-touched rules; idempotent writes; layout v0 (neighbour placement); closing rooms opened only for agent writes; an event hook for T08.
 
-**Out (phase 2, once the discovery tools exist):** `add_figure`, `apply_clusters`, `label_cluster`, `add_table`, `add_diagram`, the d3-force "Structure by" layout ([Concept: Clustering and layout](../../Concept.md#system-architecture)).
+**Out (phase 2, once the discovery tools exist):** `apply_clusters`, `label_cluster`, `add_table`, `add_diagram`, the d3-force "Structure by" layout ([Concept: Clustering and layout](../../Concept.md#system-architecture)). Figures arrive through `set_card` once `get_figures` exists. The v4 mockup puts quotes and figures inside the card, not on the board, so there are no `quote` or `figure` shapes.
 
 ## Design
 
@@ -46,25 +46,26 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | --- | --- |
 | `Authorization: Bearer <memberId or personal token>` | `onBehalfOf` (personal tokens resolve to a member in T11); missing or unknown gives HTTP 401 |
 | `X-Run-Id: run_…` | `runId` on every shape written; missing is allowed (`null`) for external agents |
+| `X-Model: nvidia/…` | Recorded with the time for each card field `set_card` writes, for the card's "AI" labels (T10); missing is allowed |
 | URL `:boardId` | The room; created on first write like any room today |
 
 **Tools (v1).**
 
 | Tool | Input | Output | Rules |
 | --- | --- | --- | --- |
-| `get_board` | none | `{boardId, question, papers: [{paperId, title, year, kind, status, rating, fit, working, cluster, humanTouched}], links: [{from, to, relation}], notes: [{shapeId, text, author}], highlights: [{shapeId, paperId, text, category, note, author}], discardedIds}` | Compact, never raw records; `question` and `discardedIds` come from T08's board DB and are empty before it exists; capped at 500 papers |
-| `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, kind?, near?, rating?, fit?, reason?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; an existing card is updated in place unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
-| `link_papers` | `{links: [{from, to, relation}]}`, relation one of `cites`, `cited_by`, `similar`, `contradicts`, `extends` | `{linked, skipped}` | Arrow with two bindings, ID `shape:agent-link-<from>--<to>` so repeats are no-ops; both cards must exist; resizes cards by link count (`w = h = 160 + 16 × min(links, 8)`) unless human-touched |
-| `set_rating` | `{paperId, score, fit?, reason?}` | `{ok, skipped}` | `score` 0 to 1 |
-| `mark_working` | `{paperIds, on}` | `{ok}` | The "working" badge |
-| `set_summary` | `{paperId, tldr?, summary?, whyItMatters?}` | `{ok, skipped}` | Skips if `editedByHuman` |
-| `add_note` | `{text, near?}` | `{shapeId}` | Built-in note; `near` is a paper ID |
-| `add_highlight` | `{paperId, text, page?, category?, note?}` | `{shapeId}` | `highlight` shape beside its card, linked by an arrow; no `rects` (the overlay anchors it by text, T10) |
-| `add_quote` | `{paperId, text, section?}` | `{shapeId}` or an MCP tool error | Rejected unless `text` appears verbatim (whitespace-normalised) in the paper's abstract, or full text once `get_fulltext` exists; the stored `url` gets a `#:~:text=` fragment |
+| `get_board` | none | `{boardId, question, goals, papers: [{paperId, label, title, year, type, kind, status, scores, working, cluster, humanTouched, pinnedNotes}], links: [{from, to, kind, label, by}], notes: [{shapeId, text, author, pinnedTo}], discardedIds, removedLinks}` | Compact, never raw records; `question`, `goals`, `discardedIds` and `removedLinks` come from T08's board DB and are empty before it exists; capped at 500 papers |
+| `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, type?, peerReviewed?, citedBy?, retracted?, kind?, near?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; retracted papers and seeds already on the board are skipped; an existing card is updated in place unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
+| `set_scores` | `{paperId, scores: {[goal]: {score, fit, why}}}` | `{ok, skipped}` | `score` 0 to 1; `goal` must be one of the board's goals; the node colour and ranked list follow it |
+| `set_card` | `{paperId, oneLine?, claims?, facets?, figure?, tldr?, summary?, gaps?}` | `{ok, skipped}` | Fills the card's first view and Details (T10); each field can arrive on its own, so the card fills in section by section; `claims[].evidence` must name quote IDs that exist on the card (or `seeds`); `figure` needs an `imageUrl` from the paper (no generated images) |
+| `add_quote` | `{paperId, text, source?}` | `{quoteId}` or an MCP tool error | Adds to the card's `quotes`; rejected unless `text` appears verbatim (whitespace-normalised) in the paper's abstract, or full text once `get_fulltext` exists; the stored `url` gets a `#:~:text=` fragment |
+| `link_papers` | `{links: [{from, to, kind, label?}]}`, `kind` one of `cites`, `similar` | `{linked, skipped}` | Arrow with two bindings, ID from `linkShapeId`, so repeats are no-ops; both cards must exist; skipped if a person removed the same link (`removedLinks`) or hid it; resizes cards by link count unless human-touched |
+| `mark_working` | `{paperIds, on}` | `{ok}` | The "Agent is reading…" ring |
+| `add_note` | `{text, paperId?}` | `{shapeId}` | Built-in note, authored as the agent; with `paperId` it is pinned to that card with a `note-pin` binding (T01) and appears in the card's Notes |
+| `add_highlight` | `{paperId, text, page?, category?, note?}` | `{shapeId}` | Only if T10's PDF reading is in scope: `highlight` shape beside its card; no `rects` (the PDF view anchors it by text) |
 
 Every write sets the meta from the [shared contracts](README.md#shared-contracts). Tool descriptions are self-contained (an external agent reads only them) and name their limits.
 
-**Human-touched rules, enforced here.** Never change `x`, `y` or `parentId` of a shape with `pinnedByHuman`; never change props of a shape with `editedByHuman`; never touch a shape without `meta.createdBy === "agent"` except to bind an arrow to it; never delete.
+**Human-touched rules, enforced here.** Never change `x`, `y` or `parentId` of a shape with `pinnedByHuman`; never change props of a shape with `editedByHuman`; never touch a shape without `meta.createdBy === "agent"` except to bind an arrow or a pinned note to it; never delete; never recreate a link a person removed, or relabel or unhide one a person labelled or hid (v4: "you edit, then the agent catches up").
 
 **Layout v0.** `placeNear` is deterministic and runs inside the write transaction:
 
@@ -84,7 +85,7 @@ The agent may suggest `near`; it never sends coordinates (the input schemas have
 - [ ] `client/package.json`: `@modelcontextprotocol/sdk@1.32.1`, `zod@4.6.5`.
 - [ ] Extract `client/server/rooms.ts` from `server.ts` (no behaviour change; `POST /api/rooms/:room/shapes` keeps working).
 - [ ] `client/server/layout.ts` with unit tests.
-- [ ] `client/server/canvasTools.ts`: the nine tools as plain functions.
+- [ ] `client/server/canvasTools.ts`: the eight core tools as plain functions (`add_highlight` only with T10's PDF reading).
 - [ ] `client/server/papersClient.ts`: MCP client to `PAPERS_MCP_URL`, `get_paper` cached per paper ID in memory.
 - [ ] `client/server/canvasMcp.ts` and the route in `server.ts`.
 - [ ] Idle close in `rooms.ts`.
@@ -93,12 +94,14 @@ The agent may suggest `near`; it never sends coordinates (the input schemas have
 
 ## Acceptance criteria
 
-1. `npx @modelcontextprotocol/inspector` connected to `http://localhost:5858/api/mcp/canvas/demo` with `Authorization: Bearer m_test` lists the nine tools; `add_papers` with three papers and `near` puts three non-overlapping cards beside the neighbour, live in an open browser.
-2. Calling `add_papers` again with the same IDs and new ratings updates the cards; after a person moves one card, a further call reports it in `skipped` and leaves it where the person put it.
-3. `add_quote` with text that isn't in the abstract returns a tool error and writes nothing; with a verbatim sentence it writes a `quote` shape whose `url` carries the text fragment.
-4. Every shape written carries `createdBy`, `onBehalfOf` and, when `X-Run-Id` was sent, `runId`.
-5. A write to a board nobody has open succeeds, and the room is closed 30 seconds later.
-6. The harness's `toolsets.canvas()` (with `CANVAS_MCP_URL` and `BOARD_TOKEN`) lists the same tools.
+1. `npx @modelcontextprotocol/inspector` connected to `http://localhost:5858/api/mcp/canvas/demo` with `Authorization: Bearer m_test` lists the eight core tools; `add_papers` with three papers and `near` puts three non-overlapping nodes beside the neighbour, live in an open browser.
+2. Calling `add_papers` again with the same IDs and new metadata updates the cards; after a person moves one card, a further call reports it in `skipped` and leaves it where the person put it. A retracted paper is skipped.
+3. `set_scores` for two goals colours the node by the viewer's current goal; `set_card` with only `oneLine`, then later `facets`, fills the open card section by section (T10).
+4. `add_quote` with text that isn't in the abstract returns a tool error and writes nothing; with a verbatim sentence it adds a quote to the card whose `url` carries the text fragment.
+5. After a person deletes a `similar` link, `link_papers` with the same pair reports it in `skipped`; `add_note` with a `paperId` creates a note that moves with that card.
+6. Every shape written carries `createdBy`, `onBehalfOf` and, when `X-Run-Id` was sent, `runId`.
+7. A write to a board nobody has open succeeds, and the room is closed 30 seconds later.
+8. The harness's `toolsets.canvas()` (with `CANVAS_MCP_URL` and `BOARD_TOKEN`) lists the same tools.
 
 ## Tests
 

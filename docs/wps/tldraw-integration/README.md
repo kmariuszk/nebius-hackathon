@@ -2,7 +2,7 @@
 
 Oct 18, 2026 · Work package group T · Branch `feat/tldraw-agent-integration` · Status: planned
 
-This group builds everything between a researcher's browser and the agents: the tldraw board and its custom shapes, the board service that owns each shared room, the chat panel that talks ACP over a WebSocket, the canvas MCP that agents write through, the REST and SSE API, the ranked list and paper overlay, and the half of the harness that faces the board (the ACP adapter and the canvas and viewer tools). The agents' reasoning, their models and the discovery service belong to other owners; this group meets them at the contracts in [`interfaces.md`](interfaces.md).
+This group builds everything between a researcher's browser and the agents: the tldraw board and its custom shapes, the board service that owns each shared room, the chat panel that talks ACP over a WebSocket, the canvas MCP that agents write through, the REST and SSE API, the v4 board UI (nodes, paper card, ranked list, filters, top and bottom bars, link and note editing), and the half of the harness that faces the board (the ACP adapter and the canvas and viewer tools). The agents' reasoning, their models and the discovery service belong to other owners; this group meets them at the contracts in [`interfaces.md`](interfaces.md).
 
 ## Scope at a glance
 
@@ -12,7 +12,7 @@ The circled part of [architecture diagram 1](../../architecture.html#components)
 | --- | --- | --- |
 | Browser: canvas (tldraw + `useSync`) | **This group** | T01, T06, T07 |
 | Browser: chat panel (ACP client) | **This group** | T05, T06, T07 |
-| Browser: ranked list + paper overlay | **This group** | T09, T10 |
+| Browser: ranked list + paper card (v4), filters, top and bottom bars, editing | **This group** | T09, T10, T13, T14 |
 | Board service: sync rooms | **This group** (exists, extended) | T01, T02 |
 | Board service: canvas MCP + layout service | **This group** | T02, T11 |
 | Board service: ACP pipe | **This group** | T03 |
@@ -29,7 +29,8 @@ The circled part of [architecture diagram 1](../../architecture.html#components)
 | tldraw board | Multiplayer starter ported to a Node sync server: one `TLSocketRoom` per room, one SQLite file per room, `POST /api/rooms/:room/shapes` writes validated shapes server-side; default shapes only | `client/server/server.ts`, `client/client/pages/Room.tsx` |
 | Harness | ADK 2.12 with Nemotron on Token Factory via LiteLLM; `search` agent; `toolsets.papers()`, `toolsets.canvas()`, `toolsets.tavily()`; offline tests with a scripted model | `harness/` |
 | Papers MCP | `search`, `find_candidates`, `resolve_seed`, `get_paper` over streamable HTTP on `:8001` | `discovery/` |
-| ACP adapter, chat panel, canvas MCP, REST API, ranked list, overlay | Not built | — |
+| ACP adapter, chat panel, canvas MCP, REST API, ranked list, paper card | Not built | — |
+| Visual design | v4 clickable mockup of the whole board with real papers | `docs/mockups/flashcard-v4.html`, [mockups README](../../mockups/README.md) |
 
 ## The model: Nemotron 3.5 Super VL on Token Factory
 
@@ -60,13 +61,15 @@ Two things the probes showed that matter to the harness owner are in [I8](interf
 | [T03](T03-acp-pipe.md) | ACP pipe: WebSocket to harness stdio | Board | S | T04 echo mode | M1 |
 | [T04](T04-acp-adapter.md) | ACP adapter: `python -m harness` | Harness (board half) | M | I1 | M1 |
 | [T05](T05-chat-panel.md) | Chat panel: browser ACP client | Browser | M | T03 | M1 |
-| [T06](T06-viewer-actions.md) | Per-viewer canvas actions: focus, highlight, open paper | Harness + Browser | S | T04, T05 | M3 |
+| [T06](T06-viewer-actions.md) | Per-viewer canvas actions: focus, highlight, open paper, catch-up tour | Harness + Browser | S | T04, T05 | M3 |
 | [T07](T07-board-context.md) | What the agent sees: selection, the board and papers as images | Browser + Harness | M | T04, T05 | M3 |
 | [T08](T08-rest-sse-api.md) | REST + SSE API and board DB | Board | M | T01 | M4 |
-| [T09](T09-ranked-list.md) | Ranked list beside the canvas | Browser | S | T01, T06 | M4 |
-| [T10](T10-paper-overlay.md) | Paper overlay with PDF and shared highlights | Browser | L | T01, T08 | M4 |
+| [T09](T09-ranked-list.md) | Ranked list, filters and "Looking for" (v4) | Browser | M | T01, T06, T08 | M4 |
+| [T10](T10-paper-card.md) | Paper card (v4) and PDF reading | Browser | L | T01, T08 | M4 |
 | [T11](T11-external-agents.md) | External agents on the canvas MCP | Board + Browser | S | T02, T08 | M5 |
 | [T12](T12-integration-demo.md) | Integration check and demo run | All | M | T02 to T07 | M5 |
+| [T13](T13-board-chrome.md) | Board chrome (v4): top bar, bottom bar, help | Browser | M | T01, T05, T08 | M4 |
+| [T14](T14-board-editing.md) | Editing the board (v4): links and pinned notes | Browser | M | T01, T08 | M4 |
 
 ```mermaid
 flowchart LR
@@ -80,7 +83,7 @@ flowchart LR
   T05 --> T07
   T01 --> T09["T09 Ranked list"]
   T06 --> T09
-  T08 --> T10["T10 Paper overlay"]
+  T08 --> T10["T10 Paper card"]
   T01 --> T10
   T02 --> T11["T11 External agents"]
   T08 --> T11
@@ -88,9 +91,35 @@ flowchart LR
   T06 --> T12
   T07 --> T12
   T10 --> T12
+  T01 --> T13["T13 Board chrome"]
+  T05 --> T13
+  T08 --> T13
+  T01 --> T14["T14 Board editing"]
+  T08 --> T14
+  T13 --> T12
+  T14 --> T12
 ```
 
-**Suggested order for one person:** T04 echo mode, T03, T05 (M1: chat works), then T01, T02 (M2: the agent writes to the board), then T06, T07 (M3), then T08, T09, T10 (M4), then T11, T12 (M5). With a second person, the Board lane (T01, T02, T08) and the Browser lane (T05, T09, T10) run in parallel from the start, meeting at the contracts below.
+**Suggested order for one person:** T04 echo mode, T03, T05 (M1: chat works), then T01, T02 (M2: the agent writes to the board), then T06, T07 (M3), then T08, T13, T10, T09, T14 (M4: the v4 board), then T11, T12 (M5). With a second person, the Board lane (T01, T02, T08) and the Browser lane (T05, T13, T10, T09, T14) run in parallel from the start, meeting at the contracts below.
+
+## Visual spec: the v4 mockup
+
+Ralph's [v4 mockup](../../mockups/README.md) (`docs/mockups/flashcard-v4.html`, merged from `main` on Oct 18) is the visual spec for the browser side. Where it differs from Concept.md, v4 wins for the UI; where it needs data, [I9](interfaces.md#i9-discovery-data-the-v4-card-shows) lists what the agent and discovery service supply.
+
+| v4 element | WP |
+| --- | --- |
+| Nodes: bookmark squares for seeds and kept papers, circles coloured by fit, NEW badge, "Agent is reading…" ring, first author and year under each node, cluster frames | T01 |
+| Opening a paper zooms to it and fades everything it isn't linked to; the layered card (figure, title, one sentence with hover quotes, "Compared with your seeds", Details, Keep or Discard) | T10 |
+| "Catch me up (N)" with the tour inside the card | T06, T10, T13 |
+| "Looking for" (New findings or Methods to reuse) recolours and re-ranks | T09, T13 |
+| Ranked list at the top left; Filter at the bottom right (fit, type, quality, year, discarded) | T09 |
+| Chat at the top right; each step shows model, time and cost; asking lights papers up | T04, T05, T06 |
+| Drag papers; link with the **+** handle; name, hide or delete links (cites, similar, your own) | T14 |
+| Notes pinned to a paper, moving with it and shown in its card | T01, T14 |
+| "N changes · the agent is waiting · Update suggestions" | T13, T07 |
+| Top bar with the agent in the face pile; Note and help buttons | T13 |
+
+v4 doesn't show the PDF reader with shared highlights from Concept's flow 5, so T10 keeps it as Phase B pending a decision (open question below).
 
 ## How the pieces fit
 
@@ -102,7 +131,7 @@ flowchart LR
     VA["_canvas/* handlers · T06"]
     CX["Selection + viewport image · T07"]
     RL["Ranked list · T09"]
-    OV["Paper overlay + pdf.js · T10"]
+    OV["Paper card, PDF reader · T10"]
   end
   subgraph BS["Board service: client/server, Node :5858"]
     SR[("TLSocketRoom per board")]
@@ -191,13 +220,14 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | Human-touched | `meta.pinnedByHuman` (moved by a person), `meta.editedByHuman` (props edited by a person); set by the browser (T01); the canvas MCP never moves or overwrites such a shape |
 | Run ID | `run_` plus 12 hex characters, one per ACP prompt turn, made by the harness (T04) and sent as the `X-Run-Id` header on canvas MCP calls |
 
-**ACP extension notifications (agent to client).** In the Python SDK, `conn.ext_notification("canvas/focus", …)` adds the leading underscore, so the method on the wire is `_canvas/focus`. All three carry the ACP `sessionId`.
+**ACP extension notifications (agent to client).** In the Python SDK, `conn.ext_notification("canvas/focus", …)` adds the leading underscore, so the method on the wire is `_canvas/focus`. All of them carry the ACP `sessionId`.
 
 | Method | Params | Browser effect (T06) |
 | --- | --- | --- |
 | `_canvas/focus` | `{sessionId, shapeIds?, paperIds?, inset?, animate?}` | Zoom this viewer's camera to the union of the shapes' bounds |
 | `_canvas/highlight` | `{sessionId, shapeIds?, paperIds?, durationMs?}` | Mark the shapes on this viewer's screen only; never written to the room |
-| `_canvas/open_paper` | `{sessionId, paperId}` | Open the paper overlay (T10) for this viewer |
+| `_canvas/open_paper` | `{sessionId, paperId}` | Open the paper's card (T10) for this viewer |
+| `_canvas/tour` | `{sessionId, title, steps: [{paperId, line}]}` | Run the catch-up tour inside the card (T06, T10): one step per paper, Keep or Discard moves on |
 
 **ACP extension request (agent to client, T07).** For the agent to look at the board or a paper on its own initiative. `conn.ext_method("canvas/snapshot", …)` in the Python SDK sends `_canvas/snapshot` and waits for the browser's answer.
 
@@ -205,7 +235,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | --- | --- | --- |
 | `_canvas/snapshot` | `{sessionId, target: "viewport" \| "shapes" \| "board" \| "paper_page", shapeIds?, paperIds?, paperId?, page?, maxSide?}` | `{mimeType: "image/png", data: <base64>, width, height, caption}`, or a JSON-RPC error if the browser can't take it (hidden tab, no PDF, timeout after 10 s) |
 
-**Prompt content (client to agent, T07).** A text block first, then one `resource` block per selected shape (`uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json`, `text`: compact shape JSON), then one `resource` block for the viewport (`uri: tldraw://<boardId>/viewport`), then `image` blocks: the viewport, and a PDF page or region when the researcher asks from the paper overlay (T10). Each image is preceded by a text line saying what it is.
+**Prompt content (client to agent, T07).** A text block first, then one `resource` block per selected shape (`uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json`, `text`: compact shape JSON), then one `resource` block for the viewport (`uri: tldraw://<boardId>/viewport`), then `image` blocks: the viewport, and a PDF page or region when the researcher asks from the PDF reader (T10). "Update suggestions" (T13) adds a `resource` block `tldraw://<boardId>/changes` with the researcher's edits. Each image is preceded by a text line saying what it is.
 
 **MCP servers in `session/new`.** The browser sends only the canvas MCP: `{type: "http", name: "canvas", url: <origin>/api/mcp/canvas/<boardId>, headers: [{name: "Authorization", value: "Bearer <memberId>"}]}`. The harness adds the papers MCP from `PAPERS_MCP_URL` itself (the browser has no reason to know where discovery runs), and swaps the canvas URL's origin for `BOARD_INTERNAL_URL` when that is set.
 
@@ -233,7 +263,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | **M1 Chat in the board** | "I type in the panel beside the board and the agent's answer streams back, with its thoughts and tool cards; Stop works." | T04, T03, T05 |
 | **M2 The agent writes to the board** | "I ask for a note or a paper and it appears on every open copy of the board, attributed to the agent on my behalf, placed next to its neighbour." | T01, T02 |
 | **M3 The agent sees the board** | "The agent zooms me to the cards behind its answer while my teammate's view stays put; it answers about the cards I selected, and when I ask about the layout it looks at the board itself." | T06, T07 |
-| **M4 The researcher's board** | "The ranked list sits beside the canvas, I open a paper, highlight a passage and everyone sees it, and I ask the agent about a figure on the page; my Keep shows on the card for everyone." | T08, T09, T10 |
+| **M4 The v4 board** | "It looks like the v4 mockup. I open a paper and the board fades to what it's linked to; the card shows a real figure, hover quotes and how it compares with my seeds; I switch 'Looking for', filter by quality, pin a note, name a link, press Update suggestions, and 'Catch me up' tours the new papers inside the card. My Keep shows for everyone." | T08, T09, T10, T13, T14 |
 | **M5 Open and ready** | "An external agent adds a card through the same MCP; one uncut run on Super VL; keyless and live tests are green; the Docker image runs it." | T11, T12 |
 
 ## Acceptance criteria for the group
@@ -244,7 +274,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 4. Selected shapes and a viewport image reach the agent, and its answer is about them. Asked about the board's layout or a figure in an open paper, the agent takes a snapshot itself (`_canvas/snapshot`) and answers from the picture.
 5. Stop ends the turn within 2 seconds with stop reason `cancelled`; closing the tab ends the harness process.
 6. A Keep or Discard vote changes the card's status for everyone and shows in the activity feed over SSE.
-7. A highlight made in the paper overlay appears for every collaborator in the PDF and as a node on the board.
+7. The board matches the v4 mockup side by side: nodes, the card's first view, ranked list, filter, top and bottom bars. Opening a card fades unrelated shapes for that viewer only; "Looking for" and filters are per viewer; links drawn, named, hidden or deleted and notes pinned by people are kept and respected by the agent.
 8. An external MCP client with a personal token can call `get_board` and `add_note` on the same board.
 9. `node --test` in `client/` and `uv run pytest` in `harness/` pass with no API keys, including one scripted end-to-end run through the real WebSocket pipe. With `TF_API_KEY` set, `uv run pytest -m live` passes the live agent tests on Super VL: tool calling, reading the board from a screenshot, reading a paper figure, and thoughts kept out of the answer.
 10. The root README says how to run all of the above, locally and in Docker.
@@ -277,6 +307,10 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | D13 | New dependencies are pinned to releases at least 7 days old | On Oct 18: `@agentclientprotocol/sdk` 1.8.0, `@modelcontextprotocol/sdk` 1.32.1, `zod` 4.6.5, `pdfjs-dist` 6.4.299, `react-markdown` 10.1.0; Python `agent-client-protocol` 0.12.1. |
 | D14 | One model family: Nemotron on Token Factory, with Super VL for every board-facing agent and every live agent test | Decided Oct 18. Both challenges require Token Factory; Super VL can see the board and papers' figures (checked live), and its tool calling passes `harness.check`. A Claude provider was considered and dropped. |
 | D15 | The agent can look for itself: a `look_at_board` / `look_at_paper` tool asks the researcher's browser for a PNG over `_canvas/snapshot`, and an ADK plugin adds the image to the next model call as a user message | Token Factory's tool messages carry text only, so the image can't be the tool result. The browser is the only place that can render the board and PDF pages; the server has no renderer. |
+| D16 | The [v4 mockup](../../mockups/README.md) is the visual spec for the browser; tldraw's default UI is replaced by v4's chrome | Merged from `main` on Oct 18; the team chose v4's layered card over the text-heavy v1 panel |
+| D17 | Quotes, figures, claims and facets live on the `paper-card` (shown in its card), not as separate board shapes | v4 shows quotes on hover inside the card and figures in the card; keeping them on the shape means every section fills in live through sync |
+| D18 | Catch-up is one `_canvas/tour` notification that the card runs locally | v4 puts the tour inside the card with Keep or Discard moving on; stepping through costs no model calls |
+| D19 | Per-viewer views (goal, filters, open card fade) are local atoms, never room state | Two people can look at the same board for different goals; the room only holds shared facts |
 
 ## Risks
 
@@ -289,7 +323,9 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | Agent writes land on top of what people are doing | Cards jump | Append-only by default; human-touched shapes skipped; layout never moves existing cards | T01, T02 |
 | Custom shape schema drift between server and client | Clients fail to connect to a room | Shared module (D6) and a test that boots a room with the client's shape list | T01 |
 | `setHintingShapes` too subtle for `_canvas/highlight` | Highlight goes unnoticed | Check first; fallback is our own overlay in `InFrontOfTheCanvas` | T06 |
-| pdf.js fights tldraw for pointer and keyboard events | Can't select text in the PDF | Render the overlay as a sibling of the canvas, not inside it | T10 |
+| pdf.js fights tldraw for pointer and keyboard events | Can't select text in the PDF | Render the reader as a sibling of the canvas, not inside it | T10 |
+| Per-viewer fading of built-in shapes depends on tldraw's `data-shape-id` attribute | Fade breaks after a tldraw upgrade | Checked in 5.5; fallback is fading only our own shapes and arrows | T10, T09 |
+| v4 needs data discovery doesn't produce yet (facets, figures, citation counts) | Empty card parts | Parts without data are left out, not faked ([I9](interfaces.md#i9-discovery-data-the-v4-card-shows)) | T10 |
 | The experimental `@agentclientprotocol/sdk/experimental/ws-client` export changes | Chat panel breaks on upgrade | Pin 1.8.0; the 20-line hand-written stream from Concept is the fallback | T05 |
 | Images make prompts heavy | Slow turns, cost | Measured cheap (about 1,400 tokens for a board screenshot); still capped at 1,600 px on the long side, one viewport image per prompt, snapshots only when the agent asks | T07 |
 | Super VL reasons before every answer | Slower turns, more tokens against the 400,000 tokens-a-minute starting limit | Reasoning streams to the panel as thoughts, so the wait is visible; `enable_thinking: false` is available per call for quick replies ([I8](interfaces.md#i8-token-factory-notes-for-the-harness-owner)) | T04 |
@@ -297,6 +333,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 
 ## Open questions
 
-- [ ] Who owns the custom shapes' visual design (the mockup in [`docs/mockups/`](../../mockups/README.md))? T01 ships working shapes with plain styling; polish may sit with whoever owns UI.
+- [ ] Does the PDF reader with shared highlights (Concept flow 5) stay in scope? v4 doesn't show it; T10 keeps it as Phase B after the card.
+- [ ] Ralph made v4: does he build parts of T10, T13 and T14 (the visual parts), with this group owning the data and sync underneath?
 - [ ] Which actions ask permission (`session/request_permission`) in the demo? Proposal: none in v0, since every v0 canvas tool only adds or updates the agent's own shapes.
 - [ ] Does a Nebius Serverless Endpoint allow one child process per chat, and how much memory does one harness need? (Also open in Concept.)

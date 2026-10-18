@@ -4,7 +4,7 @@ Work packages (WPs) split the design in [`docs/Concept.md`](../Concept.md) and [
 
 | Group | Folder | What it covers | Status |
 | --- | --- | --- | --- |
-| tldraw integration (T) | [`tldraw-integration/`](tldraw-integration/README.md) | The tldraw board and its custom shapes, the board service (sync rooms, canvas MCP and layout, ACP pipe, REST + SSE), the chat panel, ranked list and paper overlay, external agents, and the board-facing half of the harness (ACP adapter, canvas and viewer tools). Includes the interfaces with the harness and discovery owners. Model: Nemotron 3.5 Super VL on Token Factory. | Planned |
+| tldraw integration (T) | [`tldraw-integration/`](tldraw-integration/README.md) | The tldraw board and its custom shapes, the board service (sync rooms, canvas MCP and layout, ACP pipe, REST + SSE), the chat panel, the v4 board UI (nodes, paper card, ranked list, filters, top and bottom bars, link and note editing), external agents, and the board-facing half of the harness (ACP adapter, canvas and viewer tools). Includes the interfaces with the harness and discovery owners. Model: Nemotron 3.5 Super VL on Token Factory. | Planned |
 
 ## How a WP is written
 

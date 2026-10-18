@@ -1,30 +1,31 @@
-# T01: Shared board model: custom shapes, IDs, attribution, human-touched flags
+# T01: Shared board model: custom shapes, bindings, IDs, attribution, human-touched flags
 
 | Field | Value |
 | --- | --- |
 | Lane | Board + Browser |
 | Size | M |
 | Depends on | — |
-| Unblocks | T02, T08, T09, T10 |
+| Unblocks | T02, T08, T09, T10, T13, T14 |
 | Milestone | M2 |
 | Status | Not started |
 | Owner | TBD |
 
 ## Goal
 
-The board knows what a paper is. A `paper-card` and its companions (`highlight`, `quote`, `figure`) are registered once and used by both the sync server and the browser; every shape says who made it; and the moment a person moves or edits an agent's shape, the shape is marked so no agent touches it again.
+The board knows what a paper is and draws it the way the [v4 mockup](../../mockups/README.md) does. A `paper-card` node, a pinned note binding and typed links are registered once and used by both the sync server and the browser; every shape says who made it; and the moment a person moves or edits an agent's shape, the shape is marked so no agent touches it again.
 
 ## Context
 
-- [Concept: Canvas shapes](../../Concept.md#canvas-shapes) and [Canvas layout rules](../../Concept.md#system-architecture) list the shapes and their props; [Collaboration: rules when people and agents edit at once](../../Concept.md#collaboration-on-the-board) sets the human-touched rule.
-- [Architecture diagram 4](../../architecture.html#model): cards, notes, highlights and quotes live as shapes in the sync room.
-- Today `client/server/server.ts` builds its schema from `defaultShapeSchemas` only, and `client/client/pages/Room.tsx` passes no custom shape utils, so a custom shape written by anyone would be rejected.
+- **Visual spec:** [v4 mockup](../../mockups/README.md) (`docs/mockups/flashcard-v4.html`, screenshots in `docs/mockups/shots-v4/`): seeds and kept papers are white squares with a bookmark; suggestions are circles coloured by fit; a NEW badge; a dashed ring and "Agent is reading…" while the agent works; a check badge on kept papers; the label under each node is first author and year; clusters are pale frames with an upper-case title.
+- [Concept: Canvas shapes](../../Concept.md#canvas-shapes) and [Collaboration: rules when people and agents edit at once](../../Concept.md#collaboration-on-the-board).
+- v4's "What the UI needs from the backend": user edits stored with the board (moved positions, links with `label` and `by`, hidden citation links, notes pinned to a paper).
+- Today `client/server/server.ts` builds its schema from `defaultShapeSchemas` only, so a custom shape written by anyone would be rejected.
 
 ## Scope
 
-**In:** shared shape definitions and migrations; server schema; client shape utils with plain, readable rendering; ID and attribution helpers in TypeScript and Python; member identity in the browser; human-touched side effects; hiding discarded cards per viewer.
+**In:** shared shape and binding definitions with migrations; server schema; the `paper-card` node rendering from v4; the `note-pin` binding; link (arrow) meta; ID and attribution helpers in TypeScript and Python; member identity; human-touched side effects; the per-viewer state atoms other WPs read (current goal, filters, open card).
 
-**Out:** final visual design from the mockups (see open question in the group README); the `table` shape (T02 phase 2); cluster frames' behaviour (T02 phase 2, but the meta keys are fixed here).
+**Out:** the card that opens beside a node (T10); the top and bottom bars (T13); drawing and editing links and pinning notes by hand (T14); cluster frame behaviour (T02 phase 2, meta keys fixed here).
 
 ## Design
 
@@ -32,31 +33,54 @@ The board knows what a paper is. A `paper-card` and its companions (`highlight`,
 
 | File | Contents |
 | --- | --- |
-| `client/shared/shapes.ts` | Props validators and migration sequences for each custom shape; `customShapeSchemas` for `createTLSchema` |
-| `client/shared/ids.ts` | `paperShapeId(paperId)`, `agentShapeId(kind)`, `slug()`, `RUN_ID_PATTERN` |
-| `client/shared/meta.ts` | Types and helpers for `createdBy`, `onBehalfOf`, `runId`, `author`, `pinnedByHuman`, `editedByHuman` |
+| `client/shared/shapes.ts` | Props validators and migration sequences for each custom shape; `customShapeSchemas` |
+| `client/shared/bindings.ts` | The `note-pin` binding's props and migrations; `customBindingSchemas` |
+| `client/shared/ids.ts` | `paperShapeId(paperId)`, `agentShapeId(kind)`, `linkShapeId(from, to, kind)`, `slug()`, `RUN_ID_PATTERN` |
+| `client/shared/meta.ts` | Types and helpers for `createdBy`, `onBehalfOf`, `runId`, `author`, `pinnedByHuman`, `editedByHuman`, link meta |
+| `client/shared/display.ts` | `nodeLabel(authors, year)` ("Ibáñez-Molero 2026"), `sentenceCase(title)` for all-capital titles |
 | `client/shared/fixtures/paper-ids.json` | `[[paperId, expectedShapeId], …]`, read by both TypeScript and Python tests |
 
-`client/tsconfig.json` adds `shared` to `include`.
+**`paper-card` props.** Node fields drive the board; card fields fill the card beside it (T10). Both live on the shape so every part updates live through sync as the agent writes it (v4's "per-section progress").
 
-**Custom shapes.**
+| Group | Props |
+| --- | --- |
+| Identity | `paperId`, `title`, `authors` (list of display names), `year`, `venue`, `url`, `type` (`research`, `review` or `preprint`), `peerReviewed` (boolean), `citedBy` (number or null) |
+| Board state | `w`, `h`, `kind` (`seed`, `kept` or `suggestion`), `status` (`new`, `kept`, `contested`, `discarded`), `working` (boolean), `keepBy`, `discardBy` (member IDs; written only by the board service from votes, T08) |
+| Fit per goal | `scores`: `{ [goal]: { score, fit: "low" \| "medium" \| "high", why } }`, one entry per "Looking for" goal (for example `new-findings`, `methods`) |
+| Card first view | `figure` (`{imageUrl, caption, label}` or null; real figures only), `oneLine` (one sentence), `claims` (`[{text, evidence: [quoteId or "seeds"]}]`, the underlined phrases), `quotes` (`[{id, text, source, verified, url}]`), `facets` (`[{facet: "disease" \| "cells" \| "method", value, relation: "same" \| "adds" \| "other" \| "unclear", quoteId}]`) |
+| Card details | `tldr`, `summary`, `gaps` (what couldn't be checked) |
 
-| Shape | Props | Rendering (v1, plain) |
-| --- | --- | --- |
-| `paper-card` | `w`, `h`, `paperId`, `title`, `authors` (short form), `year` (number or null), `venue`, `url`, `kind` (`seed` or `suggestion`), `status` (`new`, `kept`, `contested`, `discarded`), `rating` (0 to 1 or null), `fit` (`low`, `medium`, `high` or null), `reason`, `tldr`, `summary`, `whyItMatters`, `working` (boolean), `keepBy` and `discardBy` (member IDs, written only by the board service from votes, T08) | Seeds and kept papers are rectangles, suggestions are circles (`Ellipse2d` geometry); fill colour by `fit`; badges for New, Working, Kept, Contested; voters' avatars; title and year always visible, `tldr` when zoomed in |
-| `highlight` | `w`, `h`, `paperId`, `text`, `page` (number or null), `category` (string or null), `note`, `replies` (`[{author, text, at}]`), `rects` (`[{x, y, w, h}]`, normalised to the page) | A coloured strip with the passage, the category label and the note's first line |
-| `quote` | `w`, `h`, `paperId`, `text`, `section`, `verified` (boolean), `url` (with a `#:~:text=` fragment) | Serif text with an "exact match" or "not found" tag; clicking opens `url` |
-| `figure` | `w`, `h`, `paperId`, `figureId`, `imageUrl`, `caption`, `why` | Image with caption |
+Retracted papers are never written (T02 rejects them), so there is no `retracted` prop.
+
+**Rendering the node** (`PaperCardShapeUtil`, from v4):
+
+| State | Look |
+| --- | --- |
+| `kind: seed` or `kept` | White rounded square with a bookmark icon; kept adds a check badge |
+| `kind: suggestion` | Circle filled by `scores[currentGoal].fit`: dark blue high, mid blue medium, light blue low; grey if not scored yet |
+| `status: new` | NEW badge |
+| `working: true` | Dashed ring and "Agent is reading…" under the label |
+| `status: contested` | Small split-vote mark |
+| Size | Grows with the number of links (`w = h`, 40 to 72 px for circles, 48 to 80 px for squares) |
+| Label | `nodeLabel(authors, year)` under the node; the title shows only in the card and the ranked list, in sentence case |
+
+`currentGoal` and the active filters are per-viewer atoms (below), so two people can look at the same board for different goals.
+
+**Links.** Built-in arrows bound to two cards, with meta: `kind` (`cites`, `similar` or `user`), `label` (text a person wrote, or empty), `by` (`agent`, `pubmed` or a member ID), `hiddenByHuman` (boolean). A `cites` link is a PubMed fact: people may label or hide it, never delete it. A `similar` link is the agent's guess: people may rename or delete it. ID: `linkShapeId(from, to, kind)`, so writing the same link twice is a no-op. Interaction and the "labels on hover" rule are in T14.
+
+**Notes pinned to a paper.** A `note-pin` binding from a built-in note to a `paper-card`, following tldraw's [sticker bindings](https://tldraw.dev/examples/sticker-bindings) pattern: `onAfterChangeToShape` moves the note with the paper, `onBeforeDeleteToShape` unpins it (the note stays). The card's Notes section lists pinned notes (T10).
 
 Cluster frames are built-in `frame` shapes with `meta.clusterId`, `meta.labelGenerated` and `meta.renamedByHuman`.
 
-Each shape gets an empty migration sequence now (`createShapePropsMigrationIds`, `createShapePropsMigrationSequence`), so the first prop change later is a migration, not a broken room. TypeScript typing uses tldraw 5's `TLGlobalShapePropsMap` declaration merging.
+Each shape and binding gets an empty migration sequence now (`createShapePropsMigrationIds`, `createShapePropsMigrationSequence`, and the binding equivalents), so the first prop change later is a migration, not a broken room. TypeScript typing uses tldraw 5's `TLGlobalShapePropsMap` declaration merging. The `highlight` shape for PDF highlights is defined here too (`paperId`, `text`, `page`, `category`, `note`, `replies`, `rects`), used only if T10's PDF reading stays in scope.
 
-**Server.** `createTLSchema({ shapes: { ...defaultShapeSchemas, ...customShapeSchemas } })` in `client/server/server.ts`; bindings stay the defaults (arrows bind to cards).
+**Server.** `createTLSchema({ shapes: { ...defaultShapeSchemas, ...customShapeSchemas }, bindings: { ...defaultBindingSchemas, ...customBindingSchemas } })` in `client/server/server.ts`.
 
-**Browser.** `client/client/shapes/` holds one `ShapeUtil` per custom shape (`BaseBoxShapeUtil` subclasses reading `props` and `migrations` from `client/shared/shapes.ts`) and exports `customShapeUtils`. `Room.tsx` passes the same list to `useSync({ …, shapeUtils: [...defaultShapeUtils, ...customShapeUtils] })` and to `<Tldraw shapeUtils={customShapeUtils} />`.
+**Browser.** `client/client/shapes/` holds `PaperCardShapeUtil`, `HighlightShapeUtil` and `NotePinBindingUtil`, exported as `customShapeUtils` and `customBindingUtils`. `Room.tsx` passes the same lists to `useSync({ …, shapeUtils: [...defaultShapeUtils, ...customShapeUtils], bindingUtils: [...defaultBindingUtils, ...customBindingUtils] })` and to `<Tldraw>`.
 
-**Identity.** `client/client/identity.ts`: `getMemberId()` returns `localStorage['pdc.memberId']`, creating `m_` plus 10 random characters on first use; `getDisplayName()` asks once and stores it, and sets the tldraw user name so cursors show it.
+**Per-viewer state** (`client/client/viewerState.ts`, tldraw `atom`s, never written to the room): `currentGoal`, `filters` (T09), `openCardPaperId` (T10). Shape utils read them, so changing one re-renders only this browser.
+
+**Identity.** `client/client/identity.ts`: `getMemberId()` returns `localStorage['pdc.memberId']`, creating `m_` plus 10 random characters on first use; `getDisplayName()` asks once and stores it, and sets the tldraw user name so cursors and the face pile show it.
 
 **Attribution and human-touched flags** (side effects registered in `onMount`):
 
@@ -65,45 +89,48 @@ Each shape gets an empty migration sequence now (`createShapePropsMigrationIds`,
 | `registerBeforeCreateHandler('shape', (shape, source))` | If `source === 'user'` and no `meta.createdBy`, set `meta.author = memberId` |
 | `registerBeforeChangeHandler('shape', (prev, next, source))` | If `source === 'user'` and `prev.meta.createdBy === 'agent'`: a change to `x`, `y`, `rotation` or `parentId` sets `meta.pinnedByHuman = true`; a change to any prop sets `meta.editedByHuman = true` |
 
-`source === 'remote'` changes (other people, the agent through the server) never set the flags, so the agent's own updates don't lock its cards.
+`source === 'remote'` changes (other people, the agent through the server) never set the flags, so the agent's own updates don't lock its cards. The same handlers count this viewer's edits for T13's "N changes · the agent is waiting".
 
-**Hiding discarded cards per viewer.** `<Tldraw getShapeVisibility={…}>` returns `'hidden'` for `paper-card` with `status === 'discarded'` unless this viewer has "Show discarded" on (a local atom; the toggle lives in the legend, T09).
+**Hiding.** `<Tldraw getShapeVisibility={…}>` returns `'hidden'` for discarded cards unless "Show discarded papers" is on (T09's filter), and for links with `hiddenByHuman`.
 
 ## Tasks
 
-- [ ] `client/shared/shapes.ts`, `ids.ts`, `meta.ts`, `fixtures/paper-ids.json` (include IDs with `:`, `/`, `.` and unicode).
+- [ ] `client/shared/shapes.ts`, `bindings.ts`, `ids.ts`, `meta.ts`, `display.ts`, `fixtures/paper-ids.json` (include IDs with `:`, `/`, `.` and unicode).
 - [ ] `client/package.json`: add `@tldraw/validate` pinned to the installed tldraw version; `client/tsconfig.json`: include `shared`.
-- [ ] `client/server/server.ts`: custom shapes in the schema.
-- [ ] `client/client/shapes/PaperCardShapeUtil.tsx`, `HighlightShapeUtil.tsx`, `QuoteShapeUtil.tsx`, `FigureShapeUtil.tsx`, `index.ts`.
-- [ ] `client/client/identity.ts`; display-name prompt on first visit.
-- [ ] `client/client/pages/Room.tsx`: shape utils in `useSync` and `<Tldraw>`, side-effect handlers, `getShapeVisibility`.
-- [ ] `client/server/addShape.ts`: add a `paper` mode that writes one `paper-card`, as a living example.
+- [ ] `client/server/server.ts`: custom shapes and bindings in the schema.
+- [ ] `client/client/shapes/PaperCardShapeUtil.tsx` (v4 node look), `HighlightShapeUtil.tsx`, `NotePinBindingUtil.ts`, `index.ts`.
+- [ ] `client/client/viewerState.ts`, `client/client/identity.ts`; display-name prompt on first visit.
+- [ ] `client/client/pages/Room.tsx`: utils in `useSync` and `<Tldraw>`, side-effect handlers, `getShapeVisibility`.
+- [ ] `client/server/addShape.ts`: a `paper` mode that writes one `paper-card`, as a living example.
 - [ ] Tests (below).
 
 ## Acceptance criteria
 
-1. `node server/addShape.ts <board> --paper pmid:34290406 "Some title"` puts a `paper-card` with ID `shape:paper-pmid_34290406` on the board, visible in two browsers; running it twice leaves one card.
-2. Moving that card in one browser sets `meta.pinnedByHuman` (visible in the other browser's store); editing its title sets `meta.editedByHuman`. A server-side update to it does neither.
-3. A sticky note made by a person carries `meta.author` with that browser's `memberId`.
-4. A card with `status: "discarded"` is hidden until "Show discarded" is on, in that browser only.
-5. Rooms saved before this change still open.
+1. `node server/addShape.ts <board> --paper pmid:34290406 "Some title"` puts a `paper-card` with ID `shape:paper-pmid_34290406` on the board, drawn as in v4, visible in two browsers; running it twice leaves one card.
+2. A seed renders as a bookmark square; a suggestion with `scores.new-findings.fit = "high"` renders dark blue, and switching `currentGoal` to `methods` (where its fit is low) turns it light blue in this browser only.
+3. Moving an agent's card in one browser sets `meta.pinnedByHuman`; editing it sets `meta.editedByHuman`. A server-side update does neither.
+4. A note pinned to a card with a `note-pin` binding moves when the card moves, in every browser; deleting the card leaves the note, unpinned.
+5. A link with `hiddenByHuman` is hidden for everyone; a discarded card is hidden until "Show discarded papers" is on, in that browser only.
+6. All-capital titles display in sentence case; rooms saved before this change still open.
 
 ## Tests
 
 - `client/shared/ids.test.ts`: every fixture pair; Python mirrors it in `harness/tests/test_board_ids.py` (T04) against the same file.
-- `client/server/schema.test.ts`: the server schema validates one sample of each custom shape and rejects a `paper-card` with a bad `fit`.
+- `client/shared/display.test.ts`: `nodeLabel` (one author, "et al.", accents) and `sentenceCase`.
+- `client/server/schema.test.ts`: the server schema validates one sample of each custom shape and binding and rejects a `paper-card` with a bad `fit`.
 - `client/client/sideEffects.test.ts`: the flag rules as pure functions (`nextMeta(prev, next, source)`), so no DOM is needed.
 
 Run with `node --test` from `client/`.
 
 ## Risks
 
-- **Schema drift** between server and client: a client whose schema has a shape the server lacks can't connect. Both import `client/shared/shapes.ts`, and `schema.test.ts` fails if they diverge.
-- **Flags on remote echoes:** check that the store reports changes from the sync server as `remote`, so a person's own edit coming back doesn't double-count; the pure-function test covers the rule, a two-browser check covers the wiring.
+- **Schema drift** between server and client: a client whose schema has a shape the server lacks can't connect. Both import `client/shared/`, and `schema.test.ts` fails if they diverge.
+- **Flags on remote echoes:** check that the store reports changes from the sync server as `remote`; the pure-function test covers the rule, a two-browser check covers the wiring.
+- **Props grow** as the card fills in (claims, quotes, facets): a few KB per paper is fine for a few hundred papers; long texts (summary) stay short by contract with the reader agent.
 
 ## References
 
-- [tldraw shapes](https://tldraw.dev/docs/shapes) and the [custom shape example](https://tldraw.dev/examples/custom-shape)
-- [tldraw side effects](https://tldraw.dev/sdk-features/side-effects)
-- [tldraw sync](https://tldraw.dev/docs/sync)
+- [v4 mockup and its README](../../mockups/README.md)
+- [tldraw shapes](https://tldraw.dev/docs/shapes), [custom shape example](https://tldraw.dev/examples/custom-shape), [bindings](https://tldraw.dev/sdk-features/bindings), [sticker bindings example](https://tldraw.dev/examples/sticker-bindings)
+- [tldraw side effects](https://tldraw.dev/sdk-features/side-effects), [tldraw sync](https://tldraw.dev/docs/sync)
 - [Concept: Canvas shapes](../../Concept.md#canvas-shapes)

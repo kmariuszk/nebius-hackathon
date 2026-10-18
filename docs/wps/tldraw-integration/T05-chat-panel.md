@@ -18,7 +18,7 @@ A panel slides in on the right of the board. The researcher types, and the agent
 
 - [Architecture diagram 1](../../architecture.html#components): "Chat panel, ACP client" talking ACP over a WebSocket to the ACP pipe.
 - [Concept: Product scope, flow 6 "Toggling chat"](../../Concept.md#product-scope) and the event table in [Protocols](../../Concept.md#acp-one-researchers-conversation).
-- Mockup of the chat: `docs/mockups/shots/chat.png` ([mockups README](../../mockups/README.md)).
+- **Visual spec:** the chat in the [v4 mockup](../../mockups/README.md) (`docs/mockups/flashcard-v4.html`): top right, "each step shows its model, time and cost", paper names are clickable, and asking a question highlights papers on the board (T06). The v1 shot `docs/mockups/shots/chat.png` is older.
 
 ## Scope
 
@@ -78,9 +78,9 @@ acp.client({ name: 'paper-canvas' })
 | `agent_message_chunk` | Appended to the current agent message; rendered as Markdown |
 | `agent_thought_chunk` | Collapsible dimmed block above the message, collapsed when the message starts |
 | `plan` | Checklist pinned at the top of the turn; replaced on every update |
-| `tool_call` | New card: title, status icon, model tag from `_meta.model`, collapsed details |
+| `tool_call` | New card: title, status icon, and v4's "model, time and cost" line from `_meta` (`model`, `seconds`, `costUsd`), collapsed details |
 | `tool_call_update` | Merged into the card by `toolCallId`; failed cards show the error |
-| `usage_update` | Small token count at the end of the turn |
+| `usage_update` | Token count and the session's running cost (`cost.amount`, `cost.currency`) at the end of the turn |
 | anything else | Ignored, logged once to the console |
 
 Tool card details show `rawInput` and `rawOutput` as pretty JSON, truncated in the UI with "show all". Cards whose output names papers or shapes (`added`, `shapeId`) get a "Show on board" button that publishes a local focus.

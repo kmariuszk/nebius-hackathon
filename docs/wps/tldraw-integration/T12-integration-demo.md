@@ -4,7 +4,7 @@
 | --- | --- |
 | Lane | All |
 | Size | M |
-| Depends on | T02 to T07 (T08 to T11 for their beats); the harness owner's `master` and the discovery pipeline for the full discovery run |
+| Depends on | T02 to T07 (T08 to T11, T13 and T14 for their beats); the harness owner's `master` and the discovery pipeline for the full discovery run |
 | Unblocks | The demo video |
 | Milestone | M5 |
 | Status | Not started |
@@ -48,20 +48,23 @@ The scripted turns live in the harness repo folder, next to the adapter's own te
 | --- | --- |
 | Live tests | `uv run pytest -m live` in `harness/` and the live end-to-end above pass on Super VL |
 | Discovery run | A discovery prompt places the first card within 60 s and finishes within 90 s; every tool card names its Nemotron model |
-| The agent looks | "How is the board organised?" and "what does the figure on page N show?" are answered from snapshots (T07, T10 criterion 6) |
-| Two browsers | T06 criteria 1 and 2; T10 criteria 3 and 4; T08 criterion 1 |
-| Catch me up | On a board prepared earlier, the tour focuses each new paper in Ana's view only, interleaved with the explanation |
+| The agent looks | "How is the board organised?" and "what does the figure on page N show?" are answered from snapshots (T07; T10 criterion 7 if the PDF reader is built) |
+| Two browsers | T06 criteria 1 and 2; T10 criteria 1, 3 and 4; T14 criteria 1, 3 and 5; T08 criterion 1 |
+| Catch me up | On a board prepared earlier, "Catch me up" runs the tour inside the card (T06 criterion 6), in Ana's view only |
+| Looks like v4 | Side by side with `docs/mockups/flashcard-v4.html`: nodes, card, ranked list, filter, top and bottom bars (T01, T09, T10, T13) |
 | External agent | T11 criterion 2 |
 | Docker | `docker build -f client/Dockerfile .` and `docker run` with keys serve the app and a working chat |
 | Memory | Peak memory of one idle and one busy harness recorded; `MAX_HARNESSES` default set from it against the [team limits](../../team-limits.md) |
 
 **Demo beats** (Concept's demo plan, with what each needs):
 
-1. Question and seeds, the board fills itself: T02, T04, T05, the master and discovery.
-2. Open a paper, highlight a passage, show its node; mark a figure and ask what it shows: T10, T07.
-3. Ask the chat a question, the cards behind the answer light up: T06, T07.
-4. Switch to a board prepared earlier, "Catch me up": T06, T08 (`last_seen_seq`), the master's tour.
-5. Optional: an external agent (Claude Code or Cursor) adds a note to the same board: T11.
+1. Question and seeds, the board fills itself; nodes appear with "Agent is reading…" and colour in by fit: T01, T02, T04, T05, the master and discovery.
+2. Open a paper: the board fades to what it's linked to, the card shows a real figure, one sentence with hover quotes, and "Compared with your seeds"; Keep: T10.
+3. Switch "Looking for" to Methods to reuse and filter by quality; the board recolours and the ranked list re-ranks: T09, T13.
+4. Ask the chat a question; the papers behind the answer light up; ask how the board is organised and the agent looks at it: T06, T07.
+5. Pin a note to a paper and name a link; "2 changes · the agent is waiting" → Update suggestions: T13, T14.
+6. Switch to a board prepared earlier, "Catch me up 3": the tour runs inside the card: T06, T08, the master's tour.
+7. Optional: an external agent (Claude Code or Cursor) adds a note to the same board: T11.
 
 **Documentation.** Root `README.md` gets one "Run everything" section (discovery, board service with the harness, browser) and links to this folder. Concept's protocol paths gain the `/api` prefix (decision D4), and the `.env.example` comments match the final routes.
 
