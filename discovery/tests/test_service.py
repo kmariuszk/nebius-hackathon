@@ -8,6 +8,7 @@ import pytest
 from mcp import Client
 
 from discovery import rerank
+from discovery.papers import Paper
 from discovery.server import build_server
 from discovery.service import Discovery
 from discovery.store import Store
@@ -32,7 +33,19 @@ ARTICLES = {
     "100": article("100", "Similar paper", "10.1/similar"),
     "200": article("200", "Citing paper"),
     "300": article("300", "Keyword hit", "10.1/keyword"),
+    "500": article("500", "Open access paper").replace(
+        "</ArticleIdList>", '<ArticleId IdType="pmc">PMC500</ArticleId></ArticleIdList>'
+    ),
 }
+
+FILLER = "Exhausted CD8 T cells lose effector function in chronic antigen exposure. " * 25
+PMC_ARTICLE = f"""<pmc-articleset><article><front/><body>
+<sec><title>Results</title><p>We find that “TOX drives exhaustion” in tumours
+<fig id="F1"><label>Figure 1</label><caption><title>TOX levels.</title><p>Per patient.</p></caption></fig>
+across patients.</p><sec><title>Spatial</title><p>{FILLER}</p></sec></sec>
+<sec><title>Methods</title><p>{FILLER}</p></sec>
+<sec><title>Author contributions</title><p>A wrote it.</p></sec>
+</body></article></pmc-articleset>"""
 LINKS = {
     "pubmed_pubmed": ["34290406", "100", "300"],
     "pubmed_pubmed_citedin": ["200", "100"],
@@ -46,6 +59,8 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
         term = params["term"]
         found = {"10.1038/s41586-021-03704-y[doi]": ["34290406"]}.get(term, ["300", "34290406"])
         return httpx.Response(200, json={"esearchresult": {"idlist": found}})
+    if path.endswith("/efetch.fcgi") and params["db"] == "pmc":
+        return httpx.Response(200, text=PMC_ARTICLE) if params["id"] == "PMC500" else httpx.Response(400)
     if path.endswith("/efetch.fcgi"):
         body = "".join(
             FIXTURE.split("<PubmedArticleSet>")[1].split("</PubmedArticleSet>")[0]
@@ -173,10 +188,71 @@ def test_rerank_scores_are_kept_between_0_and_1():
 async def test_tools_over_mcp(discovery):
     async with Client(build_server(discovery)) as client:
         tools = {tool.name for tool in (await client.list_tools()).tools}
-        assert tools == {"search", "find_candidates", "rerank", "resolve_seed", "get_paper"}
+        assert tools == {
+            "search", "find_candidates", "rerank", "resolve_seed", "get_paper", "get_fulltext", "check_quotes",
+        }
         result = await client.call_tool("search", {"query": "melanoma", "sources": ["pubmed"]})
         assert not result.is_error
         assert result.structured_content["countsBySource"] == {"pubmed": 2}
 
         missing = await client.call_tool("get_paper", {"paper_id": "isbn:1"})
         assert missing.is_error
+
+
+async def test_fulltext_from_pmc_puts_methods_last_and_drops_back_matter(discovery):
+    result = await discovery.get_fulltext("pmid:500")
+
+    assert result["source"] == "pmc" and result["url"] == "https://pmc.ncbi.nlm.nih.gov/articles/PMC500/"
+    assert [s["title"] for s in result["sections"]] == ["Abstract", "Results", "Methods"]
+    # Figures are listed on their own, not left in the prose; subsections stay in their section.
+    assert result["sections"][1]["text"].startswith(
+        "We find that “TOX drives exhaustion” in tumours across patients. Spatial. Exhausted"
+    )
+    assert result["figures"] == [{"figureId": "F1", "label": "Figure 1", "caption": "TOX levels. Per patient."}]
+    assert not result["truncated"] and result["skipped"] == []
+
+    short = await discovery.get_fulltext("pmid:500", max_chars=2_000)
+    # No section takes over a sixth of the budget, and Methods come last, so they are what it drops.
+    assert short["truncated"] and short["omittedSections"] == []
+    assert [len(s["text"]) <= 2_000 // 6 + 2 for s in short["sections"]] == [True, True, True]
+    shortest = await discovery.get_fulltext("pmid:500", max_chars=600)
+    assert [s["title"] for s in shortest["sections"]] == ["Abstract", "Results"]
+    assert shortest["omittedSections"] == ["Methods"]
+
+
+async def test_fulltext_finds_the_pmcid_an_openalex_record_lacks(discovery):
+    discovery.store.save(Paper(ids={"openalex": "W1", "pmid": "500"}, title="Open access paper"))
+
+    result = await discovery.get_fulltext("openalex:W1")
+
+    assert result["source"] == "pmc" and result["paperId"] == "pmid:500"
+
+
+async def test_check_quotes_accepts_verbatim_passages_only(discovery):
+    result = await discovery.check_quotes(
+        "pmid:500",
+        [
+            'We find that "TOX drives exhaustion" in tumours',  # Straight quotes match curly ones.
+            "We find that TOX drives exhaustion in all tumours",
+            "We find that … across patients",
+        ],
+    )
+
+    assert [(q["verbatim"], q["section"]) for q in result["quotes"]] == [
+        (True, "Results"), (False, None), (False, None),
+    ]
+    assert result["quotes"][0]["link"] == (
+        "https://pmc.ncbi.nlm.nih.gov/articles/PMC500/"
+        "#:~:text=We%20find%20that%20%22TOX%20drives%20exhaustion%22%20in%20tumours"
+    )
+
+
+async def test_fulltext_falls_back_to_the_abstract(discovery):
+    # The DOI's landing page is tried through Tavily, which has no key here.
+    result = await discovery.get_fulltext("pmid:100")
+    assert result["source"] == "abstract" and result["url"] == "https://doi.org/10.1/similar"
+    assert result["sections"] == [{"title": "Abstract", "text": "About Similar paper"}]
+    assert result["skipped"] == ["web: TAVILY_API_KEY is not set (from https://app.tavily.com)"]
+
+    no_copy = await discovery.get_fulltext("pmid:200")
+    assert no_copy["source"] == "abstract" and no_copy["skipped"] == ["no PMC, arXiv or publisher copy is known"]
