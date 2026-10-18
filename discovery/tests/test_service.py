@@ -95,6 +95,17 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
         ]
         reply = {"role": "assistant", "content": json.dumps({"ranked": ranked})}
         return httpx.Response(200, json={"choices": [{"message": reply}]})
+    if path.endswith("/retrieval/nvidia/llama-nemotron-rerank-vl-1b-v2/reranking"):
+        body = json.loads(request.content)
+        assert request.headers["Authorization"] == "Bearer nvidia-key"
+        if body["query"]["text"] == "busy":
+            return httpx.Response(503, json={"detail": "busy"})
+        assert body["query"] == {"text": "T cell exhaustion"}
+        # The seed is never a passage: passage 0 is the similar paper, 1 the citing one.
+        assert [passage["text"].split("\n")[0] for passage in body["passages"]] == [
+            "Similar paper", "Citing paper"
+        ]
+        return httpx.Response(200, json={"rankings": [{"index": 1, "logit": 2.0}, {"index": 0, "logit": -1.0}]})
     return httpx.Response(404)
 
 
@@ -102,7 +113,8 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
 def discovery(monkeypatch):
     for name in (
         "OPENALEX_API_KEY", "TAVILY_API_KEY", "NCBI_API_KEY", "SEMANTIC_SCHOLAR_API_KEY",
-        "SUPER_VL_MODEL", "TF_BASE_URL",
+        "SUPER_VL_MODEL", "TF_BASE_URL", "RERANK_BACKEND", "NVIDIA_API_KEY", "NVIDIA_BASE_URL",
+        "RERANK_VL_MODEL",
     ):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("TF_API_KEY", "test-key")
@@ -170,6 +182,66 @@ async def test_rerank_without_candidates_skips_the_model(discovery):
     }
 
 
+async def test_rerank_vl_scores_each_candidate_against_the_goal(discovery, monkeypatch):
+    monkeypatch.setenv("RERANK_BACKEND", "rerank_vl")
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvidia-key")
+    seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
+
+    result = await discovery.rerank(
+        "T cell exhaustion", ["pmid:100", seed.paper_id, "pmid:200"], seed_ids=[seed.paper_id], k=5
+    )
+
+    # Logits become 0-to-1 scores; a pointwise model gives no reasons and drops nothing.
+    assert [(p["rank"], p["paperId"], p["score"], p["reason"]) for p in result["ranked"]] == [
+        (1, "pmid:200", 0.881, ""),
+        (2, "doi:10.1/similar", 0.269, ""),
+    ]
+    assert result["backend"] == "rerank_vl"
+    assert result["model"] == "nvidia/llama-nemotron-rerank-vl-1b-v2"
+    assert result["candidates"] == 2 and result["skipped"] == []
+
+
+async def test_rerank_backend_argument_wins_over_the_environment(discovery, monkeypatch):
+    monkeypatch.setenv("RERANK_BACKEND", "rerank_vl")
+    seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
+    result = await discovery.rerank(
+        "T cell exhaustion", ["pmid:100", "pmid:200"], seed_ids=[seed.paper_id], backend="super_vl"
+    )
+    assert result["backend"] == "super_vl" and result["skipped"] == []
+
+
+async def test_rerank_vl_falls_back_to_super_vl_without_a_key(discovery, monkeypatch):
+    monkeypatch.setenv("RERANK_BACKEND", "rerank_vl")
+    seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
+
+    result = await discovery.rerank(
+        "T cell exhaustion", ["pmid:100", "pmid:200"], seed_ids=[seed.paper_id]
+    )
+
+    assert result["backend"] == "super_vl"
+    assert [p["reason"] for p in result["ranked"]] == ["Cites the seed.", "Close to the seed."]
+    assert result["skipped"] == [
+        "rerank_vl: NVIDIA_API_KEY is not set (from https://build.nvidia.com); ranked with super_vl"
+    ]
+
+
+async def test_rerank_vl_falls_back_to_super_vl_when_the_request_fails(discovery, monkeypatch):
+    monkeypatch.setenv("NVIDIA_API_KEY", "nvidia-key")
+    seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
+    result = await discovery.rerank(
+        "busy", ["pmid:100", "pmid:200"], seed_ids=[seed.paper_id], backend="rerank_vl"
+    )
+    assert result["backend"] == "super_vl"
+    assert result["skipped"][0].startswith("rerank_vl: HTTPStatusError: Server error '503")
+    assert result["skipped"][0].endswith("; ranked with super_vl")
+
+
+async def test_rerank_rejects_an_unknown_backend(discovery, monkeypatch):
+    monkeypatch.setenv("RERANK_BACKEND", "cohere")
+    with pytest.raises(ValueError, match="RERANK_BACKEND"):
+        await discovery.rerank("anything", ["pmid:100"])
+
+
 def test_rerank_reply_parsing_survives_prose_and_cut_off_replies():
     whole = 'Sure {see below}: ```json\n{"ranked": [{"index": 2, "reason": "uses {braces}"}]}\n``` done.'
     assert rerank.parse(whole) == ([{"index": 2, "reason": "uses {braces}"}], True)
@@ -191,6 +263,8 @@ async def test_tools_over_mcp(discovery):
         assert tools == {
             "search", "find_candidates", "rerank", "resolve_seed", "get_paper", "get_fulltext", "check_quotes",
         }
+        rerank_tool = next(t for t in (await client.list_tools()).tools if t.name == "rerank")
+        assert "rerank_vl" in json.dumps(rerank_tool.input_schema["properties"]["backend"])
         result = await client.call_tool("search", {"query": "melanoma", "sources": ["pubmed"]})
         assert not result.is_error
         assert result.structured_content["countsBySource"] == {"pubmed": 2}
