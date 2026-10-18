@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>How it works · Missing Links</title>
+<meta name="description" content="A research board that finds the papers your search missed, and shows the sentence that backs every claim.">
+<link rel="icon" href="/favicon.ico">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shantell+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./landing.css">
+</head>
+<body data-page="learn">
+<header class="nav-wrap rule">
+  <nav class="nav">
+    <a class="logo" href="./index.html"><svg class="pp-logo" aria-hidden="true"><use href="#ppLogo"/></svg>Missing Links</a>
+    <span class="grow"></span>
+    <a class="on" href="./how-it-works.html" aria-current="page">How it works</a>
+    <a data-repo="">GitHub ↗</a>
+    <a class="btn sm primary" href="./index.html">Start a board</a>
+  </nav>
+</header>
+
+<main class="page">
+  <section class="lhero">
+    <h1>A research board that finds the papers your search missed</h1>
+    <p class="lead">Give Missing Links a question and a few papers you trust. An agent searches PubMed, preprints and citation links, puts each new paper on a shared board next to your work, and shows the sentence that backs every claim.</p>
+    <a class="btn primary" href="./index.html">Start a board →</a>
+    <a href="#v" data-video style="margin-left:12px;font-size:13.5px">Watch the 2-min demo</a>
+    <div class="pp-hero pp-surface" data-scene="hero"></div>
+  </section>
+
+  <section class="sec">
+    <div class="h2">How it works</div>
+    <div class="steps">
+      <div class="box step"><div class="n">1</div><b>Give it your starting point</b><p>A question and the papers you already trust.</p></div>
+      <div class="box step"><div class="n">2</div><b>The agent searches</b><p>PubMed, PMC, bioRxiv and journals through Tavily, plus citation links from PubMed, OpenAlex and Semantic Scholar.</p></div>
+      <div class="box step"><div class="n">3</div><b>New papers land on your board</b><p>Ranked for your goal and placed next to the papers they connect to.</p></div>
+      <div class="box step"><div class="n">4</div><b>You decide, it keeps going</b><p>Keep or discard. It searches around what you keep, and catches you up next time.</p></div>
+    </div>
+  </section>
+
+  <section class="sec">
+    <div class="h2">Every claim points to the sentence behind it</div>
+    <div class="proof">
+      <div class="pp-patch pp-surface"><div class="pp-flash">
+        <span class="pp-tape"></span>
+        <div class="kick"><span class="fd">●</span> High fit · New</div>
+        <b>Tumour-reactive heterotypic CD8 T cell clusters from clinical samples</b>
+        <div class="small">Ibáñez-Molero et al. · Nature · 2026</div>
+        <blockquote>“Single-cell RNA-sequencing analysis revealed that T cells from clusters were enriched for gene signatures associated with tumour reactivity and exhaustion.”</blockquote>
+        <div class="ev"><span class="okt">✓ In the abstract, word for word</span> · <a href="https://pubmed.ncbi.nlm.nih.gov/41261135/#:~:text=Single%2Dcell%20RNA%2Dsequencing%20analysis%20revealed,reactivity%20and%20exhaustion" target="_blank" rel="noopener">Open on PubMed ↗</a></div>
+      </div></div>
+      <ul class="bul">
+        <li><div><b>Checked word for word.</b> Every quote is matched against the source. If it isn’t there, the card says so.</div></li>
+        <li><div><b>One click to the source.</b> PubMed opens with the sentence highlighted.</div></li>
+        <li><div><b>Gaps are shown, not hidden.</b> Each paper lists what the agent couldn’t check.</div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sec" id="v" data-video>
+    <div class="h2">Watch the 2-minute demo</div>
+    <div id="videoSlot"></div>
+  </section>
+
+  <section class="sec">
+    <div class="h2">Built with</div>
+    <div class="built"><span>Nebius Token Factory</span><span>NVIDIA Nemotron</span><span>Tavily</span><span>Nebius Serverless</span><span>tldraw</span><span>Google ADK</span></div>
+    <div class="small" style="margin-top:10px">Nemotron 3.5 Super VL plans and ranks · Nemotron 3.5 Lightning reads and scores · Tavily finds and reads papers on the web</div>
+  </section>
+
+  <section class="cta">
+    <div class="h2">Try it on your own question</div>
+    <p class="lead" style="margin:0 0 16px">No account needed.</p>
+    <a class="btn primary" href="./index.html">Start a board →</a>
+  </section>
+</main>
+
+<footer class="footer"><span>Built at the Pre-GTC HCLS Hackathon · Berlin · 18 Oct 2026</span><span class="grow"></span><a data-repo="">GitHub ↗</a><a data-repo="#readme">README: run it yourself</a></footer>
+
+<script src="./config.js"></script>
+<script src="./api.js"></script>
+<script src="./landing.js"></script>
+</body>
+</html>

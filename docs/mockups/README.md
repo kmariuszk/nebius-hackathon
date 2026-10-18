@@ -1,6 +1,27 @@
 # Mockups
 
-## Current: v5, the paper splits into widgets
+## Current: v6, the pinboard look
+
+v5 with the approved pinboard design. Download [`flashcard-v6.html`](flashcard-v6.html) and open it in a browser (online, for the figures and the handwriting font). It works exactly like v5 below; only the look changed.
+
+- **Every paper is a card** that says what it is: "In your collection", or "Suggested · High fit" in words. Saved papers are pinned. New suggestions are taped up, with the agent's reading order in a red circle (it follows Looking for and the filters, and matches the ranked list).
+- **Status on the corner:** New, Split vote, Reading…, ✓ Kept, Discarded, Added by you, Not linked yet.
+- **Strings run pin to pin:** red for cites, a dotted thread for similar, blue for links people draw. They're faint at rest and light up for the card you point at.
+- **Clusters** are faint dotted areas, named on torn tape. Everything you could do with them in v5 still works.
+- **Notes** are handwritten. The agent's notes are red handwriting under new cards.
+- **The opened paper's hub** is the paper's own card, circled in red marker. "Why it matters to you" shows the rank and the fit in words instead of a colour bar.
+- **Pinboard** in the top bar switches the background from paper to cork. It always opens on paper.
+
+![v6 overview](shots-v6/1-overview.png)
+
+| | |
+|---|---|
+| ![An opened paper](shots-v6/2-open.png) | ![Hovering a suggestion](shots-v6/5-hover-suggestion.png) |
+| ![Looking for methods to reuse](shots-v6/6-goal-method.png) | ![Pinboard switched on](shots-v6/7-pinboard-on.png) |
+| ![The key](shots-v6/8-help-key.png) | ![Catch me up](shots-v6/15-catchup.png) |
+| ![List and chat open](shots-v6/16-list-chat.png) | ![Editing clusters](shots-v6/14-clusters-edited.png) |
+
+## Earlier: v5, the paper splits into widgets
 
 The same board as v4, but opening a paper no longer shows one card. The paper splits into widgets around its node. Download [`flashcard-v5.html`](flashcard-v5.html) and open it in a browser (online, for the figures). Everything else (the list, chat, filters, notes, links, Catch me up) works as in v4 below.
 

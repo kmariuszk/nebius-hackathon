@@ -1,4 +1,4 @@
-"""Tavily web search, restricted to sites whose URLs identify the paper.
+"""Tavily web search, restricted to sites whose URLs identify the paper, and page extraction.
 
 A web hit isn't a paper yet (docs/Concept.md, Search sources): the caller
 resolves each URL to a PMID, PMCID, DOI or arXiv ID before using it.
@@ -13,6 +13,7 @@ import httpx
 from discovery.sources import key
 
 URL = "https://api.tavily.com/search"
+EXTRACT_URL = "https://api.tavily.com/extract"
 
 # Sites where `papers.ids_from_url` can read the paper's identifier from the URL.
 DOMAINS = [
@@ -49,3 +50,12 @@ async def search(
         WebHit(url=hit["url"], title=hit.get("title", ""), content=hit.get("content", ""))
         for hit in response.json().get("results", [])
     ]
+
+
+async def extract(client: httpx.AsyncClient, url: str) -> str | None:
+    """The page's main text as markdown (Tavily Extract), or None if Tavily couldn't fetch it."""
+    headers = {"Authorization": f"Bearer {key('TAVILY_API_KEY', 'from https://app.tavily.com')}"}
+    response = await client.post(EXTRACT_URL, json={"urls": [url], "format": "markdown"}, headers=headers)
+    response.raise_for_status()
+    results = response.json().get("results", [])
+    return results[0].get("raw_content") if results else None
