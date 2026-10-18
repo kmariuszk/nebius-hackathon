@@ -1,45 +1,45 @@
 import assert from 'node:assert/strict'
-import { test } from 'node:test'
-import { applyVote, myVote, type VoteFields } from './votes.ts'
+import { afterEach, test } from 'node:test'
+import { ApiError } from '../api.ts'
+import { castVote, myVote } from './votes.ts'
 
-const fresh: VoteFields = { keepBy: [], discardBy: [], status: 'new', kind: 'suggestion' }
+// The vote rules themselves are tested with the server (server/triage.test.ts).
 
-test('keeping a suggestion moves it to the collection', () => {
-	assert.deepEqual(applyVote(fresh, 'm_me', 'keep'), { keepBy: ['m_me'], discardBy: [], status: 'kept', kind: 'kept' })
+const realFetch = globalThis.fetch
+afterEach(() => {
+	globalThis.fetch = realFetch
 })
 
-test('discarding marks it discarded', () => {
-	assert.deepEqual(applyVote(fresh, 'm_me', 'discard'), {
-		keepBy: [],
-		discardBy: ['m_me'],
-		status: 'discarded',
-		kind: 'suggestion',
-	})
+function fakeFetch(status: number, body: unknown) {
+	const calls: { url: string; init: RequestInit }[] = []
+	globalThis.fetch = async (url, init) => {
+		calls.push({ url: String(url), init: init ?? {} })
+		return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
+	}
+	return calls
+}
+
+test('myVote reads this member’s vote off the card', () => {
+	const props = { keepBy: ['m_ana'], discardBy: ['m_igor'] }
+	assert.equal(myVote(props, 'm_ana'), 'keep')
+	assert.equal(myVote(props, 'm_igor'), 'discard')
+	assert.equal(myVote(props, 'm_ralph'), null)
 })
 
-test('votes both ways make it contested, and it stays a suggestion', () => {
-	const kept = applyVote(fresh, 'm_ana', 'keep')
-	const split = applyVote(kept, 'm_igor', 'discard')
-	assert.equal(split.status, 'contested')
-	assert.equal(split.kind, 'suggestion')
-	assert.deepEqual(myVote(split, 'm_ana'), 'keep')
-	assert.deepEqual(myVote(split, 'm_igor'), 'discard')
-	assert.equal(myVote(split, 'm_ralph'), null)
+test('castVote sends the vote to the board service and returns the previous one for Undo', async () => {
+	const calls = fakeFetch(200, { status: 'contested', keepBy: ['m_ana'], discardBy: ['m_me'] })
+	const before = await castVote('b1', { paperId: 'doi:10.1/x', keepBy: ['m_ana', 'm_me'], discardBy: [] }, 'm_me', 'discard')
+	assert.equal(before, 'keep')
+	assert.equal(calls[0].url, '/api/v1/boards/b1/papers/doi%3A10.1%2Fx/vote')
+	assert.equal(calls[0].init.method, 'PUT')
+	assert.equal((calls[0].init.headers as Record<string, string>).authorization, 'Bearer m_me')
+	assert.deepEqual(JSON.parse(String(calls[0].init.body)), { decision: 'discard' })
 })
 
-test('changing your vote replaces it; taking it back (Undo) restores the card', () => {
-	const kept = applyVote(fresh, 'm_me', 'keep')
-	assert.deepEqual(applyVote(kept, 'm_me', 'discard').keepBy, [])
-	assert.deepEqual(applyVote(kept, 'm_me', null), fresh)
-})
-
-test('Undo leaves other people’s votes alone', () => {
-	const ana = applyVote(fresh, 'm_ana', 'keep')
-	const both = applyVote(ana, 'm_me', 'discard')
-	assert.deepEqual(applyVote(both, 'm_me', null), ana)
-})
-
-test('seeds stay seeds', () => {
-	const seed: VoteFields = { ...fresh, kind: 'seed', status: 'kept' }
-	assert.equal(applyVote(seed, 'm_me', 'discard').kind, 'seed')
+test('a vote the board service refuses is an ApiError with its code', async () => {
+	fakeFetch(404, { error: { code: 'not_found', message: 'No card for pmid:1 on this board' } })
+	await assert.rejects(
+		castVote('b1', { paperId: 'pmid:1', keepBy: [], discardBy: [] }, 'm_me', 'keep'),
+		(e: ApiError) => e instanceof ApiError && e.status === 404 && e.code === 'not_found' && /No card/.test(e.message)
+	)
 })
