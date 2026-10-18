@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master agent chat</title>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<style>
+  :root {
+    --bg: #f7f7f5; --panel: #fff; --ink: #1d1d1b; --muted: #6b6b66; --line: #e3e3de;
+    --accent: #3b5bdb; --user: #eef1fd; --step: #fafaf8; --err: #c92a2a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #161615; --panel: #1f1f1d; --ink: #ececea; --muted: #9a9a94; --line: #33332f;
+      --accent: #8ea4ff; --user: #252a3d; --step: #1b1b19; --err: #ff8787;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.55 system-ui, sans-serif; }
+  header { padding: 12px 16px; border-bottom: 1px solid var(--line); display: flex; gap: 12px; align-items: baseline; }
+  header h1 { font-size: 15px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  header button { margin-left: auto; }
+  main { max-width: 860px; margin: 0 auto; padding: 16px 16px 140px; }
+  .msg { margin: 14px 0; }
+  .user { background: var(--user); padding: 10px 14px; border-radius: 10px; white-space: pre-wrap; }
+  .agent { background: var(--panel); border: 1px solid var(--line); padding: 10px 14px; border-radius: 10px; }
+  .agent p:first-child { margin-top: 0; } .agent p:last-child { margin-bottom: 0; }
+  .agent a { color: var(--accent); }
+  details.step { background: var(--step); border: 1px solid var(--line); border-radius: 8px; margin: 6px 0; font-size: 13px; }
+  details.step summary { cursor: pointer; padding: 6px 10px; color: var(--muted); }
+  details.step summary b { color: var(--ink); font-weight: 600; }
+  details.step pre { margin: 0; padding: 8px 10px; overflow-x: auto; white-space: pre-wrap; word-break: break-word; max-height: 420px; border-top: 1px solid var(--line); }
+  .status { color: var(--muted); font-size: 13px; }
+  .error { color: var(--err); white-space: pre-wrap; }
+  form { position: fixed; bottom: 0; left: 0; right: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 12px 16px; }
+  form div { max-width: 860px; margin: 0 auto; display: flex; gap: 8px; }
+  textarea { flex: 1; resize: vertical; min-height: 56px; padding: 8px 10px; font: inherit; color: inherit; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+  button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: inherit; cursor: pointer; }
+  button[type=submit] { background: var(--accent); color: #fff; border: none; }
+  button:disabled { opacity: .5; cursor: default; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Master agent</h1>
+  <span>Super VL · search agents on Lightning · rerank on Super VL</span>
+  <button id="reset" type="button">New chat</button>
+</header>
+<main id="log">
+  <p class="status">Ask for papers, e.g. “T cell exhaustion in melanoma and anti-PD-1 resistance. Seed: doi 10.1038/s41586-021-03704-y. Find me 8 new papers.” A first answer takes about two minutes; the steps show up as they happen.</p>
+</main>
+<form id="form">
+  <div>
+    <textarea id="input" placeholder="Message the master agent (Enter to send, Shift+Enter for a new line)" autofocus></textarea>
+    <button type="submit" id="send">Send</button>
+  </div>
+</form>
+<script>
+const log = document.getElementById("log");
+const form = document.getElementById("form");
+const input = document.getElementById("input");
+const send = document.getElementById("send");
+let sessionId = null;
+
+document.getElementById("reset").onclick = () => {
+  sessionId = null;
+  log.innerHTML = '<p class="status">New chat.</p>';
+};
+
+input.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+});
+
+function add(tag, cls, text) {
+  const el = document.createElement(tag);
+  if (cls) el.className = cls;
+  if (text !== undefined) el.textContent = text;
+  log.appendChild(el);
+  window.scrollTo(0, document.body.scrollHeight);
+  return el;
+}
+
+function step(summaryHtml, body) {
+  const d = add("details", "step");
+  d.innerHTML = `<summary>${summaryHtml}</summary>`;
+  const pre = document.createElement("pre");
+  pre.textContent = typeof body === "string" ? body : JSON.stringify(body, null, 2);
+  d.appendChild(pre);
+  return d;
+}
+
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+// Tool results arrive in different wrappers: the search agent's JSON text, or an MCP result.
+function unwrap(result) {
+  if (result?.structuredContent) return result.structuredContent;
+  const text = result?.result ?? result?.content?.[0]?.text;
+  if (typeof text !== "string") return result;
+  const start = text.indexOf("{"), end = text.lastIndexOf("}");
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return text; }
+}
+
+function describeCall(name, args) {
+  if (name === "search") return `<b>search agent</b> ${esc(args.request ?? "")}`;
+  if (name === "rerank") return `<b>rerank</b> ${args.paper_ids?.length ?? 0} candidates, k=${args.k ?? 20}`;
+  return `<b>${esc(name)}</b> ${esc(JSON.stringify(args))}`;
+}
+
+function describeResult(name, data) {
+  if (name === "search" && data?.candidateIds) return `<b>search agent</b> → ${data.candidateIds.length} candidates for “${esc(data.subQuery ?? "")}”`;
+  if (name === "rerank" && data?.ranked) return `<b>rerank</b> → ${data.ranked.length} ranked of ${data.candidates ?? "?"} by ${esc(data.model ?? "")} in ${data.seconds ?? "?"} s`;
+  if (name === "resolve_seed" && data?.title) return `<b>resolve_seed</b> → ${esc(data.paperId)} ${esc(data.title)}`;
+  if (name === "get_paper" && data?.title) return `<b>get_paper</b> → ${esc(data.title)}`;
+  return `<b>${esc(name)}</b> → result`;
+}
+
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  send.disabled = true;
+  add("div", "msg user", text);
+  const status = add("p", "status", "Thinking…");
+  const started = Date.now();
+  const timer = setInterval(() => { status.textContent = `Working… ${Math.round((Date.now() - started) / 1000)} s`; }, 1000);
+  let answer = null, answerText = "";
+
+  try {
+    const response = await fetch("/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, session_id: sessionId }),
+    });
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let nl;
+      while ((nl = buffer.indexOf("\n")) >= 0) {
+        const line = buffer.slice(0, nl); buffer = buffer.slice(nl + 1);
+        if (!line.trim()) continue;
+        const ev = JSON.parse(line);
+        if (ev.type === "session") sessionId = ev.id;
+        else if (ev.type === "call") { step(`${ev.at}s · ${describeCall(ev.name, ev.args)}`, ev.args); answer = null; }
+        else if (ev.type === "result") { const data = unwrap(ev.result); step(`${ev.at}s · ${describeResult(ev.name, data)}`, data); answer = null; }
+        else if (ev.type === "thought") step(`${ev.at}s · <b>thinking</b>`, ev.text);
+        else if (ev.type === "text") {
+          if (!answer) { answer = add("div", "msg agent"); answerText = ""; }
+          answerText += ev.text;
+          answer.innerHTML = DOMPurify.sanitize(marked.parse(answerText));
+          answer.querySelectorAll("a").forEach((a) => { a.target = "_blank"; a.rel = "noopener"; });
+        }
+        else if (ev.type === "error") add("p", "error", ev.text);
+        else if (ev.type === "done") status.textContent = `Done in ${ev.at} s`;
+        log.appendChild(status);
+        window.scrollTo(0, document.body.scrollHeight);
+      }
+    }
+  } catch (err) {
+    add("p", "error", String(err));
+  } finally {
+    clearInterval(timer);
+    send.disabled = false;
+    input.focus();
+  }
+});
+</script>
+</body>
+</html>

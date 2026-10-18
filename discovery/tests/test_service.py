@@ -64,13 +64,32 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
         assert json.loads(request.content)["positivePaperIds"] == ["DOI:10.1038/s41586-021-03704-y"]
         paper = {"paperId": "abc", "title": "Recommended paper", "externalIds": {"DOI": "10.1/similar"}}
         return httpx.Response(200, json={"recommendedPapers": [paper]})
+    if path.endswith("/chat/completions"):
+        body = json.loads(request.content)
+        assert body["model"] == "nvidia/Nemotron-3.5-Super-VL"
+        prompt = body["messages"][1]["content"]
+        # The seed is context, not a candidate: candidate 1 is the similar paper, 2 the citing one.
+        assert "[S1] " in prompt
+        assert "[1] Similar paper" in prompt and "[2] Citing paper" in prompt and "[3]" not in prompt
+        ranked = [
+            {"index": 2, "score": 0.9, "reason": "Cites the seed."},
+            {"index": 99, "score": 0.8, "reason": "Invented."},
+            {"index": 2, "score": 0.7, "reason": "Repeated."},
+            {"index": 1, "score": 0.4, "reason": "Close to the seed."},
+        ]
+        reply = {"role": "assistant", "content": json.dumps({"ranked": ranked})}
+        return httpx.Response(200, json={"choices": [{"message": reply}]})
     return httpx.Response(404)
 
 
 @pytest.fixture
 def discovery(monkeypatch):
-    for name in ("OPENALEX_API_KEY", "TAVILY_API_KEY", "NCBI_API_KEY", "SEMANTIC_SCHOLAR_API_KEY"):
+    for name in (
+        "OPENALEX_API_KEY", "TAVILY_API_KEY", "NCBI_API_KEY", "SEMANTIC_SCHOLAR_API_KEY",
+        "SUPER_VL_MODEL", "TF_BASE_URL",
+    ):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("TF_API_KEY", "test-key")
     monkeypatch.setattr("discovery.sources.pubmed._throttle.interval", 0)
     monkeypatch.setattr("discovery.sources.semantic_scholar._throttle.interval", 0)
     return Discovery(httpx.AsyncClient(transport=httpx.MockTransport(fake_apis)), Store())
@@ -100,10 +119,36 @@ async def test_find_candidates_merges_strategies_and_drops_seeds(discovery):
     assert (await discovery.get_paper("pmid:100")).title == "Similar paper"
 
 
+async def test_rerank_ranks_candidates_once_with_the_seeds_as_context(discovery):
+    seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
+
+    result = await discovery.rerank(
+        "T cell exhaustion",
+        # pmid:100 and its DOI are one paper; the seed is never ranked; isbn:1 is not an ID kind.
+        ["pmid:100", "doi:10.1/similar", seed.paper_id, "pmid:200", "isbn:1"],
+        seed_ids=[seed.paper_id],
+        k=5,
+    )
+
+    # Invented and repeated candidate numbers are dropped.
+    assert [(p["rank"], p["paperId"], p["reason"]) for p in result["ranked"]] == [
+        (1, "pmid:200", "Cites the seed."),
+        (2, "doi:10.1/similar", "Close to the seed."),
+    ]
+    assert result["ranked"][0]["title"] == "Citing paper"
+    assert result["backend"] == "super_vl" and result["candidates"] == 2
+    assert [note.split(":")[0] for note in result["skipped"]] == ["candidate isbn"]
+
+
+async def test_rerank_without_candidates_skips_the_model(discovery):
+    result = await discovery.rerank("anything", [])
+    assert result["ranked"] == [] and result["skipped"] == ["no candidates to rank"]
+
+
 async def test_tools_over_mcp(discovery):
     async with Client(build_server(discovery)) as client:
         tools = {tool.name for tool in (await client.list_tools()).tools}
-        assert tools == {"search", "find_candidates", "resolve_seed", "get_paper"}
+        assert tools == {"search", "find_candidates", "rerank", "resolve_seed", "get_paper"}
         result = await client.call_tool("search", {"query": "melanoma", "sources": ["pubmed"]})
         assert not result.is_error
         assert result.structured_content["countsBySource"] == {"pubmed": 2}

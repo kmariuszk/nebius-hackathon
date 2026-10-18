@@ -63,9 +63,23 @@ class FakePapers:
             return {"candidateIds": ["pmid:2"], "countsByStrategy": {"pubmed_links": 1}, "skipped": []}
 
         @self.server.tool()
-        async def rerank(paper_ids: list[str]) -> list[str]:
+        async def resolve_seed(doi: str | None = None, pmid: str | None = None) -> dict[str, Any]:
+            self.calls.append(("resolve_seed", {"doi": doi, "pmid": pmid}))
+            return {"paperId": f"doi:{doi}", "title": "Seed paper"}
+
+        @self.server.tool()
+        async def get_paper(paper_id: str) -> dict[str, Any]:
+            self.calls.append(("get_paper", {"paper_id": paper_id}))
+            return {"paperId": paper_id, "title": "Single-cell melanoma atlas", "abstract": "We map T cells."}
+
+        @self.server.tool()
+        async def rerank(
+            goal: str, paper_ids: list[str], seed_ids: list[str] | None = None, k: int = 20
+        ) -> dict[str, Any]:
             """Not one of the search agent's tools, so it must never see it."""
-            return paper_ids
+            self.calls.append(("rerank", {"goal": goal, "paper_ids": paper_ids, "seed_ids": seed_ids, "k": k}))
+            ranked = [{"rank": 1, "paperId": "pmid:1", "title": "Single-cell melanoma atlas", "reason": "Same cells."}]
+            return {"ranked": ranked, "backend": "super_vl", "skipped": []}
 
 
 @pytest.fixture

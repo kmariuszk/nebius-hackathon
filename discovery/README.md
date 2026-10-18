@@ -15,10 +15,11 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | --- | --- | --- |
 | `search` | `query`, `limit`, `sources` (pubmed, openalex, web), `since` | `papers` (summaries with `foundBy`), `countsBySource`, `skipped` |
 | `find_candidates` | `seed_ids`, `exclude_ids`, `strategies` (pubmed_links, citing, recommend, keyword, web), `since`, `limit`, `query` | `candidateIds` (found by most strategies first), `countsByStrategy`, `skipped` |
+| `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `k` | `ranked` (summary, `rank`, `score`, `reason`), `model`, `seconds`, `candidates`, `skipped` |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
 
-Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Scoring, rerank, clustering, full text and figures from `docs/Concept.md` are still to come.
+Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. `rerank` sends one listwise request to Nemotron 3.5 Super VL on Token Factory with every candidate's and seed's title and abstract, and takes about 30 seconds for 60 candidates. Scoring, clustering, full text and figures from `docs/Concept.md` are still to come.
 
 ## Sources
 
@@ -29,3 +30,4 @@ Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PM
 | Semantic Scholar | Recommendations from the seeds, steered away from excluded papers | Optional `SEMANTIC_SCHOLAR_API_KEY` |
 | Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv; each hit is resolved to a paper ID | `TAVILY_API_KEY` |
 | arXiv | Records for arXiv hits | None |
+| Token Factory | `rerank` with Super VL | `TF_API_KEY` |

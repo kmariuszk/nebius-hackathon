@@ -21,8 +21,9 @@ PAPERS_URL = "http://127.0.0.1:8001/mcp"
 TAVILY_URL = "https://mcp.tavily.com/mcp/"
 
 # Seconds to wait for one HTTP response. Papers tools call several scholarly
-# APIs in a row, so this is well above the MCP client's 5-second default.
-TIMEOUT = 120.0
+# APIs in a row, and `rerank` has Super VL read up to 100 abstracts, so this
+# is well above the MCP client's 5-second default.
+TIMEOUT = 300.0
 
 
 def papers(*tool_names: str) -> McpToolset:
