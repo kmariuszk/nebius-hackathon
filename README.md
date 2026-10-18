@@ -1,6 +1,10 @@
-# nebius-hackathon
+# Research Canvas
 
-Research canvas for the Nebius hackathon.
+A multiplayer canvas where researchers and AI agents find, rank, and discuss papers together in real time. Drop in a seed paper or a question, and the agent populates the board with scored, clustered results — live, alongside your team — while you keep exploring, voting, and chatting over the same shared board. Built on tldraw for the canvas and Nemotron models (via Nebius Token Factory) for the agents.
+
+**Try it:** run the client below, open a board, click **Chat**, and ask the agent to find papers on a topic.
+
+## Architecture
 
 - `client/`: the canvas app, from tldraw's Multiplayer starter kit ([tldraw-sync-cloudflare](https://github.com/tldraw/tldraw-sync-cloudflare)), with tldraw installed from npm and the Cloudflare Worker ported to a plain Node server so it can run on a Nebius VM.
   - `client/client/`: the React frontend. Each URL path is a room, so everyone on `/<room>` shares one live board with cursors and presence.
