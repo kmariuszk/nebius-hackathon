@@ -1,0 +1,618 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Search and Rerank</title>
+<style>
+  :root {
+    --bg:#f5f4ef; --surface:#fff; --ink:#1c1c1e; --muted:#5d6066; --line:#e2e0d8;
+    --accent:#2f55d4; --accent-soft:#e9eefc;
+    --pm:#2f6fd4; --oa:#d97a1f; --web:#1f9a6a; --s2:#8a4fd1;
+    --good:#1f9a6a; --good-soft:#e2f4ec; --bad:#c8402f; --bad-soft:#fbe7e3; --hot:#f2c94c; --hot-soft:#fdf5d8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131315; --surface:#1c1c20; --ink:#ececef; --muted:#a2a3ab; --line:#2d2d33;
+      --accent:#84a0ff; --accent-soft:#222a45;
+      --pm:#6f9bff; --oa:#f0a052; --web:#4fc79a; --s2:#b58cf0;
+      --good:#4fc79a; --good-soft:#173329; --bad:#ff7a66; --bad-soft:#3a1d19; --hot:#e8c25a; --hot-soft:#3a3218;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131315; --surface:#1c1c20; --ink:#ececef; --muted:#a2a3ab; --line:#2d2d33;
+    --accent:#84a0ff; --accent-soft:#222a45;
+    --pm:#6f9bff; --oa:#f0a052; --web:#4fc79a; --s2:#b58cf0;
+    --good:#4fc79a; --good-soft:#173329; --bad:#ff7a66; --bad-soft:#3a1d19; --hot:#e8c25a; --hot-soft:#3a3218;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  .page { max-width:880px; margin:0 auto; padding:44px 24px 64px; }
+  .eyebrow { font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--muted); margin:0 0 10px; }
+  h1 { font:600 40px/1.1 ui-serif, Georgia, serif; margin:0 0 14px; }
+  .lede { font-size:18px; max-width:760px; margin:0 0 22px; }
+  code { font:12.5px ui-monospace, SFMono-Regular, Menlo, monospace; background:var(--accent-soft); padding:1px 5px; border-radius:5px; }
+  .pill { display:inline-block; font-size:11px; font-weight:600; letter-spacing:.05em; text-transform:uppercase; padding:2px 8px; border-radius:99px; vertical-align:middle; }
+  .pill.built { background:var(--good-soft); color:var(--good); }
+  .pill.planned { background:var(--hot-soft); color:var(--ink); border:1px dashed var(--hot); }
+  .map { display:grid; grid-template-columns:repeat(auto-fill, minmax(190px, 1fr)); gap:8px; margin:0 0 30px; padding:0; list-style:none; counter-reset:m; }
+  .map li { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:9px 12px; font-size:13.5px; counter-increment:m; }
+  .map li a { color:var(--ink); text-decoration:none; font-weight:600; }
+  .map li a::before { content:counter(m) ". "; color:var(--accent); }
+  .map li .pill { margin-top:4px; }
+  .toy { background:var(--accent-soft); border-radius:12px; padding:14px 16px; font-size:14.5px; margin:0 0 30px; }
+  section.card { background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:24px; margin-bottom:24px; scroll-margin-top:16px; }
+  section.card h2 { font-size:22px; margin:0 0 6px; }
+  .where { font-size:13px; color:var(--muted); margin:0 0 14px; }
+  .intro { margin:0 0 14px; max-width:720px; }
+  h3.part { font:600 26px/1.2 ui-serif, Georgia, serif; margin:40px 0 14px; }
+
+  /* Scene: a stage of moving pieces, a caption and step controls. */
+  .stage { position:relative; overflow:hidden; background:var(--bg); border:1px solid var(--line); border-radius:12px; }
+  .stage.square { aspect-ratio:1; max-width:460px; margin:0 auto; }
+  .cap { min-height:5.2em; margin:12px 2px 10px; font-size:15px; }
+  .cap b { color:var(--accent); }
+  .ctrl { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .ctrl button { font:inherit; font-size:14px; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:9px; padding:6px 13px; cursor:pointer; }
+  .ctrl button:hover:not(:disabled) { border-color:var(--accent); }
+  .ctrl button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .ctrl button.primary { background:var(--accent); color:var(--surface); border-color:var(--accent); }
+  .ctrl button:disabled { opacity:.4; cursor:default; }
+  .ctrl .count { font-size:13px; color:var(--muted); margin-left:auto; }
+  .dots { display:flex; gap:5px; }
+  .dots i { width:7px; height:7px; border-radius:50%; background:var(--line); }
+  .dots i.on { background:var(--accent); }
+
+  .it { position:absolute; transform:translate(-50%,-50%); transition:left .6s ease, top .6s ease, width .6s ease, height .6s ease, opacity .5s ease, transform .6s ease, background-color .3s, border-color .3s, color .3s; }
+  .it.la { transform:translate(0,-50%); }
+  .hdr { font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--muted); white-space:nowrap; }
+  .hdr.wrap { white-space:normal; text-align:center; line-height:1.25; }
+  .tile { background:var(--surface); border:1px solid var(--line); border-left:4px solid var(--line); border-radius:8px; padding:5px 8px; font-size:12.5px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 1px 2px rgb(0 0 0 / .05); }
+  .tile b { font-weight:700; }
+  .tile.multi { white-space:normal; padding:8px 10px; }
+  .tile.multi code { font-size:11px; }
+  .tile.pm { border-left-color:var(--pm); } .tile.oa { border-left-color:var(--oa); }
+  .tile.web { border-left-color:var(--web); } .tile.s2 { border-left-color:var(--s2); }
+  .tile.out { border-left-color:var(--accent); }
+  .tile.hot { border-color:var(--hot); background:var(--hot-soft); }
+  .tile.good { border-color:var(--good); background:var(--good-soft); }
+  .tile.strike { background:var(--bad-soft); border-color:var(--bad); text-decoration:line-through; color:var(--muted); }
+  .tile.seed { border-left-color:var(--ink); font-weight:600; }
+  .tile:has(.tags, .x, .gain) { padding-right:40px; }
+  .tags, .x, .gain { position:absolute; right:7px; top:50%; transform:translateY(-50%); }
+  .t { display:inline-block; width:8px; height:8px; border-radius:50%; margin-left:2px; vertical-align:middle; }
+  .t.pm { background:var(--pm); } .t.oa { background:var(--oa); } .t.web { background:var(--web); }
+  .t.pl { background:var(--pm); } .t.ci { background:var(--oa); } .t.rec { background:var(--s2); }
+  .x { font-weight:700; color:var(--accent); }
+  .gain { color:var(--good); font-weight:700; }
+  .bar { height:24px; border-radius:6px; background:var(--accent); color:var(--surface); font-size:12px; font-weight:600; padding:0 8px; line-height:24px; white-space:nowrap; overflow:visible; }
+  .bar.alt { background:var(--oa); } .bar.alt2 { background:var(--good); }
+  .line { height:0; border-top:2px dashed var(--bad); }
+  .line.ok { border-color:var(--good); }
+  .note { font-size:11.5px; color:var(--muted); white-space:nowrap; }
+  .note.bad { color:var(--bad); font-weight:600; } .note.good { color:var(--good); font-weight:600; }
+  .chip { background:var(--surface); border:1px solid var(--line); border-radius:99px; padding:3px 10px; font-size:12px; white-space:nowrap; }
+  .chip.hot { background:var(--hot-soft); border-color:var(--hot); }
+  .chip.good { background:var(--good-soft); border-color:var(--good); color:var(--good); font-weight:600; }
+  .chip.bad { background:var(--bad-soft); border-color:var(--bad); color:var(--bad); font-weight:600; }
+  .step { background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:7px 12px; font-size:13px; white-space:normal; line-height:1.35; }
+  .step .who { display:inline-block; min-width:76px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .step.hot { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+  .step.end { border-color:var(--good); background:var(--good-soft); }
+  .ring { aspect-ratio:1; border-radius:50%; border:1.5px dashed var(--accent); opacity:.7; }
+  .dot { aspect-ratio:1; border-radius:50%; background:var(--accent); }
+  .dot.sq { border-radius:3px; background:var(--ink); }
+  .dot.q { background:var(--hot); border:2px solid var(--ink); }
+  .dot.bad { background:var(--bad); } .dot.good { background:var(--good); }
+  .dot .dl { position:absolute; left:140%; top:50%; transform:translateY(-50%); font-size:11.5px; white-space:nowrap; color:var(--ink); font-weight:600; }
+  .dot .dl.l { left:auto; right:140%; }
+  .box { border:2px dashed var(--accent); border-radius:14px; background:var(--accent-soft); }
+  .box .hdr { position:absolute; top:6px; left:12px; color:var(--accent); }
+  .abs { background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:12.5px; line-height:1.45; white-space:normal; }
+  .abs mark { background:var(--hot-soft); color:inherit; border-bottom:2px solid var(--hot); padding:0 1px; }
+  .abs .verdict { display:block; margin-top:4px; font-weight:700; font-size:12px; }
+  .abs .verdict.ok { color:var(--good); } .abs .verdict.no { color:var(--bad); }
+  .zap { font-size:11px; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:6px; padding:3px 6px; white-space:nowrap; }
+  .score { font-size:12px; font-weight:700; border-radius:6px; padding:3px 6px; white-space:nowrap; }
+  .score.hi { background:var(--good-soft); color:var(--good); } .score.lo { background:var(--bad-soft); color:var(--bad); }
+  .why { font-size:12px; font-style:italic; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+  .funnel { display:flex; flex-direction:column; gap:6px; margin:10px 0 0; }
+  .funnel div { margin:0 auto; text-align:center; background:var(--accent-soft); border-radius:8px; padding:8px 10px; font-size:13.5px; }
+  .funnel div:nth-child(1) { width:100%; } .funnel div:nth-child(2) { width:88%; } .funnel div:nth-child(3) { width:76%; }
+  .funnel div:nth-child(4) { width:64%; } .funnel div:nth-child(5) { width:52%; } .funnel div:nth-child(6) { width:40%; background:var(--accent); color:var(--surface); }
+  table { border-collapse:collapse; width:100%; font-size:14px; margin-top:8px; }
+  th, td { text-align:left; padding:8px 10px; border-top:1px solid var(--line); vertical-align:top; }
+  th { color:var(--muted); font-weight:600; font-size:12px; text-transform:uppercase; letter-spacing:.05em; }
+  .tablewrap { overflow-x:auto; }
+  footer { font-size:12.5px; color:var(--muted); margin-top:10px; }
+  @media (prefers-reduced-motion: reduce) { .it { transition:none; } }
+  @media (max-width:560px) {
+    .page { padding:28px 16px 48px; } h1 { font-size:30px; } .lede { font-size:16px; }
+    section.card { padding:18px 14px; } .tile { font-size:11px; padding:4px 5px; } .step { font-size:12px; }
+    .dot .dl, .note, .why { font-size:10px; } .cap { font-size:14px; }
+  }
+</style>
+</head>
+<body>
+<main class="page">
+  <p class="eyebrow">Paper Discovery Canvas · how it works</p>
+  <h1>How search and rerank work</h1>
+  <p class="lede">From "a researcher asks a question" to "a ranked board of papers", one small step at a time. Each box below is a tiny animation: press <b>Next</b> and watch what happens to a handful of toy papers.</p>
+
+  <div class="toy"><b>The toy example used throughout.</b> Question: <i>"Which exhausted CD8 T-cell states predict response to immunotherapy in melanoma?"</i> Two seed papers the researcher already trusts, <b>S1</b> and <b>S2</b>. Candidate papers get letters (A, B, P, Q…). IDs, titles and scores are made up so the arithmetic is easy to follow; the rules are the real ones.</div>
+
+  <ul class="map">
+    <li><a href="#ids">One paper, many names</a><br><span class="pill built">built</span></li>
+    <li><a href="#rr">Taking turns (round robin)</a><br><span class="pill built">built</span></li>
+    <li><a href="#links">Expanding from seeds</a><br><span class="pill built">built</span></li>
+    <li><a href="#votes">Strategies vote</a><br><span class="pill built">built</span></li>
+    <li><a href="#agent">The search agent</a><br><span class="pill built">built</span></li>
+    <li><a href="#embed">Meaning space</a><br><span class="pill planned">planned</span></li>
+    <li><a href="#cites">Shared references</a><br><span class="pill planned">planned</span></li>
+    <li><a href="#verdict">An LLM reads each one</a><br><span class="pill planned">planned</span></li>
+    <li><a href="#rerank">Listwise rerank</a><br><span class="pill planned">planned</span></li>
+  </ul>
+
+  <h3 class="part">Part 1 · Finding candidates (built today)</h3>
+  <p class="intro">Part 1 is about <b>recall</b>: cast a wide net and don't lose anything. Nothing here judges whether a paper is actually good. It just collects, deduplicates and orders by cheap signals. The code is in <code>discovery/</code>, served as the papers MCP.</p>
+
+  <section class="card" id="ids">
+    <h2>1 · One paper, many names</h2>
+    <p class="where"><span class="pill built">built</span> <code>discovery/discovery/store.py:37</code> · <code>papers.py:16</code></p>
+    <p class="intro">Before anything else: the same paper arrives from different sources under different IDs. If we didn't fix that, every count and ranking after this would be wrong.</p>
+    <div class="scene" data-scene="ids" data-h="300"></div>
+  </section>
+
+  <section class="card" id="rr">
+    <h2>2 · Taking turns: merging ranked lists</h2>
+    <p class="where"><span class="pill built">built</span> <code>discovery/discovery/service.py:253</code> (<code>_round_robin</code>) · <code>service.py:37</code> (<code>search</code>)</p>
+    <p class="intro"><code>search(query)</code> asks PubMed, OpenAlex and the web (Tavily) at the same time. Each answers with its own ranked list. How do you combine three lists when their scores mean different things?</p>
+    <div class="scene" data-scene="rr" data-h="320"></div>
+  </section>
+
+  <section class="card" id="links">
+    <h2>3 · Expanding from seeds: counting links</h2>
+    <p class="where"><span class="pill built">built</span> <code>discovery/discovery/service.py:189</code> (<code>_pubmed_links</code>, the formula is on line 206)</p>
+    <p class="intro">Keywords miss papers that use different words. Seeds don't have that problem: a paper that cites your seed, is cited by it, or that PubMed calls "similar" is related however it's worded.</p>
+    <div class="scene" data-scene="links" data-h="330"></div>
+  </section>
+
+  <section class="card" id="votes">
+    <h2>4 · Strategies vote</h2>
+    <p class="where"><span class="pill built">built</span> <code>discovery/discovery/service.py:57</code> (<code>find_candidates</code>, sort on line 100)</p>
+    <p class="intro"><code>find_candidates(seeds)</code> runs several independent strategies: the PubMed links from step 3, OpenAlex papers that cite the seeds, and Semantic Scholar recommendations. Then it combines them.</p>
+    <div class="scene" data-scene="votes" data-h="320"></div>
+  </section>
+
+  <section class="card" id="agent">
+    <h2>5 · The search agent drives the tools</h2>
+    <p class="where"><span class="pill built">built</span> <code>harness/harness/agents/search/agent.py</code> (the <code>done</code> tool is on branch <code>fix/search-agent-done</code>) · the master agent that calls it is <span class="pill planned">planned</span></p>
+    <p class="intro">Steps 1–4 are plain code. A small, fast model (Nemotron Lightning) decides which of them to call for one sub-query. It has a strict budget and only one way to stop.</p>
+    <div class="scene" data-scene="agent" data-h="330"></div>
+  </section>
+
+  <h3 class="part">Part 2 · Scoring and reranking (designed, not built yet)</h3>
+  <p class="intro">Part 2 is about <b>precision</b>: out of a few hundred candidates, which ones actually matter, and in what order? This follows <code>docs/Concept.md</code> (Discovery and ranking pipeline, steps 5–8). The <code>server.py</code> docstring says it outright: "Scoring, rerank, clustering… are still to come."</p>
+
+  <section class="card" id="embed">
+    <h2>6 · Meaning space: embedding similarity</h2>
+    <p class="where"><span class="pill planned">planned</span> <code>score_candidates</code> · <code>docs/Concept.md</code> step 5 · embeddings on Token Factory, stored in LanceDB</p>
+    <div class="scene" data-scene="embed" data-square="1"></div>
+  </section>
+
+  <section class="card" id="cites">
+    <h2>7 · Shared references, recency, one pre-score</h2>
+    <p class="where"><span class="pill planned">planned</span> <code>score_candidates</code> · <code>docs/Concept.md</code> step 5 and "Clustering and layout"</p>
+    <div class="scene" data-scene="cites" data-h="310"></div>
+  </section>
+
+  <section class="card" id="verdict">
+    <h2>8 · An LLM reads each candidate, and we check its homework</h2>
+    <p class="where"><span class="pill planned">planned</span> <code>score_candidates</code> (Lightning, in parallel) · <code>docs/Concept.md</code> steps 5–7</p>
+    <div class="scene" data-scene="verdict" data-h="330"></div>
+  </section>
+
+  <section class="card" id="rerank">
+    <h2>9 · Listwise rerank: compare them all at once</h2>
+    <p class="where"><span class="pill planned">planned</span> <code>rerank</code> (Super VL, top ~100) · <code>docs/Concept.md</code> step 8 and "NVIDIA model routing"</p>
+    <div class="scene" data-scene="rerank" data-h="340"></div>
+  </section>
+
+  <section class="card" id="whole">
+    <h2>The whole funnel</h2>
+    <p class="intro">Every stage is cheaper per paper than the one after it, so the expensive model only sees the finalists.</p>
+    <div class="funnel">
+      <div>Master splits the question into ~3 sub-queries <span class="pill planned">planned</span></div>
+      <div>Per sub-query: <code>search</code> (≤2 × 10) + <code>find_candidates</code> (≤100) <span class="pill built">built</span></div>
+      <div>Deduplicate by every ID; drop seeds and discarded <span class="pill built">built</span></div>
+      <div>Score all: embeddings + citations + recency + Lightning verdict <span class="pill planned">planned</span></div>
+      <div>Over the threshold → on the board early <span class="pill planned">planned</span></div>
+      <div>Super VL reranks the top ~100 <span class="pill planned">planned</span></div>
+    </div>
+    <div class="tablewrap">
+    <table>
+      <tr><th>Stage</th><th>What decides order</th><th>Cost per paper</th></tr>
+      <tr><td>search</td><td>Each source's own ranking, interleaved</td><td>~0 (one API call covers many)</td></tr>
+      <tr><td>find_candidates</td><td>How many strategies found it; for PubMed links, how many lists it is in</td><td>~0</td></tr>
+      <tr><td>score_candidates</td><td>Similarity to question and seeds, shared references, recency, Lightning's verdict</td><td>One embedding + one small LLM call</td></tr>
+      <tr><td>rerank</td><td>Super VL comparing the finalists side by side, with seed abstracts</td><td>One big call shared by ~100 papers</td></tr>
+    </table>
+    </div>
+    <p class="intro" style="margin-top:14px">How we'll know each stage earns its place (Concept.md, evaluation): rank a held-out set three ways (embeddings only, then embeddings plus Lightning verdicts, then both plus the Super VL rerank) and show the judges one table.</p>
+  </section>
+
+  <footer>Written from the code on <code>main</code> (d41b617) and <code>fix/search-agent-done</code> (2ed9e82), and from <code>docs/Concept.md</code>, on 18 October 2026. Toy numbers are illustrative; the formulas in steps 2–4 are the real ones.</footer>
+</main>
+
+<script>
+/* A scene is a list of frames. Each frame has a caption and the pieces on the
+   stage. A piece keeps its id from frame to frame, so CSS transitions animate
+   it from where it was to where it is now. Pieces are centred on (x%, y). */
+const S = {};
+
+function mount(root, frames) {
+  const square = root.dataset.square;
+  root.innerHTML = `<div class="stage${square ? ' square' : ''}"></div><p class="cap" aria-live="polite"></p>
+    <div class="ctrl"><button data-a="prev">← Back</button><button data-a="next" class="primary">Next →</button>
+    <button data-a="play">▶ Play</button><button data-a="reset">↺</button><span class="dots"></span><span class="count"></span></div>`;
+  const stage = root.querySelector('.stage');
+  if (!square) stage.style.height = root.dataset.h + 'px';
+  const cap = root.querySelector('.cap'), count = root.querySelector('.count'), dots = root.querySelector('.dots');
+  const btn = a => root.querySelector(`[data-a="${a}"]`);
+  dots.innerHTML = frames.map(() => '<i></i>').join('');
+  const els = new Map();
+  let i = 0, timer = null;
+  const yu = square ? '%' : 'px';
+
+  function place(el, it) {
+    el.style.left = it.x + '%';
+    el.style.top = it.y + yu;
+    el.style.width = it.w != null ? it.w + '%' : '';
+    el.style.height = it.h != null ? it.h + 'px' : '';
+  }
+  function draw() {
+    const f = frames[i], seen = new Set();
+    for (const it of f.items) {
+      seen.add(it.id);
+      let el = els.get(it.id);
+      if (!el) {
+        el = document.createElement('div');
+        stage.appendChild(el);
+        els.set(it.id, el);
+        el.style.transition = 'none';
+        place(el, it.from || it);
+        el.style.opacity = 0;
+        el.getBoundingClientRect();
+        el.style.transition = '';
+      }
+      clearTimeout(el._rm);
+      el.className = 'it ' + (it.cls || '') + (it.a === 'left' ? ' la' : '');
+      if (el._html !== it.html) { el.innerHTML = it.html || ''; el._html = it.html; }
+      place(el, it);
+      el.style.opacity = it.o ?? (/\bdim\b/.test(it.cls) ? .35 : 1);
+      el.style.zIndex = it.z ?? 2;
+    }
+    for (const [id, el] of els) if (!seen.has(id)) {
+      el.style.opacity = 0;
+      clearTimeout(el._rm);
+      el._rm = setTimeout(() => { el.remove(); els.delete(id); }, 600);
+    }
+    cap.innerHTML = f.cap;
+    count.textContent = `${i + 1} / ${frames.length}`;
+    [...dots.children].forEach((d, k) => d.classList.toggle('on', k <= i));
+    btn('prev').disabled = i === 0;
+    btn('next').disabled = i === frames.length - 1;
+  }
+  function stop() { clearInterval(timer); timer = null; btn('play').textContent = '▶ Play'; }
+  root.addEventListener('click', e => {
+    const a = e.target.closest('button')?.dataset.a;
+    if (!a) return;
+    if (a !== 'play') stop();
+    if (a === 'next' && i < frames.length - 1) i++;
+    if (a === 'prev' && i > 0) i--;
+    if (a === 'reset') i = 0;
+    if (a === 'play') {
+      if (timer) { stop(); return; }
+      if (i === frames.length - 1) i = 0;
+      btn('play').textContent = '❚❚ Pause';
+      timer = setInterval(() => { if (i < frames.length - 1) { i++; draw(); } else stop(); }, 3200);
+    }
+    draw();
+  });
+  draw();
+}
+
+const card = (id, x, y, html, cls = '', more = {}) => ({ id, x, y, w: 21, html, cls: 'tile ' + cls, ...more });
+const hdr = (id, x, y, html, more = {}) => ({ id, x, y, html, cls: 'hdr', ...more });
+const note = (id, x, y, html, cls = '', more = {}) => ({ id, x, y, html, cls: 'note ' + cls, ...more });
+
+/* ---------- 1 · One paper, many names ---------- */
+S.ids = (() => {
+  const L = 25, R = 72;
+  const heads = [hdr('hl', L, 20, 'Incoming record'), hdr('hr', R, 20, 'Store (SQLite)')];
+  const pmRec = '<b>From PubMed</b> · Exhausted CD8 T cells…<br><code>pmid:111</code> <code>doi:10.1000/cd8</code><br>abstract ✓ · open PDF —';
+  const oaRec = '<b>From OpenAlex</b> · Exhausted CD8 T cells…<br><code>openalex:W222</code> <code>doi:10.1000/cd8</code><br>abstract — · open PDF ✓';
+  const stored = pdf => `<b>paper</b> <code>doi:10.1000/cd8</code><br>Exhausted CD8 T cells…<br>abstract ✓ · open PDF ${pdf ? '✓' : '—'}`;
+  const row = (id, y, alias, cls = '') => ({ id, x: R, y, w: 44, html: `<code>${alias}</code> → paper`, cls: 'tile ' + cls });
+  const m = { w: 42, cls: 'tile multi' };
+  const recPM = { id: 'p', x: L, y: 95, html: pmRec, ...m, cls: 'tile multi pm' };
+  const inStore = (pdf, cls = '') => ({ id: 'p', x: R, y: 95, html: stored(pdf), w: 44, cls: 'tile multi out ' + cls });
+  const aliasHdr = hdr('ah', R, 160, 'alias table');
+  return [
+    { cap: 'Every source names papers its own way: PubMed by <b>PMID</b>, OpenAlex by a <b>W-number</b>, publishers by <b>DOI</b>. Here PubMed hands us a record with two of those IDs.',
+      items: [...heads, recPM] },
+    { cap: 'Saving it: none of its IDs is in the store yet, so it becomes a <b>new paper</b>. Its ID is the most widely shared one it has (order: doi, pmid, pmcid, arxiv, openalex, s2), so DOI wins. <b>Every</b> ID it has goes into the alias table.',
+      items: [...heads, inStore(false), aliasHdr, row('a1', 190, 'doi:10.1000/cd8'), row('a2', 222, 'pmid:111')] },
+    { cap: 'Later, OpenAlex returns the same paper. It has a different ID, <code>W222</code>, but it carries the same DOI. It has no abstract, but it does have an open-access PDF link.',
+      items: [...heads, inStore(false), aliasHdr, row('a1', 190, 'doi:10.1000/cd8'), row('a2', 222, 'pmid:111'), { id: 'o', x: L, y: 95, html: oaRec, ...m, cls: 'tile multi oa' }] },
+    { cap: 'Lookup: try each of its IDs in the alias table. <code>doi:10.1000/cd8</code> is <b>a hit</b>, so this is the paper we already have, not a new one.',
+      items: [...heads, inStore(false), aliasHdr, row('a1', 190, 'doi:10.1000/cd8', 'hot'), row('a2', 222, 'pmid:111'), { id: 'o', x: L, y: 95, html: oaRec, ...m, cls: 'tile multi oa hot' }] },
+    { cap: '<b>Merge.</b> The stored values win; only the gaps are filled from the newcomer. So the PDF link is added and the new alias <code>openalex:W222</code> is indexed. It is still <b>one</b> paper.',
+      items: [...heads, inStore(true, 'good'), aliasHdr, row('a1', 190, 'doi:10.1000/cd8'), row('a2', 222, 'pmid:111'), row('a3', 254, 'openalex:W222', 'good'), { id: 'o', x: R, y: 95, html: oaRec, ...m, cls: 'tile multi oa', o: 0 }] },
+    { cap: 'The payoff: <code>get_paper("openalex:W222")</code> and <code>get_paper("pmid:111")</code> both return this record. A paper found by three sources is counted once, and its <code>foundBy</code> lists all three. Steps 2 and 4 depend on exactly that.',
+      items: [...heads, inStore(true), aliasHdr, row('a1', 190, 'doi:10.1000/cd8'), row('a2', 222, 'pmid:111'), row('a3', 254, 'openalex:W222', 'hot'), { id: 'q', x: L, y: 254, w: 42, html: '<code>get_paper("openalex:W222")</code> →', cls: 'tile multi hot' }] },
+  ];
+})();
+
+/* Interleave source lists, as _round_robin + _save_all do. `done` = rounds taken so far. */
+function merged(cfg, done, opt = {}) {
+  const { cols, order, colX, title, label } = cfg;
+  const outX = 87, rowY = r => 62 + 40 * r, outY = k => 62 + 36 * k;
+  const items = [...order.map(s => hdr('h-' + s, colX[s], 24, label[s], { w: 23, cls: 'hdr wrap' })), hdr('h-out', outX, 24, 'merged', { w: 23, cls: 'hdr wrap' })];
+  const out = [], absorbed = [];
+  const max = Math.max(...order.map(s => cols[s].length));
+  for (let r = 0; r < max; r++) for (const s of order) {
+    const L = cols[s][r];
+    if (!L) continue;
+    const id = s + '-' + L;
+    if (r >= done) { items.push(card(id, colX[s], rowY(r), `<b>${L}</b> ${title[L]}`, s)); continue; }
+    let e = out.find(e => e.L === L);
+    if (!e) out.push(e = { L, id, by: [s] });
+    else { e.by.push(s); if (r === done - 1 && !opt.settled) absorbed.push({ id, s, e }); }
+  }
+  out.forEach((e, k) => {
+    const pos = opt.place ? opt.place(e, k) : k;
+    if (pos == null) return;
+    e.pos = pos;
+    const tags = opt.count ? `<span class="x">×${e.by.length}</span>` : `<span class="tags">${e.by.map(s => `<i class="t ${s}"></i>`).join('')}</span>`;
+    items.push(card(e.id, outX, outY(pos), `<b>${e.L}</b> ${title[e.L]}${tags}`, 'out ' + (opt.cls ? opt.cls(e, k) : ''), { z: 3 }));
+  });
+  for (const a of absorbed) items.push(card(a.id, outX, outY(a.e.pos), `<b>${a.e.L}</b> ${title[a.e.L]}`, a.s, { o: 0, z: 4 }));
+  return items;
+}
+
+/* ---------- 2 · Round robin ---------- */
+S.rr = (() => {
+  const cfg = {
+    cols: { pm: ['A', 'B', 'C'], oa: ['B', 'D', 'E'], web: ['F', 'A', 'G'] },
+    order: ['pm', 'oa', 'web'], colX: { pm: 13, oa: 37, web: 61 },
+    label: { pm: '<span style="color:var(--pm)">●</span> PubMed', oa: '<span style="color:var(--oa)">●</span> OpenAlex', web: '<span style="color:var(--web)">●</span> Web' },
+    title: { A: 'CD8 exhaustion atlas', B: 'TOX drives exhaustion', C: 'PD-1 blockade cohort', D: 'Melanoma TIL scRNA-seq', E: 'Stem-like CD8 cells', F: 'Preprint: TCF7+ cells', G: 'Review: T-cell states' },
+  };
+  const cut = { id: 'cut', x: 87, y: 62 + 36 * 4.5, w: 24, cls: 'line' };
+  return [
+    { cap: '<code>search()</code> asks three sources <b>in parallel</b>. Each returns its own list, best first. Their scores can\'t be compared: PubMed\'s "best" and the web\'s "best" are measured differently.',
+      items: merged(cfg, 0) },
+    { cap: '<b>Round 1:</b> take every source\'s #1. A, B and F join the merged list. The coloured dots record which source found each one (<code>foundBy</code>).',
+      items: merged(cfg, 1) },
+    { cap: '<b>Round 2:</b> everyone\'s #2. PubMed\'s B and the web\'s A are papers we already have (same IDs, step 1), so they <b>don\'t add a row</b>; they just add a dot. D is new.',
+      items: merged(cfg, 2) },
+    { cap: '<b>Round 3:</b> C, E and G. Every source got the same number of turns.',
+      items: merged(cfg, 3) },
+    { cap: 'Cut at <code>limit</code> (here 5). <b>Why take turns instead of sorting?</b> There is no shared score to sort by. Taking turns guarantees that each source\'s best papers make the cut, and no single source can crowd out the others.',
+      items: [...merged(cfg, 3, { settled: true, cls: (e, k) => k >= 5 ? 'dim' : '' }), cut, note('cutl', 87, 62 + 36 * 4.5 + 12, 'limit = 5', 'bad')] },
+  ];
+})();
+
+/* ---------- 3 · PubMed links ---------- */
+S.links = (() => {
+  const lists = [
+    { name: 'S1 · similar articles', items: ['P', 'Q', 'R'] },
+    { name: 'S2 · similar articles', items: ['Q', 'T'] },
+    { name: 'S1 · papers citing it', items: ['Q', 'U'] },
+    { name: 'S2 · its references', items: ['P'] },
+  ];
+  const gain = (r, n) => 1 + (1 - r / n) / 10;
+  const firstSeen = ['P', 'Q', 'R', 'T', 'U'];
+  const sorted = ['Q', 'P', 'U', 'T', 'R'];
+  const LX = 24, BX = 54, MAXW = 40, MAX = 3.3;
+  const heads = [hdr('hl', LX, 22, 'A list from PubMed'), hdr('hb', 74, 22, 'Running score')];
+  function frame(k, cap, final) {
+    const score = {};
+    lists.slice(0, k).forEach(l => l.items.forEach((L, r) => { score[L] = (score[L] || 0) + gain(r, l.items.length); }));
+    const items = [...heads];
+    if (k === 0) {
+      items.push(card('s1', LX - 10, 90, '<b>S1</b> seed', 'seed', { w: 18 }), card('s2', LX + 10, 90, '<b>S2</b> seed', 'seed', { w: 18 }));
+    } else if (!final) {
+      const l = lists[k - 1];
+      items.push({ id: 'lh' + k, x: LX, y: 62, w: 44, html: `<b>${l.name}</b>`, cls: 'tile seed' });
+      l.items.forEach((L, r) => items.push(card(`l${k}${L}`, LX, 100 + 36 * r, `<b>${L}</b> rank ${r + 1} of ${l.items.length}<span class="gain">+${gain(r, l.items.length).toFixed(2)}</span>`, 'pm', { w: 44 })));
+    } else {
+      items.push({ id: 'fx', x: LX, y: 130, w: 44, html: 'Sorted by score.<br>Tie (T, U at 1.05): <b>higher PMID first</b>, which means newer.<br>The seeds themselves are dropped.', cls: 'tile multi' });
+    }
+    const order = final ? sorted : firstSeen;
+    order.filter(L => score[L]).forEach((L, row) => {
+      const s = score[L];
+      items.push({ id: 'b' + L, a: 'left', x: BX, y: 70 + 38 * row, w: (s / MAX) * MAXW, html: `<b>${L}</b> ${s.toFixed(2)}`, cls: 'bar' + (final && row === 0 ? ' alt2' : '') });
+    });
+    return { cap, items };
+  }
+  return [
+    frame(0, 'For each seed, PubMed provides three lists: <b>similar articles</b> (the top 20 are kept), <b>papers that cite it</b>, and <b>its references</b>. Two toy seeds give us four short lists to go through.'),
+    frame(1, 'Each appearance is worth <b>1 point</b>, plus a tiny bonus of at most 0.1 for being near the top of its list: <code>1 + (1 − rank/length) / 10</code>. Here P is #1 of 3, so it gets 1 + 0.1 = <b>1.10</b>.'),
+    frame(2, 'Next list. <b>Q shows up again</b>, so its bar grows by about another 1. T is new.'),
+    frame(3, 'Q is in a <b>third</b> list now. The score works out to roughly "<b>how many lists is this paper in?</b>". A paper tied to several seeds, in several ways, is very likely relevant.'),
+    frame(4, 'S2 cites P, so P gets a second point.'),
+    frame(5, 'Final order: Q, P, then the rest. The rank bonus never adds up to a whole extra list, so <b>position only breaks near-ties</b>, and exact ties go to the newest paper.', true),
+  ];
+})();
+
+/* ---------- 4 · Strategies vote ---------- */
+S.votes = (() => {
+  const cfg = {
+    cols: { pl: ['P', 'Q', 'T'], ci: ['V', 'S1', 'Q'], rec: ['X', 'Q', 'V'] },
+    order: ['pl', 'ci', 'rec'], colX: { pl: 13, ci: 37, rec: 61 },
+    label: { pl: '<span style="color:var(--pm)">●</span> PubMed links', ci: '<span style="color:var(--oa)">●</span> OA citing', rec: '<span style="color:var(--s2)">●</span> S2 recommend' },
+    title: { P: 'Exhaustion clocks', Q: 'Atlas of CD8 states', T: 'TIL dynamics', V: 'Progenitor CD8 cells', S1: 'your seed', X: 'Mouse-only study' },
+  };
+  const bad = e => (e.L === 'S1' || e.L === 'X') ? 'strike' : '';
+  const order = ['Q', 'V', 'P', 'T'];
+  return [
+    { cap: 'Three strategies run in parallel. Look closely: OpenAlex\'s list contains <b>S1</b>, your own seed (S1 cites S2). Semantic Scholar suggests <b>X</b>, which someone on the board already <b>discarded</b>.',
+      items: merged(cfg, 0, { count: true }).map(it => it.id === 'ci-S1' ? { ...it, cls: 'tile seed' } : it) },
+    { cap: 'Merge by taking turns, exactly like step 2. Duplicates fold together, and the <b>×n</b> counts how many strategies found each paper. Q was found by all three.',
+      items: merged(cfg, 3, { count: true }) },
+    { cap: 'Remove the seeds and everything excluded. Matching uses <b>every</b> ID the paper has (step 1), so a discarded paper can\'t sneak back in under its DOI.',
+      items: merged(cfg, 3, { count: true, settled: true, cls: bad }) },
+    { cap: 'Sort by <b>how many strategies agree</b>. When unrelated methods (citations, PubMed similarity, a recommender) all point at Q, that\'s strong evidence. The sort is stable, so ties keep their turn order.',
+      items: merged(cfg, 3, { count: true, settled: true, place: e => { const k = order.indexOf(e.L); return k < 0 ? null : k; } }) },
+    { cap: 'The result is a list of <code>candidateIds</code>. Note that <b>nothing so far has read an abstract for meaning</b>. These are cheap signals that cast a wide net. Judging the papers is Part 2.',
+      items: merged(cfg, 3, { count: true, settled: true, place: e => { const k = order.indexOf(e.L); return k < 0 ? null : k; }, cls: () => 'good' }) },
+  ];
+})();
+
+/* ---------- 5 · The search agent ---------- */
+S.agent = (() => {
+  const rows = [
+    ['master', '<b>Request:</b> sub-query "TOX-driven CD8 exhaustion in melanoma", seeds S1 S2, exclude X'],
+    ['call 1/3', '<code>search(query, limit=10)</code> → 10 papers from PubMed, OpenAlex, web'],
+    ['call 2/3', 'Only a few on-topic? <code>search</code> once more with broader wording (optional)'],
+    ['call 3/3', '<code>find_candidates(seeds, exclude)</code> → up to 100 candidate IDs'],
+    ['done', '<code>done(sub_query, candidates ≤15 with a "why" each, candidate_ids, notes)</code>'],
+  ];
+  const it = (k, upto) => ({ id: 'r' + k, x: 50, y: 40 + 56 * k, w: 92, html: `<span class="who">${rows[k][0]}</span> ${rows[k][1]}`, cls: 'step' + (k === upto ? (k === 4 ? ' end' : ' hot') : '') });
+  const f = (upto, cap, extra = []) => ({ cap, items: [...rows.slice(0, upto + 1).map((_, k) => it(k, upto)), ...extra] });
+  return [
+    f(0, 'The (planned) master agent splits the question into ~3 sub-queries and gives each to a <b>search agent</b> running on Nemotron <b>Lightning</b>: fast and cheap, since all it does is call tools.'),
+    f(1, 'First call: keyword search across the three sources (step 2). The rule: <b>every reply must be a tool call</b> (tool choice "required"). The model can\'t just chat.'),
+    f(2, 'If the results look thin, it may search once more with a broader rewording. That\'s at most two searches.'),
+    f(3, 'With seeds, it expands from them (steps 3–4). That\'s at most one call. The budget keeps a small model from looping forever.'),
+    f(4, 'The <b>only way to finish</b> is <code>done</code>. It validates the answer (bad fields → "fix these and call done again"), saves it to session state as <code>search_result</code> and ends the run. The instruction says plainly: <b>"You do not rank papers."</b> Ranking comes next.'),
+  ];
+})();
+
+/* ---------- 6 · Meaning space ---------- */
+S.embed = (() => {
+  const dot = (id, x, y, label, cls = '', left = false, w = 3.4) => ({ id, x, y, w, html: `<span class="dl${left ? ' l' : ''}">${label}</span>`, cls: 'dot ' + cls, z: 5 });
+  const q = dot('q', 50, 50, 'question', 'q', false, 4.6);
+  const cands = cls => [
+    dot('S1', 43, 41, 'S1', 'sq' + (cls.S1 || ''), true), dot('S2', 57, 57, 'S2', 'sq' + (cls.S2 || '')),
+    dot('Q', 59, 43, 'Q', cls.Q || ''), dot('V', 40, 59, 'V', cls.V || '', true),
+    dot('P', 64, 67, 'P', cls.P || ''), dot('B', 33, 36, 'B', cls.B || '', true),
+    dot('K', 85, 13, 'K · skin-screening app', cls.K || '', true),
+  ];
+  const rings = [
+    { id: 'r1', x: 50, y: 50, w: 30, cls: 'ring', z: 1 }, { id: 'r2', x: 50, y: 50, w: 58, cls: 'ring', z: 1 }, { id: 'r3', x: 50, y: 50, w: 86, cls: 'ring', z: 1 },
+    note('l1', 50, 33.5, 'sim ≈ 0.9'), note('l2', 50, 19.5, 'sim ≈ 0.7'), note('l3', 50, 5.5, 'sim ≈ 0.5'),
+  ];
+  const vec = { id: 'vec', x: 50, y: 84, w: 90, html: '"Which exhausted CD8 T-cell states predict response…"<br>→ <code>[0.12, −0.48, 0.03, … thousands of numbers]</code>', cls: 'tile multi', z: 6 };
+  return [
+    { cap: 'An <b>embedding model</b> turns a text (here, title + abstract) into a long list of numbers: <b>a point in "meaning space"</b>. Texts about the same thing land close together, even when they share no words. (Drawn in 2D here; the real space has thousands of dimensions.)',
+      items: [q, vec] },
+    { cap: 'Embed every candidate and both seeds the same way. Seeds are the black squares. Most candidates cluster near the question, because they really are about the same topic.',
+      items: [q, ...cands({})] },
+    { cap: '<b>Similarity = closeness.</b> Technically it\'s the cosine of the angle between two vectors: 1 = the same meaning, 0 = unrelated. The rings show it: the inner ring holds very similar papers.',
+      items: [q, ...cands({}), ...rings] },
+    { cap: '<b>K</b> came from a keyword search: it contains "melanoma" and "T cell", but it\'s about a skin-screening app. In meaning space it\'s <b>far away</b>, so it scores low. That\'s why every keyword and web hit gets re-scored here.',
+      items: [q, ...cands({ K: 'bad' }), ...rings] },
+    { cap: 'Candidates are compared with the question <b>and with the seeds</b>, so "close to the papers you already trust" counts too. Q sits near both the question and S1, so it scores well on both.',
+      items: [q, ...cands({ Q: 'good', S1: ' good', K: 'bad' }), ...rings] },
+  ];
+})();
+
+/* ---------- 7 · Shared references + pre-score ---------- */
+S.cites = (() => {
+  const sRefs = ['r1', 'r2', 'r3', 'r4', 'r5', 'r6'], vRefs = ['r4', 'r5', 'r6', 'r7', 'r8', 'r9'];
+  const shared = ['r4', 'r5', 'r6'];
+  const y = k => 74 + 31 * k;
+  const heads = [hdr('hs', 16, 26, 'S1 cites'), hdr('hv', 84, 26, 'V cites'), hdr('hm', 50, 26, 'both cite')];
+  const refs = together => {
+    const out = [];
+    sRefs.forEach((r, k) => {
+      const sh = shared.includes(r);
+      out.push(card('s' + r, together && sh ? 50 : 16, together && sh ? y(shared.indexOf(r) + 1) : y(k), `ref ${r.slice(1)}`, 'pm' + (together && sh ? ' good' : ''), { w: 18 }));
+    });
+    vRefs.forEach((r, k) => {
+      const sh = shared.includes(r);
+      out.push(card('v' + r, together && sh ? 50 : 84, together && sh ? y(shared.indexOf(r) + 1) : y(k), `ref ${r.slice(1)}`, 'oa', { w: 18, o: together && sh ? 0 : 1 }));
+    });
+    return out;
+  };
+  const sig = (id, row, label, val, cls) => [
+    note('n' + id, 22, 80 + 52 * row, label),
+    { id: 'b' + id, a: 'left', x: 36, y: 80 + 52 * row, w: val * 50, html: val.toFixed(2), cls: 'bar ' + cls },
+  ];
+  return [
+    { cap: 'Papers that cite the same things are usually <b>part of the same conversation</b>. Here are seed S1 and candidate V with their reference lists.',
+      items: [...heads, ...refs(false)] },
+    { cap: 'Pull the shared references into the middle: <b>3 in common</b> out of <b>9 distinct</b> references overall. Overlap = 3 / 9 = <b>0.33</b> (Jaccard; this one is called "bibliographic coupling").',
+      items: [...heads, ...refs(true), { id: 'j', x: 50, y: 230, html: '3 ÷ 9 = <b>0.33</b>', cls: 'chip good' }] },
+    { cap: 'The mirror image is <b>co-citation</b>: how often other papers cite both. Citations catch papers that are close within a field; embeddings catch papers on the same topic that never cite each other. That\'s why we use both.',
+      items: [...heads, ...refs(true), { id: 'j', x: 50, y: 230, html: '3 ÷ 9 = <b>0.33</b>', cls: 'chip good' }, { id: 'cc', x: 50, y: 268, w: 90, html: 'co-citation: other candidates that cite <b>both</b> S1 and V', cls: 'tile multi', z: 3 }] },
+    { cap: 'Now each candidate has a few cheap signals: <b>meaning</b> (step 6), <b>citations</b> (this step) and <b>recency</b> (newer papers get a nudge). They combine into one pre-score. <b>The weights aren\'t decided yet</b>; Concept.md leaves them to be tuned on a held-out evaluation.',
+      items: [hdr('hp', 50, 26, 'candidate V · signals'), ...sig('m', 0, 'meaning', 0.82, ''), ...sig('c', 1, 'citations', 0.33, 'alt'), ...sig('r', 2, 'recency', 0.7, 'alt2'), { id: 'pre', x: 50, y: 258, html: 'weighted blend → <b>pre-score</b>', cls: 'chip hot' }] },
+  ];
+})();
+
+/* ---------- 8 · Lightning verdict + quote check ---------- */
+S.verdict = (() => {
+  const C = [['Q', 0.91], ['K', 0.12], ['V', 0.78], ['B', 0.86], ['R', 0.31], ['P', 0.74]];
+  const x = k => 9 + 16.4 * k;
+  const papers = (cls = () => '', yf = () => 44, xf = x) => C.map(([L], k) => card('c' + L, xf(k), yf(k), `<b>${L}</b>`, 'out ' + cls(k), { w: 13 }));
+  const zaps = C.map(([L], k) => ({ id: 'z' + L, x: x(k), y: 104, html: '⚡ reading', cls: 'zap' }));
+  const scores = (yf = () => 104, xf = x) => C.map(([L, s], k) => ({ id: 'z' + L, x: xf(k), y: yf(k), html: s.toFixed(2), cls: 'score ' + (s >= 0.7 ? 'hi' : 'lo') }));
+  const absOk = { id: 'a1', x: 50, y: 200, w: 94, html: '<b>Q abstract:</b> … we find that <mark>TCF7+ progenitor-exhausted CD8 T cells predict response to anti-PD-1</mark> in two cohorts …<span class="verdict ok">✓ quote found word for word, so it\'s verified</span>', cls: 'abs' };
+  const absNo = { id: 'a2', x: 50, y: 280, w: 94, html: '<b>P abstract:</b> … exhausted subsets expand after treatment … &nbsp;<i>model\'s quote: "P proves exhaustion predicts response"</i><span class="verdict no">✗ not in the abstract, so it\'s flagged "unverified"</span>', cls: 'abs' };
+  const above = k => C[k][1] >= 0.7;
+  // Placed cards pack into one row on the board; the rest keep their place.
+  const packed = k => above(k) ? 20 + 20 * C.slice(0, k).filter(([, s]) => s >= 0.7).length : x(k);
+  return [
+    { cap: 'Numbers can\'t read. So every candidate also goes to <b>Nemotron Lightning</b>: one request per paper, <b>all in parallel</b>. Hundreds at once take seconds. (It\'s a tool, not an agent loop; an agent looping over 300 papers would be slow and expensive.)',
+      items: [...papers(), ...zaps] },
+    { cap: 'Each reply is small JSON: a <b>verdict</b> (relevant or not), a score, a one-line TL;DR, and a <b>quote</b> from the abstract that backs it up.',
+      items: [...papers(k => C[k][1] < 0.7 ? 'dim' : ''), ...scores()] },
+    { cap: 'LLMs can invent quotes, so we <b>check them</b>: the quote must appear <b>word for word</b> in the abstract (plain exact string match). If it doesn\'t, the explanation is flagged "unverified". A verified quote also gets a link that highlights it on the source page.',
+      items: [...papers(k => C[k][1] < 0.7 ? 'dim' : ''), ...scores(), absOk, absNo] },
+    { cap: '<b>Place early:</b> as soon as a verdict clears the threshold, the card goes onto the board with a "working" badge. The researcher doesn\'t wait for the whole batch. Low scorers like K and R stay off.',
+      items: [
+        ...papers(k => above(k) ? 'good' : 'dim', k => above(k) ? 250 : 44, packed),
+        ...scores(k => above(k) ? 290 : 104, packed),
+        { id: 'th', x: 50, y: 170, w: 96, cls: 'line ok' }, note('thl', 88, 158, 'threshold', 'good'),
+        hdr('board', 50, 214, 'on the board · working…'),
+      ] },
+  ];
+})();
+
+/* ---------- 9 · Listwise rerank ---------- */
+S.rerank = (() => {
+  const P = { Q: ['Atlas of CD8 states', 0.86, 'Same states as S1 and S2'], V: ['Progenitor CD8 cells', 0.85, 'Same cells, other cancer'], B: ['TOX drives exhaustion', 0.85, 'Key mechanism'], D: ['TOX in a small cohort', 0.84, 'Repeats B, smaller cohort'], A: ['Review: T-cell states', 0.83, 'Review, no new data'], E: ['Test of S1 in new cohort', 0.81, 'Directly tests S1\'s claim'] };
+  const before = ['Q', 'V', 'B', 'D', 'A', 'E'], after = ['E', 'Q', 'B', 'V', 'A', 'D'];
+  const y = k => 56 + 46 * k;
+  const rows = (order, x, opt = {}) => order.map((L, k) => card('p' + L, x, y(k), `<b>${k + 1}. ${L}</b> ${P[L][0]}<span class="x" style="color:var(--muted)">${opt.noScore ? '' : P[L][1].toFixed(2)}</span>`, 'out ' + (opt.cls ? opt.cls(L, k) : ''), { w: 44, z: 4 }));
+  const why = order => order.map((L, k) => ({ id: 'w' + L, x: 77, y: y(k), w: 40, html: P[L][2], cls: 'why', z: 4 }));
+  const box = { id: 'box', x: 50, y: 170, w: 97, h: 326, html: '<span class="hdr">one Super VL prompt</span>', cls: 'box', z: 1 };
+  const ctx = [
+    { id: 'k1', x: 77, y: 56, w: 38, html: '<b>S1</b> full abstract', cls: 'tile seed' },
+    { id: 'k2', x: 77, y: 96, w: 38, html: '<b>S2</b> full abstract', cls: 'tile seed' },
+    { id: 'k3', x: 77, y: 136, w: 38, html: 'goal: <b>evidence</b>', cls: 'tile hot' },
+    { id: 'k4', x: 77, y: 200, w: 38, html: '…plus ~94 more candidates', cls: 'note' },
+  ];
+  return [
+    { cap: 'After scoring, the top ~100 are sorted by score. But each paper was judged <b>alone</b> (pointwise), so the scores bunch up (0.86, 0.85, 0.85, 0.84…) and the judge never noticed that <b>D repeats B</b>.',
+      items: [hdr('hh', 30, 22, 'sorted by score'), ...rows(before, 30)] },
+    { cap: '<b>Listwise:</b> put them <b>all into one prompt</b> to Nemotron <b>Super VL</b>, along with every seed\'s full abstract and the goal being ranked for. Its 1M-token context fits ~100 abstracts plus the seeds in a single call.',
+      items: [box, ...rows(before, 30), ...ctx] },
+    { cap: 'Now it can <b>compare</b>: "D repeats B with a smaller cohort", "A is a review", "E directly tests S1\'s claim". Picking the better of two papers is much easier, and more consistent, than giving each one an absolute score. (Reasons are illustrative.)',
+      items: [box, ...rows(before, 30, { cls: L => L === 'D' || L === 'E' ? 'hot' : '' }), ...why(before)] },
+    { cap: 'It returns an <b>order</b>. The cards re-sort, and each reason travels with its paper. E rises to the top; the duplicate D drops to last. <code>set_rating</code> then recolours the cards on the board and updates the ranked list.',
+      items: [hdr('hh', 30, 22, 'reranked for "evidence"'), ...rows(after, 30, { noScore: true, cls: L => L === 'E' ? 'good' : L === 'D' ? 'dim' : '' }), ...why(after)] },
+    { cap: '<b>Why not rerank everything?</b> Cost and speed. Cheap steps cut hundreds of papers down to ~100 (<b>recall</b>), and the expensive model only orders the finalists (<b>precision</b>). The backend can be swapped (<code>RERANK_BACKEND</code>): Super VL by default, or a dedicated rerank model. Switching the "Rank for" goal re-sorts instantly, because each goal was scored up front.',
+      items: [hdr('hh', 30, 22, 'reranked for "evidence"'), ...rows(after, 30, { noScore: true }), ...why(after)] },
+  ];
+})();
+
+document.querySelectorAll('[data-scene]').forEach(el => mount(el, S[el.dataset.scene]));
+</script>
+</body>
+</html>
