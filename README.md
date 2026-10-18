@@ -2,7 +2,9 @@
 
 Research canvas for the Nebius hackathon.
 
-- `client/`: the canvas app. tldraw's Basic starter kit (Vite, React, TypeScript), with tldraw installed from npm.
+- `client/`: the canvas app, from tldraw's Multiplayer starter kit ([tldraw-sync-cloudflare](https://github.com/tldraw/tldraw-sync-cloudflare)), with tldraw installed from npm.
+  - `client/client/`: the React frontend. Each URL path is a room, so everyone on `/<room>` shares one live board with cursors and presence.
+  - `client/worker/`: the sync server, a Cloudflare Worker with one Durable Object per room. Room state is saved in the Durable Object's SQLite storage, and images and videos go to an R2 bucket.
 - `board/`: Python scripts that generate SVG for the planning Miro board.
 
 ## Run the client
@@ -15,7 +17,9 @@ pnpm install
 pnpm dev
 ```
 
-Then open http://localhost:5173.
+`pnpm dev` starts the frontend and the sync server together at http://localhost:5173, which sends you to a random room. Open the same room URL in another tab or on another machine to collaborate. Locally, the Durable Objects and R2 are simulated and saved under `client/.wrangler/`, so you don't need a Cloudflare account.
+
+To deploy, you need a Cloudflare account and an R2 bucket named as in `client/wrangler.toml`. Then run `pnpm build` and `pnpm exec wrangler deploy` from `client/`.
 
 ## Working with tldraw
 
