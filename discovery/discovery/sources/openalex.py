@@ -11,7 +11,7 @@ from typing import Any
 import httpx
 
 from discovery.papers import Paper
-from discovery.sources import Throttle, key
+from discovery.sources import Throttle, key, raise_for_status
 
 BASE = "https://api.openalex.org"
 _throttle = Throttle(10)
@@ -21,7 +21,7 @@ async def _get(client: httpx.AsyncClient, path: str, params: dict[str, Any]) -> 
     params = {**params, "api_key": key("OPENALEX_API_KEY", "free at https://openalex.org/settings/api")}
     await _throttle.wait()
     response = await client.get(f"{BASE}{path}", params=params)
-    response.raise_for_status()
+    raise_for_status(response)
     return response.json()
 
 
