@@ -61,6 +61,6 @@ uv run pytest                    # offline tests
 
 - The ACP adapter (`python -m harness`) that the board service will pipe the chat panel to; `docs/Concept.md` (Harness: ADK behind ACP) has the sketch.
 - Placing papers on the board: the master answers in the chat until the canvas MCP exists.
-- Bulk scoring (`score_candidates`); the master reranks the merged candidates directly.
+- A numeric relevance score (`score_candidates`, from embeddings, citation overlap and recency). The master ranks with the papers MCP's `rerank` alone, so the order and scores are Super VL's judgement, not a formula; see [How ranking works today](../discovery/README.md#how-ranking-works-today).
 - Background reader and context passes (`process_papers`).
 - Labelling each trace step with its model and time for the demo.

@@ -19,7 +19,13 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
 
-Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. `rerank` sends one listwise request to Nemotron 3.5 Super VL on Token Factory with every candidate's and seed's title and abstract, and takes about 30 seconds for 60 candidates. Scoring, clustering, full text and figures from `docs/Concept.md` are still to come.
+Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Scoring, clustering, full text and figures from `docs/Concept.md` are still to come.
+
+### How ranking works today
+
+`rerank` is the only ranking step. It sends one listwise request to Nemotron 3.5 Super VL on Token Factory with the goal and every candidate's and seed's title and abstract, and takes about 30 seconds for 60 candidates. The order, the 0-to-1 `score` and the `reason` are the model's judgement. No formula is behind them, so a score can't be broken down into parts, and only the first 100 candidates get ranked.
+
+Concept.md's ranking pipeline puts a numeric score before this step: `score_candidates` (step 5) combines embedding similarity to the question and the seeds, citation overlap with the seeds and recency, then adds a Lightning verdict per candidate. `rerank` would then reorder only the top 100 by that score. None of step 5 exists yet. It needs an embedding model on Token Factory, a store for the vectors, and reference lists for every candidate, plus weights for the parts, which Concept.md doesn't give (its `0.6 × cosine + 0.4 × citation overlap` is paper-to-paper similarity for clustering, not relevance).
 
 ## Sources
 
