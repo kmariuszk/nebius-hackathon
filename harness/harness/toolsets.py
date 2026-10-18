@@ -20,9 +20,12 @@ from harness import settings
 PAPERS_URL = "http://127.0.0.1:8001/mcp"
 TAVILY_URL = "https://mcp.tavily.com/mcp/"
 
-# Seconds to wait for one HTTP response. Papers tools call several scholarly
-# APIs in a row, so this is well above the MCP client's 5-second default.
-TIMEOUT = 120.0
+# Seconds to connect to an MCP server, so an unreachable one fails fast.
+CONNECT_TIMEOUT = 30.0
+# Seconds one tool call may take. Papers tools call several scholarly APIs in a
+# row, and `rerank` has Super VL read up to 100 abstracts (up to 4 minutes on
+# its own), so this is well above the MCP client's 5-minute default.
+CALL_TIMEOUT = 600.0
 
 
 def papers(*tool_names: str) -> McpToolset:
@@ -51,7 +54,10 @@ def http_toolset(url: str, tool_names: Sequence[str], headers: dict[str, str]) -
     """A toolset on a streamable HTTP MCP server, limited to `tool_names` if any."""
     return McpToolset(
         connection_params=StreamableHTTPConnectionParams(
-            url=url, headers=headers or None, timeout=TIMEOUT
+            url=url,
+            headers=headers or None,
+            timeout=CONNECT_TIMEOUT,
+            sse_read_timeout=CALL_TIMEOUT,
         ),
         tool_filter=list(tool_names) or None,
     )
