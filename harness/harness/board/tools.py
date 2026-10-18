@@ -25,6 +25,7 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnecti
 from pydantic import BaseModel
 
 from harness import settings, toolsets
+from harness.board.viewer import viewer_tools
 
 log = logging.getLogger(__name__)
 
@@ -128,8 +129,14 @@ class BoardTools:
         return toolsets.http_toolset(self.papers_url, tool_names, auth)
 
     def viewer(self) -> list[BaseTool]:
-        """Focus, highlight, open paper and tour (T06), look at the board or a paper (T07)."""
-        return []
+        """Focus, highlight, open paper and tour on this chat's researcher's screen (T06).
+
+        Only a chat has a screen to point at, so there are none without an ACP
+        session (`adk web`, `from_env()`). T07 adds look at the board or a paper.
+        """
+        if self.conn is None or self.session_id is None:
+            return []
+        return viewer_tools(self.conn, self.session_id)
 
     def plan(self) -> BaseTool:
         """`update_plan`: the chat shows it as a checklist (I3); it gets no tool card."""

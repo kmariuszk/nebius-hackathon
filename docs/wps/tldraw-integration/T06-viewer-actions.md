@@ -7,7 +7,7 @@
 | Depends on | T04, T05 |
 | Unblocks | T09 (row click reuses focus), T12, the catch-me-up tour (harness owner) |
 | Milestone | M3 |
-| Status | Not started |
+| Status | Harness half done: the four tools send `_canvas/*`. Browser: `focus`, `highlight` and `open_paper` are handled; `_canvas/tour` arrives but only logs (no tour yet) |
 | Owner | TBD |
 
 ## Goal
@@ -36,12 +36,12 @@ The agent can point at things for the person it is talking to: zoom their view t
 
 | Tool | Signature | Sends |
 | --- | --- | --- |
-| `focus` | `focus(paper_ids: list[str] = [], shape_ids: list[str] = [])` | `conn.ext_notification("canvas/focus", {sessionId, paperIds, shapeIds})`, on the wire `_canvas/focus` |
-| `highlight` | `highlight(paper_ids: list[str] = [], shape_ids: list[str] = [], seconds: int = 6)` | `_canvas/highlight` with `durationMs` |
+| `focus` | `focus(paper_ids: list[str] \| None = None, shape_ids: list[str] \| None = None)` | `conn.ext_notification("canvas/focus", {sessionId, paperIds, shapeIds})`, on the wire `_canvas/focus` |
+| `highlight` | `highlight(paper_ids: list[str] \| None = None, shape_ids: list[str] \| None = None, seconds: int = 6)` | `_canvas/highlight` with `durationMs` |
 | `open_paper` | `open_paper(paper_id: str)` | `_canvas/open_paper` |
 | `tour` | `tour(steps: list[{paper_id, line}], title: str = "Catch-up")` | `_canvas/tour` with `{sessionId, title, steps: [{paperId, line}]}` |
 
-- Each returns `{"ok": true}` at once; the browser doesn't answer (notifications, not requests).
+- Each returns `{"ok": true}` at once; the browser doesn't answer (notifications, not requests). With nothing to point at (no IDs, no tour steps) or the browser gone, it sends nothing and returns `{"ok": false, "error": …}` for the model. Empty ID lists are left out of the params.
 - Docstrings tell the model when to use them: focus when pointing someone at papers, highlight for "the papers behind this answer", open_paper when asked to show a paper, tour to walk through new papers. They change only the asker's screen and never the board.
 - Notifications and `session/update` messages travel the same ordered stdout, so a tour that alternates text and `focus` arrives in that order.
 - No tool cards for these (T04's plugin skips them); their effect is visible on the canvas.
@@ -63,9 +63,10 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 
 ## Tasks
 
-- [ ] `harness/harness/board/viewer.py`; `BoardTools.viewer()` returns the four tools; echo mode sends `_canvas/focus` for selected shapes.
+- [x] `harness/harness/board/viewer.py`; `BoardTools.viewer()` returns the four tools.
+- [ ] Echo mode sends `_canvas/focus` for selected shapes.
 - [ ] `client/client/canvas/tour.ts`: tour state (steps, index), driving T10's widgets and the tour header in the actions widget; the `_canvas/tour` schema in `client/shared/acpExt.ts`.
-- [ ] `harness/tests/test_viewer_tools.py`: scripted model calls `focus`; the test client receives `_canvas/focus` with the right `sessionId` and IDs, after the preceding message chunk.
+- [x] `harness/tests/test_viewer_tools.py`: scripted model calls `focus`; the test client receives `_canvas/focus` with the right `sessionId` and IDs, after the preceding message chunk.
 - [ ] `client/client/canvas/viewerActions.ts` with `resolveTargets` and the busy queue as pure, tested functions.
 - [ ] Hinting visibility check; the `InFrontOfTheCanvas` fallback only if needed.
 - [ ] "Follow the agent" switch in `ChatPanel.tsx`.

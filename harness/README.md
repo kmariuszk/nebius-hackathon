@@ -92,7 +92,7 @@ HARNESS_MODEL=scripted:script.json uv run python -m harness   # every agent repl
 | --- | --- |
 | `harness/__main__.py` | Stdout guard, flags, SIGTERM and stdin-close shutdown |
 | `harness/acp/` | `adapter.py` (the ACP agent), `worker.py` (one task per session owns the runner and its MCP toolsets), `mapping.py` (prompt blocks to the message, events to updates), `trace.py` (tool cards), `scripted.py`, `prices.py` |
-| `harness/board/` | `tools.py` (`BoardTools`: canvas, papers, viewer, plan), `assistant.py` (`board_assistant`), `prompts.py` (canvas rules and context tags for instructions), `echo.py`, `ids.py` |
+| `harness/board/` | `tools.py` (`BoardTools`: canvas, papers, viewer, plan), `viewer.py` (`focus`, `highlight`, `open_paper`, `tour`: `_canvas/*` notifications to this chat's browser only), `assistant.py` (`board_assistant`), `prompts.py` (canvas rules and context tags for instructions), `echo.py`, `ids.py` |
 
 To give an agent the board, take a `BoardTools` in `build` (interfaces I1); the adapter passes it when the signature asks for it:
 
