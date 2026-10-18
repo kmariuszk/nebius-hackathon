@@ -11,7 +11,7 @@
 		"dev": "concurrently -k -n vite,server \"vite --host\" \"node --watch server/server.ts\"",
 		"build": "tsc && vite build",
 		"start": "node server/server.ts",
-		"test": "node --test \"server/**/*.test.ts\" \"shared/**/*.test.ts\" \"client/**/*.test.ts\""
+		"test": "node --test --test-force-exit \"server/**/*.test.ts\" \"shared/**/*.test.ts\" \"client/**/*.test.ts\""
 	},
 	"dependencies": {
 		"@agentclientprotocol/sdk": "1.8.0",
