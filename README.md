@@ -9,9 +9,49 @@ Research canvas for the Nebius hackathon.
 - `discovery/`: the papers MCP the agents search with (PubMed, OpenAlex, Semantic Scholar, Tavily); see [discovery/README.md](discovery/README.md).
 - `board/`: Python scripts that generate SVG for the planning Miro board.
 
+## API keys
+
+The team's API keys live in SecretStash, Nebius AI Cloud's secrets manager, as the secret `app-api-keys` in `group54-project` (`project-e05zbb9fln00tq4scev5wx`, region `uk-south2`). Its keys are named as in `.env.example`: `TF_API_KEY`, `TAVILY_API_KEY`, `OPENALEX_API_KEY`, `NCBI_API_KEY` and `SEMANTIC_SCHOLAR_API_KEY`. A key nobody has filled in yet holds `REPLACE_ME`.
+
+Don't confuse it with `hackathon-object-storage` in the same project: the organizers manage that one, and it holds the Object Storage (S3) credentials.
+
+### Fetch the keys into `.env`
+
+You need the [Nebius CLI](https://docs.nebius.com/cli/install) and `jq`. Sign in once, in the browser, with the account that accepted the hackathon invite:
+
+```zsh
+curl -sSL https://artifacts.nebius.cloud/cli/install.sh | bash   # then open a new terminal
+nebius profile create hackathon --parent-id project-e05zbb9fln00tq4scev5wx
+```
+
+Then, from the repo root:
+
+```zsh
+nebius --profile hackathon mysterybox payload get --secret-id mbsec-e05tbcmak0f50xsd0q --format json \
+  | jq -r '.data[] | select(.string_value != "REPLACE_ME") | "\(.key)=\(.string_value)"' > .env
+```
+
+This overwrites `.env` with the current keys and leaves out the unfilled ones. Every other setting in `.env.example` is commented out at its default; to change one, append it after fetching. SecretStash's CLI service is still called `mysterybox`. If the command says access is denied, ask an organizer to give the team group payload-read on `app-api-keys`, as they did for `hackathon-object-storage`.
+
+### Add or change a key
+
+In the [console](https://console.nebius.com/), open `group54-project`, then **SecretStash**, then `app-api-keys`, and create a new version with every key in it, the changed one included. Make it the primary version; the fetch command reads the primary. Name a new key after the environment variable that reads it, and add that variable to `.env.example`. Keep keys out of the repo, chat and screenshots.
+
+### Use the keys in a deployment
+
+Nebius workloads (Serverless endpoints and jobs) read the secret directly, so the keys never go into an image. Pass one `--env-secret` per variable; each takes the payload entry with the same name:
+
+```zsh
+nebius --profile hackathon ai endpoint create ... \
+  --env-secret TF_API_KEY=app-api-keys \
+  --env-secret TAVILY_API_KEY=app-api-keys
+```
+
+In the console, the same thing is under **Secret environment variables** when you create the endpoint or job.
+
 ## Run the agents
 
-You need [uv](https://docs.astral.sh/uv/). Copy `.env.example` to `.env` and fill in at least `TF_API_KEY` and `TAVILY_API_KEY`.
+You need [uv](https://docs.astral.sh/uv/) and a `.env` with at least `TF_API_KEY` and `TAVILY_API_KEY`: [fetch the keys](#fetch-the-keys-into-env), or copy `.env.example` to `.env` and fill it in.
 
 ```zsh
 cd discovery && uv run python -m discovery    # terminal 1: the papers MCP on :8001
