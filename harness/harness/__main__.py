@@ -1,6 +1,6 @@
 """`python -m harness`: the ACP agent on stdio, one process per chat.
 
-    uv run python -m harness            # the agent named by HARNESS_AGENT (board_assistant)
+    uv run python -m harness            # the agent named by HARNESS_AGENT (master)
     uv run python -m harness --echo     # no model, no keys: same as HARNESS_AGENT=echo
 
 The board service's ACP pipe starts one per chat. Nothing but ACP may reach
@@ -76,7 +76,7 @@ if __name__ == "__main__":
         stream=sys.stderr,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
     )
-    asyncio.run(main("echo" if args.echo else settings.get("HARNESS_AGENT", "board_assistant")))
+    asyncio.run(main("echo" if args.echo else settings.get("HARNESS_AGENT", "master")))
     # Library threads (LiteLLM, telemetry) must not keep a finished chat's process alive.
     logging.shutdown()
     os._exit(0)

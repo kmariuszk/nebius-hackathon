@@ -53,21 +53,36 @@ uv run pytest                    # offline tests
 
 | Agent | Model | Tools | Status |
 | --- | --- | --- | --- |
-| `master` | Super VL | `search` agent (as a tool, a fresh one per call), `reader` agent (as a tool), papers `resolve_seed`, `get_paper`, `rerank` | Built; chats with the researcher, runs about three sub-queries in parallel and reranks every candidate they found. Candidate IDs go from the tool results to `rerank` without a model retyping them (`agents/master/candidates.py`). Calls `reader` when asked to summarise a paper. No canvas tools yet |
+| `master` | Super VL | `search` agent (as a tool, a fresh one per call), `reader` agent (as a tool), papers `resolve_seed`, `get_paper`, `rerank`; on a board also papers `score_candidates`, canvas `get_board`, `add_papers`, `set_scores`, `link_papers`, `add_note`, `process_papers`, the viewer tools and `update_plan` | Built; the default chat agent. On a board it runs the discovery onto the board (below). Without one (`adk web`) it runs about three sub-queries in parallel, reranks every candidate they found and answers in the chat. Candidate IDs go from the tool results to the papers MCP without a model retyping them (`agents/master/candidates.py`). Calls `reader` when asked to summarise a paper |
 | `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with its picks as JSON; the IDs its tools return go to the master's candidate pool |
 | `reader` | Super VL | papers `get_fulltext`, `check_quotes` | Built; reads one paper and answers with its artifacts as JSON: TL;DR, summary, plain-language abstract, categorised highlights, quotes with highlight links, and key figures by caption. Every highlight and quote is checked word for word against the text. About 25 to 35 s a paper |
-| `context` | see `docs/Concept.md` | | To do |
+| `context` | Lightning | canvas `get_board`, `add_quote`, `set_card`, `link_papers` | Built; relates one read paper to the board: writes "why it matters" (`oneLine` and its claims) and "the paper at a glance" on its card, and links it to the closest papers with kind `similar`. `process_papers` runs it after the reader |
+
+### The master on a board
+
+Under ACP the master gets the chat's board (`build(board)`, interfaces I1) and follows the pipeline in `docs/Concept.md` (Discovery and ranking pipeline):
+
+1. `get_board` and `update_plan`; seeds not on the board yet are looked up with `get_paper` or `resolve_seed`.
+2. The `search` agent once per sub-query, in parallel.
+3. `score_candidates` on the whole pool, without the board's discarded papers; the harness fills in `candidate_ids`.
+4. `add_papers` with the seeds and the 12 best-scored candidates, each `near` its closest seed. The harness drops papers no tool returned and fills in titles, authors, years, venues, links and `foundBy` from the tool results, so the model only picks papers and neighbours.
+5. `process_papers`, which returns at once (below).
+6. `rerank` on the top of the scoring (the harness fills in `paper_ids`), then `set_scores` per placed paper and board goal.
+7. The answer in the chat, with papers as `[Title](paper:<id>)` links. Papers it placed but didn't hand to `process_papers` are read anyway once the turn ends.
+
+`process_papers` (`agents/master/background.py`) reads each placed paper in the background, with its own runners: the `reader`; a model-free step that writes the reader's quotes (`add_quote`, which keeps only sentences from the abstract for now), its summary and what it couldn't check (`set_card` `summary`, `gaps`); then the `context` agent; then `mark_working` off. A failed step still clears the badge and says why in `gaps`. At most 3 papers are read at a time and the background agents make at most 30 model calls a minute, since Token Factory's limit is shared. Background writes carry the run ID of the turn that placed the paper and the researcher's member ID, like the turn's own writes. Closing the chat stops the passes still running, and each clears its badge.
 
 ### The reader's artifacts
 
-The reader's JSON uses the fields of the canvas MCP tools it will call once the board service exists, so the switch is a change of tools, not of prompts:
+On the board, `process_papers` writes them to the card; in the chat, the master answers with them:
 
-| Field | Canvas tool |
+| Field | On the card |
 | --- | --- |
-| `tldr`, `summary`, `rewrittenAbstract` | `set_summary` |
-| `highlights` (`text`, `section`, `category`: method, dataset, result or limitation, `note`) | `add_highlight` |
-| `quotes` (`text`, `section`, `link` with a `#:~:text=` fragment) | `add_quote` |
-| `figures` (`figureId`, `label`, `why`) | `add_figure` |
+| `summary` | `set_card` `summary` |
+| `quotes`, `highlights` (`text`) | `add_quote`, for the passages that are word for word in the abstract |
+| `source` `abstract` | `set_card` `gaps`: "Read from the abstract only" |
+| `tldr`, `highlights`, `summary` | The context agent's request, for `oneLine`, claims and glance |
+| `figures` (`figureId`, `label`, `why`) | Not yet: `set_card` takes a figure with an image URL, which `get_fulltext` doesn't give |
 
 `source` says what it read: `pmc` or `web` for the full text, `abstract` when no full text was found, which `notes` then says too.
 
@@ -77,13 +92,13 @@ The board service pipes each chat panel to one `python -m harness` process, whic
 
 ```zsh
 uv run python -m harness --echo                   # no model, no keys: plan, one tool card, the prompt echoed back
-uv run python -m harness                          # HARNESS_AGENT, default board_assistant, on Super VL
+uv run python -m harness                          # HARNESS_AGENT, default master, on Super VL
 HARNESS_MODEL=scripted:script.json uv run python -m harness   # every agent replays recorded turns, no keys
 ```
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
-| `HARNESS_AGENT` | `board_assistant` | `board_assistant`, `echo`, any `harness/agents/<name>`, or `module:function` |
+| `HARNESS_AGENT` | `master` | `master`, `board_assistant`, `echo`, any `harness/agents/<name>`, or `module:function` |
 | `HARNESS_MODEL` | unset | `scripted:<path>`: a JSON file of turns per agent name (format in `harness/acp/scripted.py`) |
 | `BOARD_INTERNAL_URL` | unset | Origin used to reach the canvas MCP instead of the one the browser sent; the board service sets it |
 | `MODEL_PRICES_JSON` | unset | Override USD per million input and output tokens, e.g. `{"nvidia/Nemotron-3.5-Super-VL": [0.3, 0.9]}` |
@@ -108,8 +123,8 @@ Tests: `uv run pytest` runs the adapter as a real subprocess against scripted mo
 
 ## Not built yet
 
-- Placing papers on the board from `master`: it has no canvas tools yet, so it answers in the chat; `board_assistant` is the agent that writes to the board.
-- A numeric relevance score (`score_candidates`, from embeddings, citation overlap and recency). The master ranks with the papers MCP's `rerank` alone, so the order and scores are Super VL's judgement, not a formula; see [How ranking works today](../discovery/README.md#how-ranking-works-today).
-- Background reader and context passes (`process_papers`); the reader runs only when the master calls it.
-- Writing the reader's artifacts to the board, and figure images: `get_fulltext` lists PMC figures by label and caption, so the reader picks figures from their captions, not by looking at them.
-- Labelling each trace step with its model and time for the demo.
+- Verdicts, citation overlap and recency in `score_candidates`: it scores by embedding similarity to the question and the closest seed, so the master places the top of that score. The master's instruction already skips candidates marked `placeable: false` once the papers MCP sends that field.
+- Clustering (`cluster_papers`, `apply_clusters`, `label_cluster`): neither MCP has the tools yet, so the master doesn't cluster.
+- Figures on the card: `get_fulltext` lists PMC figures by label and caption but no image URL, which `set_card` needs; the reader picks figures from their captions, not by looking at them.
+- Full-text quotes on the card: the canvas MCP's `add_quote` only accepts sentences from the abstract, so the reader's full-text quotes are left out.
+- Tool cards for the background passes: they run after the turn, so the chat shows no cards for them; the board shows their progress with the reading badge.
