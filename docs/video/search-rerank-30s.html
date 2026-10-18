@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Search and Rerank in 30s</title>
+<style>
+  :root {
+    --bg:#f5f4ef; --surface:#fff; --ink:#1c1c1e; --muted:#5d6066; --line:#e2e0d8;
+    --accent:#2f55d4; --accent-soft:#e9eefc;
+    --pm:#2f6fd4; --oa:#d97a1f; --web:#1f9a6a; --s2:#8a4fd1;
+    --good:#1f9a6a; --good-soft:#e2f4ec; --bad:#c8402f; --bad-soft:#fbe7e3; --hot:#f2c94c; --hot-soft:#fdf5d8;
+  }
+  * { box-sizing:border-box; }
+  html, body { margin:0; background:var(--bg); }
+  body { font:18px/1.4 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color:var(--ink); }
+  #film { position:relative; width:1280px; height:720px; overflow:hidden; background:var(--bg); }
+  #beat { position:absolute; left:40px; top:30px; font-size:15px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+  #brand { position:absolute; right:40px; top:30px; font-size:14px; color:var(--muted); }
+  #sub { position:absolute; left:50%; bottom:44px; transform:translateX(-50%); max-width:1100px; text-align:center;
+         background:rgb(20 20 24 / .86); color:#fff; font-size:29px; line-height:1.3; font-weight:500; padding:10px 22px; border-radius:10px; }
+  #progress { position:absolute; left:0; bottom:0; height:5px; background:var(--accent); }
+
+  .it { position:absolute; transform:translate(-50%,-50%); }
+  .it.la { transform:translate(0,-50%); }
+  .hdr { font-size:14px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); white-space:nowrap; text-align:center; }
+  .tile { background:var(--surface); border:1.5px solid var(--line); border-left:6px solid var(--line); border-radius:10px; padding:9px 14px; font-size:18px; line-height:1.3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; box-shadow:0 2px 6px rgb(0 0 0 / .06); }
+  .tile.big { white-space:normal; text-align:center; font:600 30px/1.3 ui-serif, Georgia, serif; padding:22px 30px; border-left-width:1.5px; }
+  .tile.multi { white-space:normal; }
+  .tile.pm { border-left-color:var(--pm); } .tile.oa { border-left-color:var(--oa); }
+  .tile.web { border-left-color:var(--web); } .tile.s2 { border-left-color:var(--s2); }
+  .tile.out { border-left-color:var(--accent); }
+  .tile.seed { border-left-color:var(--ink); font-weight:700; }
+  .tile.hot { border-color:var(--hot); background:var(--hot-soft); }
+  .tile.good { border-color:var(--good); background:var(--good-soft); }
+  .tile.strike { background:var(--bad-soft); border-color:var(--bad); text-decoration:line-through; color:var(--muted); }
+  .tile:has(.tags, .x) { padding-right:56px; }
+  .tags, .x { position:absolute; right:12px; top:50%; transform:translateY(-50%); }
+  .t { display:inline-block; width:12px; height:12px; border-radius:50%; margin-left:3px; vertical-align:middle; }
+  .t.pm, .t.pl { background:var(--pm); } .t.oa, .t.ci { background:var(--oa); } .t.web { background:var(--web); } .t.rec { background:var(--s2); }
+  .x { font-weight:800; color:var(--accent); }
+  .chip { background:var(--accent-soft); color:var(--accent); border-radius:99px; padding:8px 18px; font-size:19px; font-weight:600; white-space:nowrap; }
+  .ring { border-radius:50%; border:2px dashed var(--accent); opacity:.6; }
+  .dot { border-radius:50%; background:var(--accent); }
+  .dot.sq { border-radius:4px; background:var(--ink); }
+  .dot.q { background:var(--hot); border:3px solid var(--ink); }
+  .dot.bad { background:var(--bad); } .dot.good { background:var(--good); }
+  .dot .dl { position:absolute; left:150%; top:50%; transform:translateY(-50%); font-size:17px; font-weight:700; white-space:nowrap; color:var(--ink); }
+  .dot .dl.l { left:auto; right:150%; }
+  .note { font-size:15px; color:var(--muted); white-space:nowrap; }
+  .zap { font-size:16px; font-weight:700; color:var(--accent); background:var(--accent-soft); border-radius:8px; padding:5px 10px; white-space:nowrap; }
+  .score { font-size:18px; font-weight:800; border-radius:8px; padding:5px 10px; white-space:nowrap; }
+  .score.hi { background:var(--good-soft); color:var(--good); } .score.lo { background:var(--bad-soft); color:var(--bad); }
+  .abs { background:var(--surface); border:1.5px solid var(--line); border-radius:12px; padding:16px 20px; font-size:20px; line-height:1.5; white-space:normal; }
+  .abs mark { background:var(--hot-soft); color:inherit; border-bottom:3px solid var(--hot); }
+  .abs .ok { display:block; margin-top:8px; font-weight:800; color:var(--good); }
+  .box { border:2.5px dashed var(--accent); border-radius:18px; background:var(--accent-soft); }
+  .box .hdr { position:absolute; top:12px; left:18px; color:var(--accent); }
+  .why { font-size:18px; font-style:italic; color:var(--muted); white-space:nowrap; }
+</style>
+</head>
+<body>
+<div id="film">
+  <div id="beat"></div>
+  <div id="brand">Paper Discovery Canvas</div>
+  <div id="stage"></div>
+  <div id="sub"></div>
+  <div id="progress"></div>
+</div>
+<script>
+/* A 30-second timeline. `render(t)` draws the film at t seconds, so frames can
+   be captured one by one (render.mjs) or played live (open this file).
+   Each keyframe lists the pieces on screen; a piece keeps its id across
+   keyframes and moves from where it was over D seconds. Pieces are centred
+   on (x, y) in a 1280×720 frame, except `a: 'left'` ones. */
+const LENGTH = 30, D = 0.7;
+
+const BEATS = [
+  [0, '1 · The question'], [4.5, '2 · Cast a wide net'], [10, '3 · Expand from seeds'],
+  [15, '4 · Score by meaning'], [20, '5 · Read and verify'], [25, '6 · Rerank'],
+];
+const SUBS = [
+  [0.3, 4.3, 'A researcher asks a question and picks a few seed papers they trust.'],
+  [4.6, 9.8, 'First, a wide net: PubMed, OpenAlex and the web take turns; duplicates merge.'],
+  [10.1, 14.8, 'From the seeds we follow citations; papers that several methods agree on rise.'],
+  [15.1, 19.8, 'Then we score by meaning: each paper lands near the question, or far away.'],
+  [20.1, 24.8, 'A fast model reads every candidate at once; each quote is checked word for word.'],
+  [25.1, 29.8, 'Finally, a large model compares the top hundred side by side and orders them.'],
+];
+
+const tile = (id, x, y, html, cls = '', w = 230, more = {}) => ({ id, x, y, w, html, cls: 'tile ' + cls, ...more });
+const hdr = (id, x, y, html) => ({ id, x, y, html, cls: 'hdr' });
+const F = [];
+const at = (t, items) => F.push({ t, items });
+
+/* 1 · The question */
+const question = y => tile('q', 640, y, '“Which exhausted CD8 T-cell states predict response to immunotherapy in melanoma?”', 'big', 860);
+const seeds = y => [tile('S1', 560, y, '<b>S1</b> seed', 'seed', 140), tile('S2', 720, y, '<b>S2</b> seed', 'seed', 140)];
+at(0, [question(270), ...seeds(420)]);
+at(2.2, [question(200), ...seeds(330),
+  ...['TOX and exhaustion', 'progenitor CD8 cells', 'anti-PD-1 response'].map((s, k) =>
+    ({ id: 'sq' + k, x: 290 + 350 * k, y: 450, html: 'sub-query: ' + s, cls: 'chip', from: { x: 290 + 350 * k, y: 510 } }))]);
+
+/* Interleave source lists in turns, as the discovery service does. */
+function merged(cfg, done, opt = {}) {
+  const { cols, order, colX, title, label } = cfg;
+  const outX = 1060, rowY = r => 200 + 58 * r, outY = k => 200 + 52 * k;
+  const items = [...order.map(s => hdr('h-' + s, colX[s], 140, label[s])), hdr('h-out', outX, 140, 'merged')];
+  const out = [], absorbed = [];
+  for (let r = 0; r < 3; r++) for (const s of order) {
+    const L = cols[s][r], id = s + '-' + L;
+    if (r >= done) { items.push(tile(id, colX[s], rowY(r), `<b>${L}</b> ${title[L]}`, s)); continue; }
+    let e = out.find(e => e.L === L);
+    if (!e) out.push(e = { L, id, by: [s] });
+    else { e.by.push(s); if (r === done - 1 && !opt.settled) absorbed.push({ id, s, e }); }
+  }
+  out.forEach((e, k) => {
+    const pos = opt.place ? opt.place(e) : k;
+    if (pos == null) return;
+    e.pos = pos;
+    const tags = opt.count ? `<span class="x">×${e.by.length}</span>` : `<span class="tags">${e.by.map(s => `<i class="t ${s}"></i>`).join('')}</span>`;
+    items.push(tile(e.id, outX, outY(pos), `<b>${e.L}</b> ${title[e.L]}${tags}`, 'out ' + (opt.cls ? opt.cls(e) : ''), 270));
+  });
+  for (const a of absorbed) items.push(tile(a.id, outX, outY(a.e.pos), `<b>${a.e.L}</b> ${title[a.e.L]}`, a.s, 270, { o: 0 }));
+  return items;
+}
+const dot = c => `<span style="color:var(--${c})">●</span> `;
+
+/* 2 · Cast a wide net */
+const rr = {
+  cols: { pm: ['A', 'B', 'C'], oa: ['B', 'D', 'E'], web: ['F', 'A', 'G'] },
+  order: ['pm', 'oa', 'web'], colX: { pm: 210, oa: 470, web: 730 },
+  label: { pm: dot('pm') + 'PubMed', oa: dot('oa') + 'OpenAlex', web: dot('web') + 'Web' },
+  title: { A: 'CD8 exhaustion atlas', B: 'TOX drives exhaustion', C: 'PD-1 blockade cohort', D: 'Melanoma TIL scRNA-seq', E: 'Stem-like CD8 cells', F: 'Preprint: TCF7+ cells', G: 'Review: T-cell states' },
+};
+at(4.5, merged(rr, 0));
+at(5.9, merged(rr, 1));
+at(7.2, merged(rr, 2));
+at(8.5, merged(rr, 3));
+
+/* 3 · Expand from seeds */
+const votes = {
+  cols: { pl: ['P', 'Q', 'T'], ci: ['V', 'S1', 'Q'], rec: ['X', 'Q', 'V'] },
+  order: ['pl', 'ci', 'rec'], colX: { pl: 210, ci: 470, rec: 730 },
+  label: { pl: dot('pm') + 'PubMed links', ci: dot('oa') + 'Citing the seeds', rec: dot('s2') + 'Recommended' },
+  title: { P: 'Exhaustion clocks', Q: 'Atlas of CD8 states', T: 'TIL dynamics', V: 'Progenitor CD8 cells', S1: 'your seed', X: 'Already discarded' },
+};
+const sorted = ['Q', 'V', 'P', 'T'];
+at(10, merged(votes, 0, { count: true }));
+at(10.9, merged(votes, 1, { count: true }));
+at(11.8, merged(votes, 2, { count: true }));
+at(12.7, merged(votes, 3, { count: true }));
+at(13.4, merged(votes, 3, { count: true, settled: true, cls: e => (e.L === 'S1' || e.L === 'X') ? 'strike' : '' }));
+at(14.1, merged(votes, 3, { count: true, settled: true, place: e => { const k = sorted.indexOf(e.L); return k < 0 ? null : k; }, cls: e => e.L === 'Q' ? 'good' : '' }));
+
+/* 4 · Score by meaning */
+const C = { x: 640, y: 330 };
+const pt = (id, px, py, label, cls = '', left = false, size = 20) => ({ id, x: C.x + (px - 50) * 5.4, y: C.y + (py - 50) * 4.6, w: size, h: size, html: `<span class="dl${left ? ' l' : ''}">${label}</span>`, cls: 'dot ' + cls });
+const space = (cls = {}) => [
+  pt('star', 50, 50, 'question', 'q', false, 28),
+  pt('dS1', 43, 41, 'S1', 'sq' + (cls.S1 || ''), true), pt('dS2', 57, 57, 'S2', 'sq'),
+  pt('dQ', 59, 43, 'Q', cls.Q || ''), pt('dV', 40, 59, 'V', '', true), pt('dP', 64, 66, 'P'), pt('dB', 34, 36, 'B', '', true),
+  pt('dK', 88, 7, 'K · skin-screening app', cls.K || '', true),
+];
+const rings = [180, 330, 480].map((d, k) => ({ id: 'ring' + k, x: C.x, y: C.y, w: d, h: d, cls: 'ring' }));
+const ringLabels = ['very similar', 'similar', 'loosely related'].map((s, k) => ({ id: 'rl' + k, x: C.x, y: C.y - [180, 330, 480][k] / 2 - 12, html: s, cls: 'note' }));
+at(15, space());
+at(16.4, [...rings, ...ringLabels, ...space()]);
+at(17.8, [...rings, ...ringLabels, ...space({ K: ' bad', Q: ' good', S1: ' good' })]);
+
+/* 5 · Read and verify */
+const cands = [['Q', 0.91], ['K', 0.12], ['V', 0.78], ['B', 0.86], ['R', 0.31], ['P', 0.74]];
+const cx = k => 240 + 160 * k;
+const papers = cls => cands.map(([L, s], k) => tile('c' + L, cx(k), 190, `<b>${L}</b>`, 'out ' + (cls ? cls(L, s) : ''), 120, { o: cls && s < 0.7 ? 0.35 : 1 }));
+at(20, [...papers(), ...cands.map(([L], k) => ({ id: 'z' + L, x: cx(k), y: 260, html: '⚡ reading', cls: 'zap' }))]);
+at(21.4, [...papers(() => ''), ...cands.map(([L, s], k) => ({ id: 'z' + L, x: cx(k), y: 260, html: s.toFixed(2), cls: 'score ' + (s >= 0.7 ? 'hi' : 'lo') }))]);
+at(22.7, [...papers((L) => L === 'Q' ? 'good' : ''), ...cands.map(([L, s], k) => ({ id: 'z' + L, x: cx(k), y: 260, html: s.toFixed(2), cls: 'score ' + (s >= 0.7 ? 'hi' : 'lo') })),
+  { id: 'abs', x: 640, y: 430, w: 980, cls: 'abs', from: { x: cx(0), y: 300, w: 980 },
+    html: '<b>Q, abstract:</b> … we find that <mark>TCF7+ progenitor-exhausted CD8 T cells predict response to anti-PD-1</mark> in two cohorts …<span class="ok">✓ quote found word for word: verified</span>' }]);
+
+/* 6 · Rerank */
+const P = { Q: ['Atlas of CD8 states', '0.86', 'Same states as both seeds'], V: ['Progenitor CD8 cells', '0.85', 'Same cells, other cancer'], B: ['TOX drives exhaustion', '0.85', 'Key mechanism'], D: ['TOX, small cohort', '0.84', 'Repeats B, smaller cohort'], A: ['Review: T-cell states', '0.83', 'Review, no new data'], E: ['Tests S1 in a new cohort', '0.81', "Directly tests S1's claim"] };
+const before = ['Q', 'V', 'B', 'D', 'A', 'E'], after = ['E', 'Q', 'B', 'V', 'A', 'D'];
+const ry = k => 150 + 62 * k;
+const rows = (order, opt = {}) => order.map((L, k) => tile('r' + L, 440, ry(k), `<b>${k + 1}. ${L}</b> ${P[L][0]}${opt.noScore ? '' : `<span class="x" style="color:var(--muted)">${P[L][1]}</span>`}`, 'out ' + (opt.cls ? opt.cls(L) : ''), 440, { o: opt.dim?.(L) ? 0.4 : 1 }));
+const why = order => order.map((L, k) => ({ id: 'w' + L, x: 700, y: ry(k), html: P[L][2], cls: 'why la', a: 'left' }));
+const box = { id: 'box', x: 640, y: 305, w: 1200, h: 420, html: '<span class="hdr">one prompt to the large model</span>', cls: 'box', z: 1 };
+const seedCtx = [
+  tile('k1', 1000, 170, '<b>S1</b> full abstract', 'seed', 260), tile('k2', 1000, 232, '<b>S2</b> full abstract', 'seed', 260),
+  tile('k3', 1000, 294, 'goal: <b>evidence</b>', 'hot', 260), { id: 'k4', x: 1000, y: 370, html: '+ ~94 more candidates', cls: 'note' },
+];
+at(25, [hdr('rh', 440, 100, 'sorted by score, each judged alone'), ...rows(before)]);
+at(26.0, [box, ...rows(before), ...seedCtx]);
+at(27.0, [box, ...rows(before, { cls: L => L === 'D' || L === 'E' ? 'hot' : '' }), ...why(before)]);
+at(28.1, [hdr('rh2', 440, 100, 'reranked side by side'), ...rows(after, { noScore: true, cls: L => L === 'E' ? 'good' : '', dim: L => L === 'D' }), ...why(after)]);
+
+/* ---------- renderer ---------- */
+const stage = document.getElementById('stage'), els = new Map();
+const ease = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const mix = (a, b, p) => a == null || b == null ? b : a + (b - a) * p;
+
+function put(id, it, g) {
+  let el = els.get(id);
+  if (!el) { el = document.createElement('div'); stage.appendChild(el); els.set(id, el); }
+  el.style.display = '';
+  const cls = 'it ' + (it.cls || '') + (it.a === 'left' ? ' la' : '');
+  if (el.className !== cls) el.className = cls;
+  if (el._html !== it.html) { el.innerHTML = it.html || ''; el._html = it.html; }
+  el.style.left = g.x + 'px';
+  el.style.top = g.y + 'px';
+  el.style.width = g.w != null ? g.w + 'px' : '';
+  el.style.height = g.h != null ? g.h + 'px' : '';
+  el.style.opacity = g.o;
+  el.style.zIndex = it.z ?? 2;
+}
+
+function render(t) {
+  let k = 0;
+  while (k + 1 < F.length && F[k + 1].t <= t) k++;
+  const cur = F[k], prev = new Map((F[k - 1]?.items || []).map(i => [i.id, i]));
+  const p = ease(Math.min(1, Math.max(0, (t - cur.t) / D)));
+  const live = new Set();
+  for (const it of cur.items) {
+    const a = prev.get(it.id) || { ...it, ...(it.from || {}), o: 0 };
+    put(it.id, it, { x: mix(a.x, it.x, p), y: mix(a.y, it.y, p), w: mix(a.w, it.w, p), h: mix(a.h, it.h, p), o: mix(a.o ?? 1, it.o ?? 1, p) });
+    live.add(it.id);
+  }
+  if (p < 1) for (const [id, a] of prev) if (!live.has(id)) {
+    put(id, a, { x: a.x, y: a.y, w: a.w, h: a.h, o: (a.o ?? 1) * (1 - p) });
+    live.add(id);
+  }
+  for (const [id, el] of els) if (!live.has(id)) el.style.display = 'none';
+
+  document.getElementById('beat').textContent = BEATS.filter(([b]) => b <= t).at(-1)[1];
+  const sub = SUBS.find(([a, b]) => t >= a && t < b), subEl = document.getElementById('sub');
+  subEl.textContent = sub ? sub[2] : '';
+  subEl.style.opacity = sub ? Math.min(1, (t - sub[0]) / .2, (sub[1] - t) / .2) : 0;
+  document.getElementById('progress').style.width = (t / LENGTH * 100) + '%';
+}
+window.render = render;
+window.SUBS = SUBS;
+
+/* Opened directly, it plays in a loop; render.mjs sets ?capture to draw frames itself. */
+if (!location.search.includes('capture')) {
+  const start = performance.now();
+  (function loop(now) { render(((now - start) / 1000) % LENGTH); requestAnimationFrame(loop); })(start);
+} else render(0);
+</script>
+</body>
+</html>

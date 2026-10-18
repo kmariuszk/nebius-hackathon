@@ -1,0 +1,23 @@
+1
+00:00:00,300 --> 00:00:04,300
+A researcher asks a question and picks a few seed papers they trust.
+
+2
+00:00:04,600 --> 00:00:09,800
+First, a wide net: PubMed, OpenAlex and the web take turns; duplicates merge.
+
+3
+00:00:10,100 --> 00:00:14,800
+From the seeds we follow citations; papers that several methods agree on rise.
+
+4
+00:00:15,100 --> 00:00:19,800
+Then we score by meaning: each paper lands near the question, or far away.
+
+5
+00:00:20,100 --> 00:00:24,800
+A fast model reads every candidate at once; each quote is checked word for word.
+
+6
+00:00:25,100 --> 00:00:29,800
+Finally, a large model compares the top hundred side by side and orders them.
