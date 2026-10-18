@@ -18,13 +18,14 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 
 - [Architecture diagram 1](../../architecture.html#components): "Canvas MCP + layout service" writes into the sync rooms; external agents use the same server.
 - [Concept: Canvas MCP tools](../../Concept.md#apis-and-data-model) is the full tool list; this WP builds the ones that need only the board, and [I5](interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp) gates the rest.
-- `client/server/server.ts` already writes validated shapes in one `room.storage.transaction` (`putShapes`) for `POST /api/rooms/:room/shapes`.
+- `client/server/server.ts` already writes validated shapes in one `room.storage.transaction`: insert-only `putShapes` for `POST /api/rooms/:room/shapes` and merging `patchShapes` for `PATCH` (T00, merged with PR #6).
+- The `paper-card` props this WP writes are fixed in `client/shared/paperCard.ts` (T01), and the shape IDs in `client/shared/ids.ts`.
 
 ## Scope
 
-**In:** MCP server over streamable HTTP; v1 tools below; attribution from headers; human-touched rules; idempotent writes; layout v0 (neighbour placement); closing rooms opened only for agent writes; an event hook for T08.
+**In:** MCP server over streamable HTTP; v1 tools below; attribution from headers; human-touched rules; idempotent writes; layout v0 (neighbour placement); closing rooms opened only for agent writes; an event hook for T08; binding records on the low-level REST route.
 
-**Out (phase 2, once the discovery tools exist):** `apply_clusters`, `label_cluster`, `add_table`, `add_diagram`, the d3-force "Structure by" layout ([Concept: Clustering and layout](../../Concept.md#system-architecture)). Figures arrive through `set_card` once `get_figures` exists. The v4 mockup puts quotes and figures inside the card, not on the board, so there are no `quote` or `figure` shapes.
+**Out (phase 2, once the discovery tools exist):** `apply_clusters`, `label_cluster`, `add_table`, `add_diagram`, the d3-force "Structure by" layout ([Concept: Clustering and layout](../../Concept.md#system-architecture)). Figures arrive through `set_card` once `get_figures` exists. The v4 and v5 mockups put quotes and figures in the opened paper (v5's widgets), not on the board, so there are no `quote` or `figure` shapes.
 
 ## Design
 
@@ -46,7 +47,7 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | --- | --- |
 | `Authorization: Bearer <memberId or personal token>` | `onBehalfOf` (personal tokens resolve to a member in T11); missing or unknown gives HTTP 401 |
 | `X-Run-Id: run_…` | `runId` on every shape written; missing is allowed (`null`) for external agents |
-| `X-Model: nvidia/…` | Recorded with the time for each card field `set_card` writes, for the card's "AI" labels (T10); missing is allowed |
+| `X-Model: nvidia/…` | Recorded with the time in the card's `provenance` (`provenance[field] = {model, at}`) for each field `set_card` writes; missing is allowed (`model: null`) |
 | URL `:boardId` | The room; created on first write like any room today |
 
 **Tools (v1).**
@@ -54,16 +55,18 @@ Any agent changes the shared board only by calling MCP tools at `/api/mcp/canvas
 | Tool | Input | Output | Rules |
 | --- | --- | --- | --- |
 | `get_board` | none | `{boardId, question, goals, papers: [{paperId, label, title, year, type, kind, status, scores, working, cluster, humanTouched, pinnedNotes}], links: [{from, to, kind, label, by}], notes: [{shapeId, text, author, pinnedTo}], discardedIds, removedLinks}` | Compact, never raw records; `question`, `goals`, `discardedIds` and `removedLinks` come from T08's board DB and are empty before it exists; capped at 500 papers |
-| `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, type?, peerReviewed?, citedBy?, retracted?, kind?, near?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; retracted papers and seeds already on the board are skipped; `type` accepts whatever discovery emits and is stored through T01's `normaliseType` (raw value in `typeRaw`); an existing card is patched (never replaced) unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
+| `add_papers` | `{papers: [{paperId, title, authors?, year?, venue?, url?, type?, peerReviewed?, citedBy?, foundBy?, retracted?, kind?, near?}]}`, at most 50 | `{added, updated, skipped: [{paperId, reason}]}` | ID from `paperShapeId`; retracted papers and seeds already on the board are skipped; `type` accepts whatever discovery emits and is stored through T01's `normaliseType` (raw value in `typeRaw`); `peerReviewed` is true, false or null (unknown); `foundBy` is how discovery found the paper (for example `pubmed`, `cites 3 seeds`), shown under More (T10); an existing card is patched (never replaced) unless human-touched (`skipped`, reason `edited by a person`); `status` starts `new`, `working` starts true |
 | `set_scores` | `{paperId, scores: {[goal]: {score, fit, why}}}` | `{ok, skipped}` | `score` 0 to 1; `goal` must be one of the board's goals; the node colour and ranked list follow it |
-| `set_card` | `{paperId, oneLine?, claims?, facets?, figure?, tldr?, summary?, gaps?}` | `{ok, skipped}` | Fills the card's first view and Details (T10); each field can arrive on its own, so the card fills in section by section; `claims[].evidence` must name quote IDs that exist on the card (or `seeds`); `figure` needs an `imageUrl` from the paper (no generated images) |
+| `set_card` | `{paperId, oneLine?, claims?, glance?, figure?, summary?, gaps?}` | `{ok, skipped}` | Fills the widgets (T10): `oneLine` and `claims` are "Why it matters to you", `glance` is "The paper at a glance" (3–4 steps of `{label, text, quoteId, relation}`, `relation` one of `same`, `adds`, `other` or null), `figure` is the figure (`{imageUrl, label, caption, captionByAi}`), `summary` and `gaps` go under More. Each field can arrive on its own, so the widgets fill in one by one. `claims[].text` must appear verbatim in `oneLine`; `claims[].evidence` must name quote IDs that exist on the card (or `seeds`), and so must each `glance[].quoteId` (or be null); `figure` needs an `imageUrl` from the paper (no generated images). Records `provenance[field] = {model, at}` for each field written, from `X-Model` |
 | `add_quote` | `{paperId, text, source?}` | `{quoteId}` or an MCP tool error | Adds to the card's `quotes`; rejected unless `text` appears verbatim (whitespace-normalised) in the paper's abstract, or full text once `get_fulltext` exists; the stored `url` gets a `#:~:text=` fragment |
-| `link_papers` | `{links: [{from, to, kind, label?}]}`, `kind` one of `cites`, `similar` | `{linked, skipped}` | Arrow with two bindings, ID from `linkShapeId`, so repeats are no-ops; both cards must exist; skipped if a person removed the same link (`removedLinks`) or hid it; resizes cards by link count unless human-touched |
+| `link_papers` | `{links: [{from, to, kind, label?}]}`, `kind` one of `cites`, `similar` | `{linked, skipped}` | Arrow with two bindings, ID from `linkShapeId` (`shape:link-<kind>-<slug(from)>--<slug(to)>`), so repeats are no-ops; a `similar` link has no direction, so the pair is sorted before the ID is built; both cards must exist; skipped if a person removed the same link (`removedLinks`) or hid it; resizes cards by link count unless human-touched |
 | `mark_working` | `{paperIds, on}` | `{ok}` | The "Agent is reading…" ring |
-| `add_note` | `{text, paperId?}` | `{shapeId}` | Built-in note, authored as the agent; with `paperId` it is pinned to that card with a `note-pin` binding (T01) and appears in the card's Notes |
+| `add_note` | `{text, paperId?}` | `{shapeId}` | Built-in note, authored as the agent; with `paperId` it is pinned to that card with a `note-pin` binding (T01, props `{dx, dy}`) and appears in its Team notes widget (T10) |
 | `add_highlight` | `{paperId, text, page?, category?, note?}` | `{shapeId}` | Only if T10's PDF reading is in scope: `highlight` shape beside its card; no `rects` (the PDF view anchors it by text) |
 
 **Creates and updates are different writes** (PR #6 review, finding 6). New shapes go through T00's insert-only `putShapes`; every update goes through T00's `patchShapes`, which merges props and keeps `x`, `y`, `rotation`, `index`, `parentId` and `meta` unless the tool is allowed to change them. A tool never re-creates an existing record, so an update can't reset a person's layout or move a card to the top of the stack.
+
+**Bindings on the REST route.** `POST /api/rooms/:room/shapes` also creates binding records: items with `typeName: 'binding'` (for example an arrow's two `arrow` bindings, or a note's `note-pin`) are validated against the binding schema and written in the same transaction as the shapes, after them, so a binding can point at a shape from the same request. A binding to a shape that doesn't exist fails the whole request. Insert-only, like shapes. The demo seed script uses it to write a whole board (papers, links, pinned notes) in one call.
 
 Every write sets the meta from the [shared contracts](README.md#shared-contracts). Tool descriptions are self-contained (an external agent reads only them) and name their limits.
 
@@ -84,8 +87,9 @@ The agent may suggest `near`; it never sends coordinates (the input schemas have
 
 ## Tasks
 
-- [ ] `client/package.json`: `@modelcontextprotocol/sdk@1.32.1`, `zod@4.6.5`.
+- [x] `client/package.json`: `@modelcontextprotocol/sdk@1.32.1`, `zod@4.6.5` (on `feat/board-build`).
 - [ ] Extract `client/server/rooms.ts` from `server.ts` (no behaviour change; `POST /api/rooms/:room/shapes` keeps working).
+- [ ] Binding records (`typeName: 'binding'`) on `POST /api/rooms/:room/shapes`.
 - [ ] `client/server/layout.ts` with unit tests.
 - [ ] `client/server/canvasTools.ts`: the eight core tools as plain functions (`add_highlight` only with T10's PDF reading).
 - [ ] `client/server/papersClient.ts`: MCP client to `PAPERS_MCP_URL`, `get_paper` cached per paper ID in memory.
@@ -98,17 +102,19 @@ The agent may suggest `near`; it never sends coordinates (the input schemas have
 
 1. `npx @modelcontextprotocol/inspector` connected to `http://localhost:5858/api/mcp/canvas/demo` with `Authorization: Bearer m_test` lists the eight core tools; `add_papers` with three papers and `near` puts three non-overlapping nodes beside the neighbour, live in an open browser.
 2. Calling `add_papers` again with the same IDs and new metadata updates the cards; after a person moves one card, a further call reports it in `skipped` and leaves it where the person put it. A retracted paper is skipped.
-3. `set_scores` for two goals colours the node by the viewer's current goal; `set_card` with only `oneLine`, then later `facets`, fills the open card section by section (T10).
+3. `set_scores` for two goals colours the node by the viewer's current goal; `set_card` with only `oneLine`, then later `glance`, fills the open widgets one by one (T10), and records `provenance.oneLine` and `provenance.glance` with the `X-Model` value and the time. A glance step or claim naming a quote ID that isn't on the card is rejected and writes nothing.
 4. `add_quote` with text that isn't in the abstract returns a tool error and writes nothing; with a verbatim sentence it adds a quote to the card whose `url` carries the text fragment.
 5. After a person deletes a `similar` link, `link_papers` with the same pair reports it in `skipped`; `add_note` with a `paperId` creates a note that moves with that card.
 6. Every shape written carries `createdBy`, `onBehalfOf` and, when `X-Run-Id` was sent, `runId`.
 7. A write to a board nobody has open succeeds, and the room is closed 30 seconds later.
 8. The harness's `toolsets.canvas()` (with `CANVAS_MCP_URL` and `BOARD_TOKEN`) lists the same tools.
+9. `POST /api/rooms/:room/shapes` with two paper cards, an arrow and its two bindings writes all five records in one transaction, visible in an open browser; a binding to a missing shape fails the request and writes nothing.
 
 ## Tests
 
 - `client/server/layout.test.ts`: no overlaps across 200 placements; determinism; `near` respected.
-- `client/server/canvasTools.test.ts`: each tool against a real `TLSocketRoom` on a temp `DATA_DIR`, including human-touched skips and idempotency.
+- `client/server/canvasTools.test.ts`: each tool against a real `TLSocketRoom` on a temp `DATA_DIR`, including human-touched skips, idempotency, `set_card`'s quote ID checks for claims and glance steps, and `provenance`.
+- `client/server/shapesRoute.test.ts`: binding records on the REST route, in the same transaction as their shapes.
 - `client/server/canvasMcp.test.ts`: the HTTP route with the SDK's `Client` and `StreamableHTTPClientTransport`; 401 without a bearer.
 
 ## Risks

@@ -12,7 +12,7 @@
 
 ## Goal
 
-Everything about a board that isn't a shape lives in one SQLite board DB behind a small REST API: the board's question, its members, Keep and Discard votes, the board's "Looking for" goals, paper records for the card, PDFs, links people removed, and an activity feed that streams over SSE. A vote changes the card for everyone through the sync room.
+Everything about a board that isn't a shape lives in one SQLite board DB behind a small REST API: the board's question, its members, Keep and Discard votes, the board's "Looking for" goals, paper records for the paper widgets, PDFs, links people removed, and an activity feed that streams over SSE. A vote changes the card for everyone through the sync room.
 
 ## Context
 
@@ -61,14 +61,14 @@ Everything about a board that isn't a shape lives in one SQLite board DB behind 
 | POST | `/boards/:id/seen` | Mark the feed seen up to a sequence number (catch-me-up) | `{seq}` → 204 |
 | POST | `/boards/:id/seeds` | Add a seed by DOI or PMID: papers MCP `resolve_seed`, then a `paper-card` with `kind: seed`, authored by the member | `{doi}` or `{pmid}` → `Paper` |
 | GET | `/boards/:id/papers` | The ranked list for non-canvas clients | `?sort=rank&status=new` → `[PaperRow]` |
-| GET | `/boards/:id/papers/:paperId` | Full record for the card's Details (the original abstract next to the AI summary): board fields, card fields, and the papers MCP's `get_paper` (cached) | → `Paper` (shape of [Concept: Paper record](../../Concept.md#paper-record), with missing parts left out) |
+| GET | `/boards/:id/papers/:paperId` | Full record for More in the paper widgets (T10: the original abstract next to the AI summary, when the paper was added): board fields, card fields, and the papers MCP's `get_paper` (cached) | → `Paper` (shape of [Concept: Paper record](../../Concept.md#paper-record), with missing parts left out) |
 | PUT | `/boards/:id/papers/:paperId/vote` | Keep, Discard, or clear | `{decision: "keep" \| "discard" \| null}` → `{status, keepBy, discardBy}` |
 | GET | `/boards/:id/papers/:paperId/pdf` | The open-access PDF, proxied for CORS | → `application/pdf` |
 | PUT | `/boards/:id/removed-links` | Record a link a person deleted (T14) | `{from, to, kind}` → 204 |
 | GET | `/boards/:id/activity` | Feed, newest first | `?after=<seq>` → `[Event]` |
 | GET | `/boards/:id/events` | SSE stream of new events | `Last-Event-ID` or `?after=` → `text/event-stream` |
 
-**Triage rules** (`triage.ts`, from [Concept: Collaborative triage](../../Concept.md#collaboration-on-the-board)): no votes leaves `new` (or `seed`); any Keep and no Discard gives `kept`; only Discards gives `discarded` (hidden, and a negative signal for later runs through `get_board`'s `discardedIds`); Keep and Discard together give `contested`. Each vote updates `decisions` and `board_papers`, then writes the card's `status`, `keepBy` and `discardBy` in one room transaction, and records a `paper.voted` event. The agent never votes: the canvas MCP has no vote tool.
+**Triage rules** (`triage.ts`, from [Concept: Collaborative triage](../../Concept.md#collaboration-on-the-board)): no votes leaves `new` (or `seed`); any Keep and no Discard gives `kept`; only Discards gives `discarded` (hidden, and a negative signal for later runs through `get_board`'s `discardedIds`); Keep and Discard together give `contested`. Each vote updates `decisions` and `board_papers`, then writes the card's `status`, `keepBy` and `discardBy` (and `kind`, which follows the status: `kept` or `suggestion`; seeds stay seeds) in one room transaction, and records a `paper.voted` event. The agent never votes: the canvas MCP has no vote tool. Until this route exists, T10's `votes.ts` writes the same props through the editor, then switches to the route.
 
 **Events.** Types: `board.created`, `member.joined`, `seed.added`, `paper.added`, `paper.updated`, `paper.linked`, `note.added`, `highlight.added`, `quote.added`, `paper.voted`, `link.removed`, and `agent.active` / `agent.idle` (sent when T03's harness registry gains its first or loses its last harness for the board; the top bar shows the agent in the face pile, T13). Payloads are small (IDs, titles, counts). SSE frames are `id: <seq>`, `event: <type>`, `data: <json>`, with a comment heartbeat every 15 seconds; a reconnect with `Last-Event-ID` replays what it missed from the DB. `get_board` (T02) reads `question` and `discardedIds` from here.
 

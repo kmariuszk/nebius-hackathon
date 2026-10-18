@@ -65,7 +65,8 @@ A browser opens `/api/acp?board=…&member=…` and is talking ACP to a fresh ha
 
 ## Tasks
 
-- [ ] `client/server/acpPipe.ts` and the upgrade branch in `client/server/server.ts`.
+- [x] The upgrade branch in `client/server/server.ts`: `/api/acp` goes to `handleAcpUpgrade` (on `feat/board-build`).
+- [ ] `client/server/acpPipe.ts`: replace the stub, which refuses every chat with a 503.
 - [ ] Registry of live harnesses (count, idle timers, shutdown).
 - [ ] `client/Dockerfile` and `client/.dockerignore` for a repo-root context; README's "Run in Docker" updated.
 - [ ] `.env.example`: `HARNESS_CMD`, `HARNESS_IDLE_MINUTES`, `MAX_HARNESSES` (commented, board service section).

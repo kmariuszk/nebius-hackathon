@@ -12,19 +12,19 @@
 
 ## Goal
 
-The board looks and works like the v4 mockup, not like a drawing app: tldraw's own toolbars and menus are gone, and in their place is v4's chrome. A top bar with the board's title and question, "Looking for", who's here (the agent included), "Catch me up" and Chat; a bottom bar with Note and, after edits, "N changes · the agent is waiting · Update suggestions"; and a help button with the legend.
+The board looks and works like the mockups (v5, which keeps v4's bars), not like a drawing app: tldraw's own toolbars and menus are gone, and in their place is v4's chrome. A top bar with the board's title and question, "Looking for", who's here (the agent included), "Catch me up" and Chat; a bottom bar with Note and, after edits, "N changes · the agent is waiting · Update suggestions"; and a help button with the legend.
 
 ## Context
 
-- **Visual spec:** [v4 mockup](../../mockups/README.md), every screenshot in `docs/mockups/shots-v4/` (top bar and bottom bar in `1-overview.png`; the changes bar in `5-named-link.png` and `9-note-pinned.png`).
+- **Visual spec:** [v4 mockup](../../mockups/README.md), every screenshot in `docs/mockups/shots-v4/` (top bar and bottom bar in `1-overview.png`; the changes bar in `5-named-link.png` and `9-note-pinned.png`). v5 keeps the bars (`shots-v5/0-board.png`; the changes bar in `11-note-drop.png`) and adds two lines to the help panel and its figure switch.
 - v4: "After edits, 'N changes · the agent is waiting' offers Update suggestions, as agreed in the brainstorm: you edit, then the agent catches up."
 - Today `Room.tsx` renders tldraw's full default UI inside the multiplayer starter's `RoomWrapper` header.
 
 ## Scope
 
-**In:** hiding tldraw's default UI; the top bar; the bottom bar; the changes counter and "Update suggestions"; help and legend; layout of the docked panels (ranked list, filter, chat, card); toasts.
+**In:** hiding tldraw's default UI; the top bar; the bottom bar; the changes counter and "Update suggestions"; help and legend; layout of the docked panels (ranked list, filter, chat) around the paper widgets; toasts.
 
-**Out:** what each panel does (ranked list and filters: T09; chat: T05; card: T10); drawing links and pinning notes (T14); the agent's response to "Update suggestions" and "Catch me up" (harness owner).
+**Out:** what each panel does (ranked list and filters: T09; chat: T05; paper widgets: T10); drawing links and pinning notes (T14); the agent's response to "Update suggestions" and "Catch me up" (harness owner).
 
 ## Design
 
@@ -37,19 +37,19 @@ The board looks and works like the v4 mockup, not like a drawing app: tldraw's o
 | Logo, board title, question | From `GET /boards/:id` (T08); clicking the title or question edits it (`PATCH`) |
 | "Looking for" switch | The board's goals (T08); sets T01's per-viewer `currentGoal`; effects in T09 |
 | Face pile | Avatars from tldraw presence (`editor.getCollaborators()` plus this viewer), coloured as their cursors; a robot avatar when the agent is active on this board (T08's `agent.active` and `agent.idle` events, fed by T03's harness registry) |
-| "Catch me up (N)" | N = papers added since this viewer's last visit (T08); sends the prompt "Catch me up" on this viewer's chat connection (T05, opened if needed); the tour itself appears in the card (T06, T10); hidden when N is 0 |
+| "Catch me up (N)" | N = papers added since this viewer's last visit (T08); sends the prompt "Catch me up" on this viewer's chat connection (T05, opened if needed); the tour itself runs in the paper widgets, with the agent's line in the actions widget under each node (T06, T10); hidden when N is 0 |
 | Chat | Opens and closes the chat panel (T05) |
 
 **Bottom bar** (`client/client/chrome/BottomBar.tsx`), centred:
 
-- **Note:** click places a note at the centre of the view; drag it onto a paper to pin it there (T14).
+- **Note:** click places a note at the centre of the view; drag it onto a paper, or onto any widget of the open paper, to pin it there (T14, T10).
 - **Changes:** after this viewer's own edits, "N changes · the agent is waiting" and an **Update suggestions** button. N counts edits since this viewer's last prompt, from T01's side-effect handlers: papers moved, links drawn, named, hidden or deleted, notes added or pinned. **Update suggestions** sends the prompt "Update suggestions" with the change list attached as a resource block (`tldraw://<boardId>/changes`, T07), then resets N. What the agent does with it (re-rank, re-run around the changed papers, respect removed links) is the master's job.
 
-**Help** (`?`, bottom right): a popover "How to read the board": squares are in your collection (seed or kept), circles are suggestions coloured by fit for the current goal, NEW means nobody has voted yet, a dashed ring means the agent is reading, a check means kept, the split mark means a split vote; link kinds (cites, similar, your own); keyboard basics.
+**Help** (`?`, bottom right): a popover "How to read the board": squares are in your collection (seed or kept), circles are suggestions coloured by fit for the current goal, NEW means nobody has voted yet, a dashed ring means the agent is reading, a check means kept, the split mark means a split vote; link kinds (cites, similar, your own); "Drop a note on a paper to pin it there."; "Click an open paper again for more." (v5); keyboard basics. It also holds T10's switch for showing the figure in an opened paper's first view.
 
-**Panel layout** (v4 positions): ranked list top left (T09), filter bottom right (T09), chat top right (T05), the card docked right (T10; to the left of the chat when both are open). Panels overlay the canvas rather than shrink it, so the board never jumps. Below 900 px wide, panels open as full-height sheets, one at a time.
+**Panel layout** (v4 positions): ranked list top left (T09), filter bottom right (T09), chat top right (T05); an opened paper's widgets (T10) fill the space between them, in two columns when the list and the chat are both open. Panels overlay the canvas rather than shrink it, so the board never jumps. Below 900 px wide, panels open as full-height sheets, one at a time.
 
-**Toasts** for confirmations, as in v4 ("Note pinned to Liu 2022. It moves with the paper and shows in its card."), using tldraw's `Toasts`.
+**Toasts** for confirmations, as in v5 ("Note pinned to Liu 2022. It moves with the paper."), using tldraw's `Toasts`.
 
 ## Tasks
 
@@ -61,14 +61,14 @@ The board looks and works like the v4 mockup, not like a drawing app: tldraw's o
 
 1. No tldraw toolbar, style panel, page menu or main menu is visible; the top and bottom bars match the v4 screenshots in layout and wording.
 2. Two people and an active chat on one board show three avatars, one of them the agent's; the agent's disappears within a minute of its harness ending.
-3. With three papers added since Ana's last visit, "Catch me up 3" starts the tour in the card; after she's seen them, the badge disappears.
+3. With three papers added since Ana's last visit, "Catch me up 3" starts the tour in the first paper's widgets; after she's seen them, the badge disappears.
 4. Moving a paper and naming a link shows "2 changes · the agent is waiting"; Update suggestions sends one prompt carrying both changes and resets the counter.
 5. Help explains every node and link style on the board.
 
 ## Tests
 
 - `client/client/chrome/changes.test.ts`: which store changes count, merging repeated moves of the same paper into one change, the change list's JSON.
-- Manual: criteria 1 to 3 side by side with the v4 mockup, recorded for T12.
+- Manual: criteria 1 to 3 side by side with the v5 mockup (v4 for the bars), recorded for T12.
 
 ## Risks
 

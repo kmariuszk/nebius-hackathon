@@ -526,11 +526,14 @@ body.wopen .pb-string.faded{opacity:.06}
 .pb-toggle input:checked + i{background:#b98f5c}
 .pb-toggle input:checked + i::after{transform:translateX(12px)}
 .pb-toggle input:focus-visible + i{outline:2px solid var(--ink);outline-offset:2px}
+.backbtn{display:inline-flex;align-items:center;gap:3px;height:32px;padding:0 11px 0 7px;border-radius:8px;border:1px solid var(--hair);color:var(--ink2);text-decoration:none;font-size:13px;font-weight:550;flex:none;margin-right:2px}
+.backbtn:hover{background:var(--page);color:var(--ink)}
 </style>
 </head>
 <body>
 
 <header class="top">
+  <a class="backbtn" id="backBtn" href="../../client/public/landing/home.html?mock=1" title="Back to your boards"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M10 3 5 8l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Boards</a>
   <div class="logo"><svg width="14" height="14" viewBox="0 0 16 16"><circle cx="5" cy="5" r="3" fill="#fff"/><circle cx="11.5" cy="11" r="2.5" fill="#86b6ef"/><path d="M7 7 L10 9.5" stroke="#fff" stroke-width="1.5"/></svg></div>
   <div class="board">Melanoma immune cells</div>
   <div class="question">Which single-cell methods help study melanoma immune cells?</div>
@@ -1451,6 +1454,7 @@ if(hp.get('menu'))state.open=hp.get('menu');
 $('#pbBgToggle').addEventListener('change',e=>document.body.classList.toggle('bg-cork',e.target.checked));
 document.fonts&&document.fonts.ready.then(()=>{drawGraph();if(state.sel)drawWLines()});
 drawKey();attachNote(STICKIES[0],'n1');setInsets();cam=overviewCam();applyCam();drawChrome();drawGraph();drawNotes();drawList();drawChat();drawChanges();
+{const b=$('#backBtn'),q=new URLSearchParams(location.search);if(q.get('mock')==='1'&&!b.getAttribute('href').includes('mock='))b.href+=(b.getAttribute('href').includes('?')?'&':'?')+'mock=1';if(q.get('tour')==='1')hp.set('catchup','1')}
 if(hp.get('catchup'))startCatchup();else if(hp.get('sel'))open(hp.get('sel'),{fly:false});
 </script>
 </body>

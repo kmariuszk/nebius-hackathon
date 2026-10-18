@@ -136,3 +136,12 @@ def papers_mcp(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakePapers]:
     yield fake
     server.should_exit = True
     thread.join(timeout=5)
+
+
+@pytest.fixture
+def canvas_mcp() -> Iterator[Any]:
+    """A stand-in canvas MCP at /api/mcp/canvas/b_test; `calls` records each call's headers."""
+    from fixtures.fake_canvas import FakeCanvas, serve
+
+    with serve(FakeCanvas()) as fake:
+        yield fake

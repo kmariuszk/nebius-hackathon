@@ -11,19 +11,24 @@
 		"dev": "concurrently -k -n vite,server \"vite --host\" \"node --watch server/server.ts\"",
 		"build": "tsc && vite build",
 		"start": "node server/server.ts",
-		"test": "node --test \"server/**/*.test.ts\""
+		"test": "node --test \"server/**/*.test.ts\" \"shared/**/*.test.ts\" \"client/**/*.test.ts\""
 	},
 	"dependencies": {
+		"@agentclientprotocol/sdk": "1.8.0",
+		"@modelcontextprotocol/sdk": "1.32.1",
 		"@tldraw/sync": "^5.5.2",
 		"@tldraw/sync-core": "^5.5.2",
 		"@tldraw/tlschema": "^5.5.2",
 		"@tldraw/utils": "^5.5.2",
+		"@tldraw/validate": "5.5.2",
 		"react": "^19.2.1",
 		"react-dom": "^19.2.1",
+		"react-markdown": "10.1.0",
 		"react-router-dom": "^6.28.2",
 		"tldraw": "^5.5.2",
 		"unfurl.js": "^6.4.0",
-		"ws": "^8.22.0"
+		"ws": "^8.22.0",
+		"zod": "4.6.5"
 	},
 	"devDependencies": {
 		"@types/node": "^22.20.5",

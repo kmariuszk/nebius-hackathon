@@ -1,12 +1,22 @@
 import { useSync } from '@tldraw/sync'
 import { ReactNode, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { Tldraw } from 'tldraw'
+import { defaultBindingUtils, defaultShapeUtils, Editor, Tldraw } from 'tldraw'
+import { ChatPanel } from '../chat/ChatPanel'
 import { getBookmarkPreview } from '../getBookmarkPreview'
+import { getMemberId } from '../identity'
 import { multiplayerAssetStore } from '../multiplayerAssetStore'
+import { customBindingUtils, customShapeUtils, getShapeVisibility } from '../shapes'
+import { registerBoardSideEffects } from '../sideEffects'
+import { PaperWidgets } from '../widgets/PaperWidgets'
+
+const shapeUtils = [...defaultShapeUtils, ...customShapeUtils]
+const bindingUtils = [...defaultBindingUtils, ...customBindingUtils]
 
 export function Room() {
-	const { roomId } = useParams<{ roomId: string }>()
+	const { roomId = '' } = useParams<{ roomId: string }>()
+	const [memberId] = useState(getMemberId)
+	const [editor, setEditor] = useState<Editor | null>(null)
 
 	// Create a store connected to multiplayer.
 	const store = useSync({
@@ -14,20 +24,39 @@ export function Room() {
 		uri: `${window.location.origin}/api/connect/${roomId}`,
 		// ...and how to handle static assets like images & videos
 		assets: multiplayerAssetStore,
+		// the server's schema has the same custom shapes and bindings (client/shared)
+		shapeUtils,
+		bindingUtils,
 	})
 
 	return (
 		<RoomWrapper roomId={roomId}>
-			<Tldraw
-				// we can pass the connected store into the Tldraw component which will handle
-				// loading states & enable multiplayer UX like cursors & a presence menu
-				store={store}
-				options={{ deepLinks: true }}
-				onMount={(editor) => {
-					// when the editor is ready, we need to register our bookmark unfurling service
-					editor.registerExternalAssetHandler('url', getBookmarkPreview)
-				}}
-			/>
+			<div className="Board">
+				<div className="Board-canvas">
+					<Tldraw
+						// we can pass the connected store into the Tldraw component which will handle
+						// loading states & enable multiplayer UX like cursors & a presence menu
+						store={store}
+						shapeUtils={customShapeUtils}
+						bindingUtils={customBindingUtils}
+						getShapeVisibility={getShapeVisibility}
+						options={{ deepLinks: true }}
+						onMount={(editor) => {
+							// when the editor is ready, we need to register our bookmark unfurling service
+							editor.registerExternalAssetHandler('url', getBookmarkPreview)
+							const unregister = registerBoardSideEffects(editor, memberId)
+							setEditor(editor)
+							return () => {
+								unregister()
+								setEditor(null)
+							}
+						}}
+					/>
+					{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
+					{editor && <PaperWidgets editor={editor} memberId={memberId} />}
+				</div>
+				<ChatPanel boardId={roomId} memberId={memberId} editor={editor} />
+			</div>
 		</RoomWrapper>
 	)
 }
