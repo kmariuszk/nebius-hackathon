@@ -40,7 +40,7 @@ Login is faked: the name is kept in the browser and sent as `X-Display-Name`. Er
 - **`demoVideoUrl`:** the video section stays hidden until it's set.
 - **`repoUrl`.**
 
-Add `?mock=1` to any page URL to use sample data instead of the board service. A yellow bar says so. With sample data, every board link (Start's submit, Home's boards and Catch me up) opens `demo-board.html`.
+Add `?mock=1` to any page URL to use sample data instead of the board service. With sample data, every board link (Start's submit, Home's boards and Catch me up) opens `demo-board.html`.
 
 ## Making it the front door
 
