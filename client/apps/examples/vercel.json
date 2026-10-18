@@ -1,0 +1,23 @@
+{
+	"installCommand": "pnpm install --filter examples.tldraw.com... --filter @tldraw/monorepo... --filter config...",
+	"buildCommand": "pnpm build",
+	"outputDirectory": "dist",
+	"ignoreCommand": "bash ../../internal/scripts/vercel/should-build-examples.sh",
+	"headers": [
+		{
+			"source": "/assets/(.*)",
+			"headers": [
+				{
+					"key": "Cache-Control",
+					"value": "public,max-age=31536000,immutable"
+				}
+			]
+		}
+	],
+	"rewrites": [
+		{
+			"source": "/(.*)",
+			"destination": "/"
+		}
+	]
+}

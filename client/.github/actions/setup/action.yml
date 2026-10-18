@@ -1,0 +1,22 @@
+name: Setup tldraw/tldraw
+description: Set up node & pnpm
+
+runs:
+  using: composite
+  steps:
+    # see https://github.com/actions/setup-node/issues/899 for one of the reasons why this
+    # needs to be done before action/setup-node
+    - name: Enable corepack
+      run: npm i -g corepack
+      shell: bash
+
+    - name: Setup Node.js Environment
+      id: setup-node
+      uses: actions/setup-node@v6
+      with:
+        node-version: 24.17.0
+        cache: pnpm
+
+    - name: Install dependencies
+      run: pnpm install --frozen-lockfile
+      shell: bash

@@ -1,0 +1,53 @@
+{
+	"name": "@tldraw/sync-collaboration",
+	"description": "tldraw sync collaboration: server-side write authorization for collaboration features.",
+	"version": "5.5.2",
+	"author": {
+		"name": "tldraw Inc.",
+		"email": "hello@tldraw.com"
+	},
+	"homepage": "https://tldraw.dev",
+	"license": "SEE LICENSE IN LICENSE.md",
+	"tldraw_product": {
+		"stableId": "tldraw:commenting",
+		"name": "Commenting",
+		"type": "feature",
+		"parent": "tldraw:collaboration",
+		"premium": true,
+		"licenseFlag": "FEAT_COMMENTING"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tldraw/tldraw"
+	},
+	"bugs": {
+		"url": "https://github.com/tldraw/tldraw/issues"
+	},
+	"main": "./src/index.ts",
+	"types": "./.tsbuild/index.d.ts",
+	"type": "module",
+	"scripts": {
+		"test-ci": "pnpm exec vitest run --passWithNoTests",
+		"test": "pnpm exec vitest --passWithNoTests",
+		"test-coverage": "pnpm exec vitest run --coverage --passWithNoTests",
+		"build": "pnpm exec tsx ../../internal/scripts/build-package.ts",
+		"build-api": "pnpm exec tsx ../../internal/scripts/build-api.ts",
+		"prepack": "pnpm exec tsx ../../internal/scripts/prepack.ts",
+		"postpack": "../../internal/scripts/postpack.sh",
+		"pack-tarball": "pnpm pack",
+		"lint": "pnpm exec tsx ../../internal/scripts/lint.ts",
+		"build-types": "tsc --build"
+	},
+	"devDependencies": {
+		"vitest": "^5.0.0"
+	},
+	"engines": {
+		"node": ">=22.12.0"
+	},
+	"dependencies": {
+		"@tldraw/store": "workspace:*",
+		"@tldraw/sync-core": "workspace:*",
+		"@tldraw/tlschema": "workspace:*",
+		"@tldraw/utils": "workspace:*"
+	}
+}

@@ -1,0 +1,61 @@
+{
+	"name": "@tldraw/collaboration",
+	"description": "tldraw collaboration umbrella package.",
+	"version": "5.5.2",
+	"author": {
+		"name": "tldraw Inc.",
+		"email": "hello@tldraw.com"
+	},
+	"homepage": "https://tldraw.dev",
+	"license": "SEE LICENSE IN LICENSE.md",
+	"tldraw_product": {
+		"stableId": "tldraw:collaboration",
+		"name": "Collaboration module",
+		"type": "product",
+		"premium": true,
+		"licenseFlag": "FEAT_COLLABORATION"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tldraw/tldraw"
+	},
+	"bugs": {
+		"url": "https://github.com/tldraw/tldraw/issues"
+	},
+	"main": "./src/index.ts",
+	"types": "./.tsbuild/index.d.ts",
+	"style": "./collaboration.css",
+	"type": "module",
+	"files": [
+		"collaboration.css"
+	],
+	"scripts": {
+		"test-ci": "pnpm exec vitest run --passWithNoTests",
+		"test": "pnpm exec vitest --passWithNoTests",
+		"test-coverage": "pnpm exec vitest run --coverage --passWithNoTests",
+		"build": "pnpm exec tsx ../../internal/scripts/build-package.ts",
+		"build-api": "pnpm exec tsx ../../internal/scripts/build-api.ts",
+		"prepack": "pnpm exec tsx ../../internal/scripts/prepack.ts",
+		"postpack": "../../internal/scripts/postpack.sh",
+		"pack-tarball": "pnpm pack",
+		"lint": "pnpm exec tsx ../../internal/scripts/lint.ts",
+		"build-types": "tsc --build"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"react": "^19.2.1",
+		"react-dom": "^19.2.1"
+	},
+	"peerDependencies": {
+		"react": "^18.2.0 || ^19.2.1",
+		"react-dom": "^18.2.0 || ^19.2.1"
+	},
+	"engines": {
+		"node": ">=22.12.0"
+	},
+	"dependencies": {
+		"@tldraw/commenting": "workspace:*",
+		"@tldraw/utils": "workspace:*"
+	}
+}

@@ -1,0 +1,174 @@
+import {
+	DurableObjectSqliteSyncWrapper,
+	type SessionStateSnapshot,
+	SQLiteSyncStorage,
+	TLSocketRoom,
+} from '@tldraw/sync-core'
+import {
+	createTLSchema,
+	// defaultBindingSchemas,
+	defaultShapeSchemas,
+	TLRecord,
+} from '@tldraw/tlschema'
+import { DurableObject } from 'cloudflare:workers'
+import { AutoRouter, error, IRequest } from 'itty-router'
+
+// add custom shapes and bindings here if needed:
+const schema = createTLSchema({
+	shapes: { ...defaultShapeSchemas },
+	// bindings: { ...defaultBindingSchemas },
+})
+
+interface SocketAttachment {
+	sessionId: string
+	snapshot: SessionStateSnapshot | null
+}
+
+function getAttachment(ws: WebSocket): SocketAttachment | null {
+	const attachment = ws.deserializeAttachment() as SocketAttachment | null
+	return attachment?.sessionId ? attachment : null
+}
+
+// Each whiteboard room is hosted in a Durable Object with WebSocket Hibernation.
+// https://developers.cloudflare.com/durable-objects/
+//
+// There's only ever one durable object instance per room. Room state is
+// persisted automatically to SQLite via ctx.storage. When all clients are
+// idle, the DO hibernates (freeing memory) while WebSocket connections
+// stay alive at the Cloudflare layer.
+export class TldrawDurableObject extends DurableObject {
+	private room: TLSocketRoom<TLRecord, void> | null = null
+	/** Map sessionId → ws so onSessionSnapshot can serialize to the right socket. */
+	private readonly sessionIdToWs = new Map<string, WebSocket>()
+
+	constructor(ctx: DurableObjectState, env: Env) {
+		super(ctx, env)
+		// Respond to ping messages at the platform level without waking the DO.
+		// The TLSyncClient sends {"type":"ping"} every 5s; without this, each
+		// ping would wake the DO from hibernation.
+		this.ctx.setWebSocketAutoResponse(
+			new WebSocketRequestResponsePair('{"type":"ping"}', '{"type":"pong"}')
+		)
+	}
+
+	private getOrCreateRoom(): TLSocketRoom<TLRecord, void> {
+		if (!this.room) {
+			const sql = new DurableObjectSqliteSyncWrapper(this.ctx.storage)
+			const storage = new SQLiteSyncStorage<TLRecord>({ sql })
+
+			this.room = new TLSocketRoom<TLRecord, void>({
+				schema,
+				storage,
+				// Disable idle timeout since Cloudflare handles keep-alive via auto-response.
+				// Without this, sessions would be pruned after 20s of no "real" messages
+				// even though the client is still connected and being auto-ponged.
+				clientTimeout: Infinity,
+				onSessionSnapshot: (sessionId, snapshot) => {
+					const ws = this.sessionIdToWs.get(sessionId)
+					if (ws) ws.serializeAttachment({ sessionId, snapshot })
+				},
+			})
+
+			// Resume any sessions that survived hibernation
+			for (const ws of this.ctx.getWebSockets()) {
+				const attachment = getAttachment(ws)
+				if (!attachment?.snapshot) continue
+				this.room.handleSocketResume({
+					sessionId: attachment.sessionId,
+					socket: ws,
+					snapshot: attachment.snapshot,
+				})
+				this.sessionIdToWs.set(attachment.sessionId, ws)
+			}
+		}
+		return this.room
+	}
+
+	private readonly router = AutoRouter({ catch: (e) => error(e) }).get(
+		'/api/connect/:roomId',
+		(request) => this.handleConnect(request)
+	)
+
+	// Entry point for all requests to the Durable Object
+	fetch(request: Request): Response | Promise<Response> {
+		return this.router.fetch(request)
+	}
+
+	// Handle new WebSocket connection requests
+	async handleConnect(request: IRequest) {
+		const sessionId = request.query.sessionId as string
+		if (!sessionId) return error(400, 'Missing sessionId')
+
+		// Create the websocket pair for the client
+		const { 0: clientWebSocket, 1: serverWebSocket } = new WebSocketPair()
+		// Use hibernation API instead of serverWebSocket.accept()
+		this.ctx.acceptWebSocket(serverWebSocket)
+
+		// Store sessionId in attachment immediately so we can identify this socket
+		// after hibernation, before the connect handshake completes.
+		const attachment: SocketAttachment = { sessionId, snapshot: null }
+		serverWebSocket.serializeAttachment(attachment)
+
+		// Resume first: a cold boot that skipped the old socket would give this session a fresh
+		// presence id, and the old one's presence would never be removed for other clients.
+		const room = this.getOrCreateRoom()
+
+		// A client reconnecting under the same session id can leave its old socket open. Clear that
+		// socket's snapshot so a resume after hibernation can't pick it over this one, which would
+		// make the room ignore this socket's messages.
+		for (const ws of this.ctx.getWebSockets()) {
+			if (ws !== serverWebSocket && getAttachment(ws)?.sessionId === sessionId) {
+				ws.serializeAttachment(attachment)
+			}
+		}
+		this.sessionIdToWs.set(sessionId, serverWebSocket)
+
+		// Connect to the room. The first webSocketMessage from the client will
+		// complete the handshake and trigger debounced snapshot storage.
+		room.handleSocketConnect({ sessionId, socket: serverWebSocket })
+
+		return new Response(null, { status: 101, webSocket: clientWebSocket })
+	}
+
+	// --- WebSocket Hibernation API handlers ---
+
+	override async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer) {
+		const attachment = getAttachment(ws)
+		if (!attachment) return
+
+		// pass the socket so a superseded socket's in-flight messages can't corrupt the new one's
+		this.getOrCreateRoom().handleSocketMessage(attachment.sessionId, message, ws)
+	}
+
+	override async webSocketClose(ws: WebSocket) {
+		this.handleWebSocketEnd(ws, 'handleSocketClose')
+	}
+
+	override async webSocketError(ws: WebSocket) {
+		this.handleWebSocketEnd(ws, 'handleSocketError')
+	}
+
+	private handleWebSocketEnd(ws: WebSocket, method: 'handleSocketClose' | 'handleSocketError') {
+		const attachment = getAttachment(ws)
+		if (!attachment) return
+
+		if (this.sessionIdToWs.get(attachment.sessionId) === ws) {
+			this.sessionIdToWs.delete(attachment.sessionId)
+		}
+
+		const room = this.getOrCreateRoom()
+
+		// If the DO was hibernating, this session was never re-added to the room
+		// (ctx.getWebSockets() doesn't include the disconnecting socket). Resume it
+		// briefly so the room can broadcast presence removal to other clients.
+		if (attachment.snapshot && !room.getSessionSnapshot(attachment.sessionId)) {
+			room.handleSocketResume({
+				sessionId: attachment.sessionId,
+				socket: ws,
+				snapshot: attachment.snapshot,
+			})
+		}
+
+		room[method](attachment.sessionId, ws)
+	}
+}
