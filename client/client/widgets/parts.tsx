@@ -418,19 +418,30 @@ export function FigureWidget() {
 
 export function ActionsWidget() {
 	const api = useWidgets()
-	const { shape, memberId, more, editor } = api
+	const { shape, boardId, memberId, more } = api
 	const p = shape.props
 	const mine = myVote(p, memberId)
 	const label = nodeLabel(p.authors, p.year)
 	const collection = p.kind === 'seed' || p.kind === 'kept'
+	const [sending, setSending] = useState(false)
 
-	const vote = (v: Vote) => {
-		const before = castVote(editor, shape.id, memberId, v)
-		if (before === undefined) return
-		const undo = () => {
-			castVote(editor, shape.id, memberId, before)
-			if (v === 'discard') openPaperId.set(p.paperId)
+	// the card changes when the board service's write reaches this browser through sync
+	const vote = async (v: Vote) => {
+		let before: Vote
+		setSending(true)
+		try {
+			before = await castVote(boardId, p, memberId, v)
+		} catch (e) {
+			api.toast({ text: `Your vote wasn’t saved: ${(e as Error).message}` })
+			return
+		} finally {
+			setSending(false)
 		}
+		const undo = () =>
+			void castVote(boardId, p, memberId, before).then(
+				() => v === 'discard' && openPaperId.set(p.paperId),
+				(e: Error) => api.toast({ text: `Undo wasn’t saved: ${e.message}` })
+			)
 		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.`, undo })
 		else if (v === 'discard') {
 			api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.`, undo })
@@ -454,17 +465,17 @@ export function ActionsWidget() {
 		)
 	} else if (p.status === 'discarded' && mine === 'discard') {
 		actions = (
-			<button className="btn" onClick={() => vote(null)}>
+			<button className="btn" onClick={() => vote(null)} disabled={sending}>
 				Bring it back
 			</button>
 		)
 	} else {
 		actions = (
 			<>
-				<button className="btn" onClick={() => vote('discard')} disabled={mine === 'discard'} aria-pressed={mine === 'discard'}>
+				<button className="btn" onClick={() => vote('discard')} disabled={sending || mine === 'discard'} aria-pressed={mine === 'discard'}>
 					Discard
 				</button>
-				<button className="btn primary" onClick={() => vote('keep')} disabled={mine === 'keep'} aria-pressed={mine === 'keep'}>
+				<button className="btn primary" onClick={() => vote('keep')} disabled={sending || mine === 'keep'} aria-pressed={mine === 'keep'}>
 					Keep
 				</button>
 			</>

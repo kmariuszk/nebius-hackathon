@@ -24,6 +24,7 @@ export interface LinkedPaper {
 
 export interface WidgetsApi {
 	editor: Editor
+	boardId: string
 	memberId: string
 	shape: PaperCardShape
 	goal: string

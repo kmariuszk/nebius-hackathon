@@ -2,9 +2,10 @@ import { useSync } from '@tldraw/sync'
 import { ReactNode, useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { defaultBindingUtils, defaultShapeUtils, Editor, Tldraw } from 'tldraw'
+import { boardApi } from '../api'
 import { ChatPanel } from '../chat/ChatPanel'
 import { getBookmarkPreview } from '../getBookmarkPreview'
-import { getMemberId } from '../identity'
+import { getDisplayName, getMemberId } from '../identity'
 import { multiplayerAssetStore } from '../multiplayerAssetStore'
 import { customBindingUtils, customShapeUtils, getShapeVisibility } from '../shapes'
 import { registerBoardSideEffects } from '../sideEffects'
@@ -17,6 +18,13 @@ export function Room() {
 	const { roomId = '' } = useParams<{ roomId: string }>()
 	const [memberId] = useState(getMemberId)
 	const [editor, setEditor] = useState<Editor | null>(null)
+
+	// join the board in the board service (T08), so it knows who votes and who's here
+	useEffect(() => {
+		boardApi(roomId, memberId)
+			.join(getDisplayName() ?? undefined)
+			.catch((e) => console.warn(`Couldn't join board ${roomId}:`, e))
+	}, [roomId, memberId])
 
 	// Create a store connected to multiplayer.
 	const store = useSync({
@@ -53,7 +61,7 @@ export function Room() {
 						}}
 					/>
 					{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
-					{editor && <PaperWidgets editor={editor} memberId={memberId} />}
+					{editor && <PaperWidgets editor={editor} boardId={roomId} memberId={memberId} />}
 				</div>
 				<ChatPanel boardId={roomId} memberId={memberId} editor={editor} />
 			</div>

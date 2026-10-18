@@ -37,6 +37,17 @@ interface Harness {
 const live = new Set<Harness>()
 const wss = new WebSocketServer({ noServer: true, maxPayload: 32 * 1024 * 1024 })
 
+// Harnesses per board, for the agent in the face pile (T08's agent.active and agent.idle events).
+const perBoard = new Map<string, number>()
+let presence: (board: string, active: boolean) => void = () => {}
+
+/** `fn` hears when a board gets its first harness (true) and loses its last (false); it must not throw. */
+export function onAgentPresence(fn: (board: string, active: boolean) => void) {
+	presence = fn
+}
+
+export const isAgentActive = (board: string) => perBoard.has(board)
+
 export function handleAcpUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
 	const url = new URL(req.url ?? '/', 'http://localhost')
 	const board = url.searchParams.get('board') ?? ''
@@ -105,6 +116,8 @@ function startHarness(ws: WebSocket, board: string, member: string, config: Retu
 		},
 	}
 	live.add(harness)
+	perBoard.set(board, (perBoard.get(board) ?? 0) + 1)
+	if (perBoard.get(board) === 1) presence(board, true)
 
 	const touch = () => {
 		clearTimeout(idleTimer)
@@ -165,6 +178,9 @@ function startHarness(ws: WebSocket, board: string, member: string, config: Retu
 		killTimers.forEach(clearTimeout)
 		clearTimeout(idleTimer)
 		live.delete(harness)
+		const left = (perBoard.get(board) ?? 1) - 1
+		if (left > 0) perBoard.set(board, left)
+		else if (perBoard.delete(board)) presence(board, false)
 		console.log(`${tag} exited (${sig ?? `code ${code}`})`)
 		const ok = code === 0 && !spawnError
 		const reason = spawnError || (ok ? 'harness exited' : sig ? `harness stopped by ${sig}` : `harness exited with code ${code}`)

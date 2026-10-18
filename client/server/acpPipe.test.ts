@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { after, before, beforeEach, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { WebSocket } from 'ws'
-import { handleAcpUpgrade, shutdownAcpPipe } from './acpPipe.ts'
+import { handleAcpUpgrade, isAgentActive, onAgentPresence, shutdownAcpPipe } from './acpPipe.ts'
 
 // The pipe on a bare HTTP server (no server.ts), with a tiny Node script as the harness.
 // HARNESS_CMD is split on spaces, so this assumes no spaces in the node or repo path.
@@ -218,6 +218,21 @@ test('pauses the harness while the browser is slow, without losing or reordering
 	assert.deepEqual(order, [...Array(400).keys()])
 	chat.ws.close()
 	await chat.closed
+})
+
+test('tells the board service when a board gets its first harness and loses its last', async () => {
+	const heard: [string, boolean][] = []
+	// harnesses from earlier tests may still be exiting, so only this board counts
+	onAgentPresence((board, active) => board === 'presence' && heard.push([board, active]))
+	const chats = [await connect(url('presence', 'm_test000000')), await connect(url('presence', 'm_test111111'))]
+	await Promise.all(chats.map((c) => c.call('env')))
+	assert.deepEqual(heard, [['presence', true]])
+	assert.equal(isAgentActive('presence'), true)
+	for (const c of chats) c.ws.close()
+	await waitUntil(() => heard.length === 2, 5000)
+	assert.deepEqual(heard, [['presence', true], ['presence', false]])
+	assert.equal(isAgentActive('presence'), false)
+	onAgentPresence(() => {})
 })
 
 test('shutting down closes every chat with 1001 and waits for the harnesses', async () => {
