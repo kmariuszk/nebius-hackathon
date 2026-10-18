@@ -1,11 +1,16 @@
 import { useSync } from '@tldraw/sync'
-import { ReactNode, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { defaultBindingUtils, defaultShapeUtils, Editor, Tldraw } from 'tldraw'
+import { defaultBindingUtils, defaultShapeUtils, Editor, Tldraw, type TLComponents } from 'tldraw'
 import { ChatPanel } from '../chat/ChatPanel'
 import { getBookmarkPreview } from '../getBookmarkPreview'
 import { getMemberId } from '../identity'
 import { multiplayerAssetStore } from '../multiplayerAssetStore'
+import { PinboardDefs, Strings } from '../pinboard/Strings'
+import { RankedList } from '../pinboard/RankedList'
+import { PinboardToolbar } from '../pinboard/Toolbar'
+import { TopBar, type Wall } from '../pinboard/TopBar'
+import '../pinboard/pinboard.css'
 import { customBindingUtils, customShapeUtils, getShapeVisibility } from '../shapes'
 import { registerBoardSideEffects } from '../sideEffects'
 import { PaperWidgets } from '../widgets/PaperWidgets'
@@ -13,10 +18,36 @@ import { PaperWidgets } from '../widgets/PaperWidgets'
 const shapeUtils = [...defaultShapeUtils, ...customShapeUtils]
 const bindingUtils = [...defaultBindingUtils, ...customBindingUtils]
 
+// The v6 board (docs/mockups/flashcard-v6.html): strings under the cards, and our own top bar and
+// toolbar in place of tldraw's menus and panels.
+const components: TLComponents = {
+	OnTheCanvas: Strings,
+	SvgDefs: PinboardDefs,
+	MenuPanel: null,
+	StylePanel: null,
+	NavigationPanel: null,
+	Toolbar: null,
+	HelpMenu: null,
+	SharePanel: null,
+	DebugPanel: null,
+	DebugMenu: null,
+}
+
+const WALL_KEY = 'pinboard-wall'
+function loadWall(): Wall {
+	try {
+		return localStorage.getItem(WALL_KEY) === 'cork' ? 'cork' : 'paper'
+	} catch {
+		return 'paper'
+	}
+}
+
 export function Room() {
 	const { roomId = '' } = useParams<{ roomId: string }>()
 	const [memberId] = useState(getMemberId)
 	const [editor, setEditor] = useState<Editor | null>(null)
+	const [chatOpen, setChatOpen] = useState(false)
+	const [wall, setWall] = useState<Wall>(loadWall)
 
 	// Create a store connected to multiplayer.
 	const store = useSync({
@@ -29,84 +60,57 @@ export function Room() {
 		bindingUtils,
 	})
 
-	return (
-		<RoomWrapper roomId={roomId}>
-			<div className="Board">
-				<div className="Board-canvas">
-					<Tldraw
-						// we can pass the connected store into the Tldraw component which will handle
-						// loading states & enable multiplayer UX like cursors & a presence menu
-						store={store}
-						shapeUtils={customShapeUtils}
-						bindingUtils={customBindingUtils}
-						getShapeVisibility={getShapeVisibility}
-						options={{ deepLinks: true }}
-						onMount={(editor) => {
-							// when the editor is ready, we need to register our bookmark unfurling service
-							editor.registerExternalAssetHandler('url', getBookmarkPreview)
-							const unregister = registerBoardSideEffects(editor, memberId)
-							setEditor(editor)
-							return () => {
-								unregister()
-								setEditor(null)
-							}
-						}}
-					/>
-					{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
-					{editor && <PaperWidgets editor={editor} memberId={memberId} />}
-				</div>
-				<ChatPanel boardId={roomId} memberId={memberId} editor={editor} />
-			</div>
-		</RoomWrapper>
-	)
-}
-
-function RoomWrapper({ children, roomId }: { children: ReactNode; roomId?: string }) {
-	const [didCopy, setDidCopy] = useState(false)
-
-	useEffect(() => {
-		if (!didCopy) return
-		const timeout = setTimeout(() => setDidCopy(false), 3000)
-		return () => clearTimeout(timeout)
-	}, [didCopy])
+	const changeWall = (next: Wall) => {
+		setWall(next)
+		try {
+			localStorage.setItem(WALL_KEY, next)
+		} catch {
+			// the wall is a per-viewer convenience; without storage it resets on reload
+		}
+	}
 
 	return (
 		<div className="RoomWrapper">
-			<div className="RoomWrapper-header">
-				<WifiIcon />
-				<div>{roomId}</div>
-				<button
-					className="RoomWrapper-copy"
-					onClick={() => {
-						navigator.clipboard.writeText(window.location.href)
-						setDidCopy(true)
-					}}
-					aria-label="copy room link"
-				>
-					Copy link
-					{didCopy && <div className="RoomWrapper-copied">Copied!</div>}
-				</button>
-			</div>
-			<div className="RoomWrapper-content">{children}</div>
-		</div>
-	)
-}
-
-function WifiIcon() {
-	return (
-		<svg
-			xmlns="http://www.w3.org/2000/svg"
-			fill="none"
-			viewBox="0 0 24 24"
-			strokeWidth="1.5"
-			stroke="currentColor"
-			width={16}
-		>
-			<path
-				strokeLinecap="round"
-				strokeLinejoin="round"
-				d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z"
+			<TopBar
+				roomId={roomId}
+				editor={editor}
+				wall={wall}
+				onWall={changeWall}
+				chatOpen={chatOpen}
+				onChat={() => setChatOpen(!chatOpen)}
 			/>
-		</svg>
+			<div className="RoomWrapper-content">
+				<div className="Board" data-wall={wall}>
+					{/* a column beside the canvas when open, so the open paper's widgets make room for it */}
+					{editor && <RankedList editor={editor} />}
+					<div className="Board-canvas">
+						<Tldraw
+							// we can pass the connected store into the Tldraw component which will handle
+							// loading states & enable multiplayer UX like cursors & a presence menu
+							store={store}
+							shapeUtils={customShapeUtils}
+							bindingUtils={customBindingUtils}
+							getShapeVisibility={getShapeVisibility}
+							components={components}
+							options={{ deepLinks: true }}
+							onMount={(editor) => {
+								// when the editor is ready, we need to register our bookmark unfurling service
+								editor.registerExternalAssetHandler('url', getBookmarkPreview)
+								const unregister = registerBoardSideEffects(editor, memberId)
+								setEditor(editor)
+								return () => {
+									unregister()
+									setEditor(null)
+								}
+							}}
+						/>
+						{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
+						{editor && <PaperWidgets editor={editor} memberId={memberId} />}
+						{editor && <PinboardToolbar editor={editor} />}
+					</div>
+					<ChatPanel boardId={roomId} memberId={memberId} editor={editor} open={chatOpen} onOpenChange={setChatOpen} />
+				</div>
+			</div>
+		</div>
 	)
 }

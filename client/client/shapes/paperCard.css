@@ -1,4 +1,210 @@
-/* paper-card nodes (T01): the arrival, the agent-is-reading ring and the lit pulse */
+/* paper cards in the v6 pinboard look (docs/mockups/flashcard-v6.html) */
+:root {
+	--pb-ink: #0b0b0b;
+	--pb-ink2: #52514e;
+	--pb-hand: 'Shantell Sans', 'Marker Felt', 'Bradley Hand', cursive;
+	--pb-string: #c2322f;
+	--pb-marker: #b8322c;
+	--pb-yarn: #2f5fa8;
+	--pb-cork: #d2b183;
+	--pb-paperw: #fffdf7;
+	--pb-tape: #ebe3cf;
+	--pb-sugg-bg: rgba(255, 255, 255, 0.38);
+	--pb-sugg-edge: 0 0 0 1px rgba(34, 29, 24, 0.16);
+}
+/* on cork the see-through card needs no hairline, and the tape is warmer */
+.Board[data-wall='cork'] {
+	--pb-sugg-bg: rgba(255, 253, 247, 0.58);
+	--pb-sugg-edge: none;
+	--pb-tape: rgba(240, 232, 208, 0.9);
+}
+
+.pb-wrap {
+	position: absolute;
+	font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+	-webkit-font-smoothing: antialiased;
+	transition: opacity 0.25s;
+}
+.pb-wrap.gone {
+	opacity: 0.35;
+}
+.pb-tilt {
+	position: absolute;
+	inset: 0;
+}
+.pb-over {
+	position: absolute;
+	left: 0;
+	top: 0;
+	overflow: visible;
+	pointer-events: none;
+}
+
+.pb-c {
+	width: 100%;
+	height: 100%;
+	box-sizing: border-box;
+	border-radius: 3px;
+	padding: 8px 9px 8px 12px;
+	position: relative;
+	overflow: hidden;
+	transition: background 0.15s, box-shadow 0.15s;
+	color: var(--pb-ink);
+}
+/* saved: solid paper, pinned */
+.pb-c.saved {
+	background: var(--pb-paperw);
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.14), 0 9px 14px -7px rgba(50, 30, 10, 0.5);
+}
+/* new suggestion: see-through, flat, taped up instead of pinned */
+.pb-c.sugg {
+	background: var(--pb-sugg-bg);
+	box-shadow: var(--pb-sugg-edge);
+}
+.tl-shape:hover .pb-c.sugg {
+	background: rgba(255, 253, 247, 0.92);
+}
+.pb-c.sel {
+	background: var(--pb-paperw);
+	box-shadow: 0 2px 3px rgba(0, 0, 0, 0.16), 0 16px 26px -6px rgba(40, 24, 8, 0.45);
+}
+.pb-c.pulse {
+	box-shadow: 0 0 0 3px #ffd84d, 0 0 18px 4px rgba(255, 216, 77, 0.6);
+}
+.pb-top {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	font-size: 11.5px;
+	line-height: 15px;
+	color: var(--pb-ink2);
+	font-weight: 600;
+	white-space: nowrap;
+}
+.pb-top b {
+	color: var(--pb-ink);
+}
+.pb-name {
+	font-size: 15px;
+	font-weight: 700;
+	line-height: 19px;
+	margin-top: 3px;
+	color: var(--pb-ink);
+	white-space: nowrap;
+	display: flex;
+	gap: 0.3em;
+	letter-spacing: -0.005em;
+}
+.pb-name .a {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	min-width: 0;
+}
+.pb-name .y {
+	flex: none;
+}
+.pb-ttl {
+	font-size: 11.5px;
+	line-height: 15px;
+	margin-top: 1px;
+	color: var(--pb-ink2);
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.pb-c.sugg .pb-ttl {
+	color: #3f3a33;
+}
+
+.pb-tapebit {
+	fill: var(--pb-tape);
+}
+.pb-rank path {
+	fill: rgba(255, 253, 247, 0.94);
+	stroke: var(--pb-marker);
+	stroke-width: 2.2;
+	stroke-linecap: round;
+}
+.pb-rank text {
+	font: 600 18px var(--pb-hand);
+	fill: var(--pb-marker);
+}
+/* the opened paper: circled in red marker */
+.pb-loop {
+	fill: none;
+	stroke: var(--pb-marker);
+	stroke-width: 3.2;
+	stroke-linecap: round;
+	opacity: 0.88;
+	stroke-dasharray: 1;
+	stroke-dashoffset: 1;
+	animation: pb-draw 0.6s 0.15s cubic-bezier(0.5, 0, 0.3, 1) forwards;
+}
+@keyframes pb-draw {
+	to {
+		stroke-dashoffset: 0;
+	}
+}
+
+/* status badges on the corner */
+.pb-badge rect {
+	fill: var(--pb-ink);
+}
+.pb-badge text {
+	font-size: 10.5px;
+	font-weight: 650;
+	fill: #fff;
+	letter-spacing: 0.02em;
+}
+.pb-badge.split rect {
+	fill: #fff6df;
+	stroke: #e0b24a;
+}
+.pb-badge.split text {
+	fill: #7a5200;
+}
+.pb-badge.kept rect {
+	fill: #e9f4ec;
+	stroke: #9cc9a8;
+}
+.pb-badge.kept text {
+	fill: #1f6b35;
+}
+.pb-badge.read rect,
+.pb-badge.gone rect {
+	fill: #fff;
+	stroke: #d3d1c9;
+}
+.pb-badge.read text,
+.pb-badge.gone text {
+	fill: var(--pb-ink2);
+}
+.pb-badge .sp {
+	fill: none;
+	stroke: var(--pb-ink2);
+	stroke-width: 2;
+	stroke-dasharray: 14 12;
+	transform-origin: 11px 9px;
+	animation: pb-rot 0.9s linear infinite;
+}
+@keyframes pb-rot {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* the agent's own note, in red under a new card */
+.pb-note {
+	font: 500 14.5px var(--pb-hand);
+	fill: var(--pb-marker);
+}
+.pb-note-ico {
+	fill: none;
+	stroke: var(--pb-marker);
+	stroke-width: 1.4;
+}
+
+/* arrival of a card the agent just added */
 .pc-arrive {
 	transform-origin: center;
 	animation: pc-arrive 420ms cubic-bezier(0.2, 0.8, 0.3, 1.25) both;
@@ -10,29 +216,11 @@
 	}
 }
 
-.pc-working {
-	animation: pc-march 1.4s linear infinite;
-}
-@keyframes pc-march {
-	to {
-		stroke-dashoffset: -22;
-	}
-}
-
-.pc-lit {
-	animation: pc-pulse 1s ease-in-out infinite;
-	filter: drop-shadow(0 0 6px rgba(42, 120, 214, 0.7));
-}
-@keyframes pc-pulse {
-	50% {
-		opacity: 0.3;
-	}
-}
-
 @media (prefers-reduced-motion: reduce) {
 	.pc-arrive,
-	.pc-working,
-	.pc-lit {
+	.pb-badge .sp,
+	.pb-loop {
 		animation: none;
+		stroke-dashoffset: 0;
 	}
 }

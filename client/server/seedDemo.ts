@@ -546,6 +546,16 @@ const shapes: Record<string, unknown>[] = []
 const bindings: Record<string, unknown>[] = []
 const box: Record<string, { x: number; y: number; w: number }> = {}
 
+// v6: positions spread out for 172×70 cards (docs/mockups/flashcard-v6.html)
+const V6_POS: Record<string, [number, number]> = {
+	s1: [260, 340], s2: [1310, 150], s3: [620, 340], s4: [1220, 490], s5: [350, 150],
+	k1: [690, 660], n1: [980, 640], n2: [1370, 650], n3: [410, 580], n4: [950, 130],
+}
+for (const [k, [x, y]] of Object.entries(V6_POS)) {
+	const raw = (P as Record<string, Raw>)[k]
+	if (raw) Object.assign(raw, { x, y })
+}
+
 for (const [k, raw] of Object.entries(P as Record<string, Raw>)) {
 	const paperId = pid(k)
 	const square = raw.kind !== 'new'
@@ -627,7 +637,8 @@ for (const [a, b, kind] of EDGES as [string, string, 'cites' | 'similar'][]) {
 
 // Ana's note on Ibáñez-Molero 2026, pinned beside it
 const n1 = box.n1
-const note = { dx: n1.w + 24, dy: n1.w / 2 - 56 }
+// beside the 172×70 card, as v6 pins notes: 20 px right of its edge, a little below its middle
+const note = { dx: n1.w / 2 + 106, dy: n1.w / 2 + 12 }
 const noteId = 'shape:agent-note-demo00000001'
 shapes.push({
 	id: noteId, type: 'note', x: n1.x + note.dx, y: n1.y + note.dy,
