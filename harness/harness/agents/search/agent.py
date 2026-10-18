@@ -12,6 +12,8 @@ the run.
 from __future__ import annotations
 
 from google.adk.agents import LlmAgent
+from google.adk.agents.callback_context import CallbackContext
+from google.adk.models.llm_response import LlmResponse
 from google.adk.tools import ToolContext
 from google.genai import types
 from pydantic import BaseModel, Field, ValidationError
@@ -19,6 +21,8 @@ from pydantic import BaseModel, Field, ValidationError
 from harness import models, toolsets
 
 RESULT_KEY = "search_result"
+# Room for the reasoning and `done` with 15 candidates. Lightning otherwise keeps repeating calls up to its 8192 cap.
+MAX_REPLY_TOKENS = 4096
 
 INSTRUCTION = """\
 You run one search sub-query for a literature discovery run and report the candidate papers you find. \
@@ -87,6 +91,22 @@ def done(
     return answer
 
 
+def first_call_only(callback_context: CallbackContext, llm_response: LlmResponse) -> LlmResponse | None:
+    """Keep only the first tool call of a reply.
+
+    Lightning packs `search`, `find_candidates` and dozens of `done` calls into one reply. Run together,
+    `done` reports before any search result exists, so the agent takes one step per reply instead.
+    """
+    parts = llm_response.content.parts if llm_response.content else None
+    calls = [p for p in parts or [] if p.function_call]
+    if len(calls) < 2:
+        return None
+    llm_response.content.parts = [p for p in parts if not p.function_call or p is calls[0]]
+    # the token cap cut the dropped calls, not the one that runs
+    llm_response.error_code = llm_response.error_message = None
+    return llm_response
+
+
 def build() -> LlmAgent:
     return LlmAgent(
         name="search",
@@ -99,9 +119,11 @@ def build() -> LlmAgent:
         model=models.lightning(),
         instruction=INSTRUCTION,
         tools=[toolsets.papers("search", "find_candidates"), done],
+        after_model_callback=first_call_only,
         # Forces a tool call every turn (tool_choice "required"), so a plain text
         # reply cannot end the run early; only `done` does.
         generate_content_config=types.GenerateContentConfig(
+            max_output_tokens=MAX_REPLY_TOKENS,
             tool_config=types.ToolConfig(
                 function_calling_config=types.FunctionCallingConfig(
                     mode=types.FunctionCallingConfigMode.ANY

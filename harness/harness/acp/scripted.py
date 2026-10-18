@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Callable
 from pathlib import Path
 from typing import Any
 
@@ -76,8 +76,26 @@ def partial(part: types.Part) -> LlmResponse:
 
 
 def use_script(root: BaseAgent, path: str) -> None:
-    """Replace the model of every agent in the tree with its turns from the file."""
+    """Replace the model of every agent in the tree with its turns from the file.
+
+    A `SearchTool` builds a fresh agent per call; each one continues its template's turns.
+    """
+    from harness.agents.master.candidates import SearchTool
+
     script = json.loads(Path(path).read_text(encoding="utf-8"))
-    for agent in walk_agents(root):
+    agents = list(walk_agents(root))
+    for agent in agents:
         if isinstance(agent, LlmAgent):
             agent.model = ScriptedModel(agent=agent.name, turns=script.get(agent.name, []))
+    for tool in (tool for agent in agents for tool in getattr(agent, "tools", [])):
+        if isinstance(tool, SearchTool):
+            tool._build = _scripted(tool._build, tool.agent.model)
+
+
+def _scripted(build: Callable[[], LlmAgent], model: BaseLlm) -> Callable[[], LlmAgent]:
+    def build_scripted() -> LlmAgent:
+        agent = build()
+        agent.model = model
+        return agent
+
+    return build_scripted

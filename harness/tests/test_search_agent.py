@@ -77,6 +77,27 @@ async def test_done_with_a_bad_answer_asks_the_model_to_fix_it(papers_mcp):
     assert state[search.RESULT_KEY]["notes"] == "no results"
 
 
+async def test_a_reply_with_many_calls_runs_only_the_first(papers_mcp):
+    # Lightning packs a search, then dozens of `done` calls, into one reply until it hits the token cap.
+    many = call("search", query="melanoma T cells", limit=10)
+    empty_done = call("done", sub_query="melanoma T cells", candidates=[], seed_candidates=0, notes="none")
+    many.parts += empty_done.parts * 3
+    agent = search.build()
+    agent.model = model = ScriptedLlm(
+        turns=[many, call("done", sub_query="melanoma T cells", candidates=[CANDIDATE], seed_candidates=0, notes="")]
+    )
+
+    _, state = await run(agent, "Sub-query: melanoma T cells")
+
+    assert papers_mcp.calls == [("search", {"query": "melanoma T cells", "limit": 10})]
+    assert [p.function_response.name for p in model.requests[1].contents[-1].parts] == ["search"]
+    assert state[search.RESULT_KEY]["candidates"][0]["paperId"] == "pmid:1"
+
+
+def test_search_agent_replies_are_capped():
+    assert search.build().generate_content_config.max_output_tokens == search.MAX_REPLY_TOKENS
+
+
 def test_search_agent_must_call_a_tool_every_turn():
     config = search.build().generate_content_config.tool_config.function_calling_config
     assert config.mode == types.FunctionCallingConfigMode.ANY

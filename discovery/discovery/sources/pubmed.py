@@ -13,7 +13,7 @@ import xml.etree.ElementTree as ET
 import httpx
 
 from discovery.papers import Paper
-from discovery.sources import Throttle
+from discovery.sources import Throttle, raise_for_status
 
 BASE = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
 EFETCH_BATCH = 200
@@ -39,7 +39,7 @@ async def _get(client: httpx.AsyncClient, tool: str, params: dict | list) -> htt
         if response.status_code != 429 or attempt == RETRIES - 1:
             break
         await asyncio.sleep(attempt + 1)
-    response.raise_for_status()
+    raise_for_status(response)
     return response
 
 

@@ -38,32 +38,53 @@ class SearchTool(AgentTool):
 
     async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
         answer: dict[str, Any] = {}
+        found: dict[str, str] = {}
         agent = self._build()
-        agent.after_tool_callback = partial(record, tool_context, answer)
+        agent.after_tool_callback = partial(record, tool_context, answer, found)
         run = AgentTool(agent=agent, include_plugins=self.include_plugins)
         text = await run.run_async(args=args, tool_context=tool_context)
         # A run that ends with `done` has no text reply, so AgentTool returns "";
         # the answer `done` accepted is the result.
-        return answer or text
+        return grounded(answer, found) if answer else text
 
 
 def record(
     parent: ToolContext,
     answer: dict[str, Any],
+    found: dict[str, str],
     *,
     tool: BaseTool,
     args: dict[str, Any],
     tool_context: ToolContext,
     tool_response: Any,
 ) -> None:
-    """After a search agent's tool call: add the IDs it returned to the master's pool,
-    and keep the answer `done` accepted."""
+    """After a search agent's tool call: add the IDs it returned to the master's pool
+    and to `found` (by lowercase ID), and keep the answer `done` accepted."""
     if tool.name == "done" and isinstance(tool_response, dict) and "error" not in tool_response:
         answer.update(tool_response)
     ids = paper_ids(tool.name, tool_response)
     if ids:
+        found.update((paper_id.lower(), paper_id) for paper_id in ids)
         count = sum(key.startswith(f"{PREFIX}{parent.function_call_id}:") for key in parent.state.to_dict())
         parent.state[f"{PREFIX}{parent.function_call_id}:{count}"] = ids
+
+
+def grounded(answer: dict[str, Any], found: dict[str, str]) -> dict[str, Any]:
+    """The answer with only the candidates a tool returned, under the tool's own ID.
+
+    Lightning sometimes reports papers no tool returned, with made-up PMIDs.
+    """
+    kept, dropped = [], []
+    for candidate in answer.get("candidates", []):
+        if real := found.get(str(candidate.get("paperId", "")).lower()):
+            kept.append({**candidate, "paperId": real})
+        else:
+            dropped.append(str(candidate.get("paperId", "")))
+    if not dropped:
+        return {**answer, "candidates": kept}
+    count = f"{len(dropped)} paper{'s' * (len(dropped) > 1)}"
+    note = f"dropped {count} no tool returned: {', '.join(dropped)}"
+    return {**answer, "candidates": kept, "notes": "; ".join(filter(None, [answer.get("notes"), note]))}
 
 
 def paper_ids(tool_name: str, response: Any) -> list[str]:

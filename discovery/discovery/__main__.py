@@ -14,6 +14,7 @@ from discovery.vectors import VectorStore
 DATA = Path(__file__).resolve().parents[1] / "data"
 
 logging.basicConfig(level=logging.INFO)
+logging.getLogger("httpx").setLevel(logging.WARNING)
 client = httpx.AsyncClient(
     timeout=30,
     follow_redirects=True,

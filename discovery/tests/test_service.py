@@ -131,6 +131,21 @@ async def test_search_reports_sources_without_keys_as_skipped(discovery):
     assert [note.split(":")[0] for note in result["skipped"]] == ["openalex", "web"]
 
 
+async def test_a_failing_source_never_reports_its_api_key(discovery, monkeypatch, caplog):
+    monkeypatch.setenv("OPENALEX_API_KEY", "secret-openalex-key")
+    monkeypatch.setenv("NCBI_API_KEY", "secret-ncbi-key")
+    # OpenAlex's daily budget is spent; NCBI fails outright (a 429 there is retried first).
+    discovery.client = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(429 if r.url.host == "api.openalex.org" else 500))
+    )
+
+    result = await discovery.search("melanoma", limit=5, sources=["pubmed", "openalex"])
+
+    assert [note.split(":")[0] for note in result["skipped"]] == ["pubmed", "openalex"]
+    assert "429 Too Many Requests" in result["skipped"][1] and "api_key=***" in result["skipped"][1]
+    assert "secret" not in json.dumps(result) and "secret" not in caplog.text
+
+
 async def test_find_candidates_merges_strategies_and_drops_seeds(discovery):
     seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
     assert seed.paper_id == "doi:10.1038/s41586-021-03704-y"

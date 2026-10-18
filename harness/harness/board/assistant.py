@@ -9,9 +9,9 @@ show the search agent's own tool calls (I2).
 from __future__ import annotations
 
 from google.adk.agents import LlmAgent
-from google.adk.tools.agent_tool import AgentTool
 
 from harness import models
+from harness.agents.master.candidates import SearchTool
 from harness.agents.search import agent as search
 from harness.board.prompts import BOARD_CONTEXT, CANVAS_RULES
 from harness.board.tools import BoardTools
@@ -39,7 +39,7 @@ def build(board: BoardTools | None = None) -> LlmAgent:
         instruction=INSTRUCTION,
         tools=[
             board.canvas("get_board", "add_papers", "add_note", "link_papers"),
-            AgentTool(agent=search.build()),
+            SearchTool(search.build),
             *board.viewer(),
             board.plan(),
         ],

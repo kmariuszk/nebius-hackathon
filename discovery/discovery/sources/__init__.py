@@ -9,7 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 import time
+
+import httpx
+
+_KEY_PARAM = re.compile(r"(api_key=)[^&\s'\"]+")
 
 
 class Skipped(Exception):
@@ -22,6 +27,16 @@ def key(name: str, purpose: str) -> str:
     if not value:
         raise Skipped(f"{name} is not set ({purpose})")
     return value
+
+
+def raise_for_status(response: httpx.Response) -> None:
+    """`response.raise_for_status()` with the `api_key` in the URL masked, since the
+    message reaches the logs and the `skipped` notes agents and researchers see."""
+    try:
+        response.raise_for_status()
+    except httpx.HTTPStatusError as error:
+        message = _KEY_PARAM.sub(r"\1***", str(error))
+        raise httpx.HTTPStatusError(message, request=error.request, response=error.response) from None
 
 
 class Throttle:

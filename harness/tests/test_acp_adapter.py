@@ -24,6 +24,7 @@ PLAN = [
     {"content": "Add the best ones to the board", "status": "pending"},
 ]
 CANDIDATE = {"paper_id": "pmid:1", "title": "Single-cell melanoma atlas", "found_by": ["pubmed"], "why": "atlas"}
+INVENTED = {"paper_id": "PMID:34512345", "title": "A paper no tool returned", "found_by": ["pubmed"], "why": "made up"}
 ANSWER = "I added [Single-cell melanoma atlas](paper:pmid:1) to the board."
 
 
@@ -60,7 +61,9 @@ async def test_a_prompt_streams_the_plan_cards_from_sub_agents_and_the_answer(ca
         ],
         search=[
             call("search", query="exhausted CD8 T cells in melanoma", limit=10),
-            call("done", sub_query="exhausted CD8 T cells", candidates=[CANDIDATE], seed_candidates=0, notes=""),
+            call(
+                "done", sub_query="exhausted CD8 T cells", candidates=[CANDIDATE, INVENTED], seed_candidates=0, notes=""
+            ),
         ],
     )
     async with harness(env=env) as h:
@@ -107,6 +110,11 @@ async def test_a_prompt_streams_the_plan_cards_from_sub_agents_and_the_answer(ca
     # The search agent's card carries the cost of both of its model calls.
     sub_agent = ends[by_title["board_assistant: search"].tool_call_id].field_meta
     assert sub_agent["tokens"] == 2 * (1200 + 80) and sub_agent["costUsd"] > 0
+    # board_assistant gets the answer `done` accepted, not the empty text of a run that ends in a tool call,
+    # and only with papers a tool returned.
+    found = ends[by_title["board_assistant: search"].tool_call_id].raw_output
+    assert [c["paperId"] for c in found["candidates"]] == ["pmid:1"]
+    assert found["notes"] == "dropped 1 paper no tool returned: PMID:34512345"
     assert ends[by_title["board_assistant: add_papers"].tool_call_id].field_meta["tokens"] == 0
     assert turn[-1].session_update == "usage_update" and turn[-1].cost.amount > 0
 
