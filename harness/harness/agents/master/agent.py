@@ -2,7 +2,8 @@
 
 It splits the question into about three sub-queries, calls the search agent
 once per sub-query, merges the candidates and ranks them with the papers MCP's
-`rerank` (docs/Concept.md, Agent design). The canvas MCP isn't built yet, so
+`rerank` (docs/Concept.md, Agent design). It calls the reader agent when the
+researcher asks about one paper in depth. The canvas MCP isn't built yet, so
 for now it answers in the chat instead of placing papers on the board.
 """
 
@@ -12,6 +13,7 @@ from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 
 from harness import models, toolsets
+from harness.agents.reader import agent as reader
 from harness.agents.search import agent as search
 
 INSTRUCTION = """\
@@ -46,6 +48,9 @@ expanding from the top paper.
 ## Follow-ups
 
 - About one paper: call `get_paper` and answer from its record, quoting the abstract where it helps.
+- "Summarise this paper", "read #2", or a question the abstract can't answer: call the `reader` agent with \
+"Paper ID: <id>" plus what the researcher wants to know. Answer with its TL;DR and summary, then its quotes as \
+short blockquotes, each with its link, and its key figures by label. Say so when it read only the abstract.
 - "Drop this one", "more like that", "focus on X": remember dropped papers as excluded IDs for the rest of \
 the conversation. If the new focus is covered by candidates you already have, call `rerank` again on them \
 with the updated goal. If it needs new angles, run new sub-queries first, then rerank everything together.
@@ -66,12 +71,14 @@ def build() -> LlmAgent:
         name="master",
         description=(
             "Talks to the researcher, splits their question into sub-queries, runs the search "
-            "agent on each, and ranks the candidates with a reason for each paper."
+            "agent on each, ranks the candidates with a reason for each paper, and has the "
+            "reader agent summarise a paper on request."
         ),
         model=models.super_vl(),
         instruction=INSTRUCTION,
         tools=[
             AgentTool(agent=search.build()),
+            AgentTool(agent=reader.build()),
             toolsets.papers("resolve_seed", "get_paper", "rerank"),
         ],
     )

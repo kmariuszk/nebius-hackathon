@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Awaitable, Iterable
+import xml.etree.ElementTree as ET
+from collections.abc import Awaitable, Callable, Iterable
+from dataclasses import asdict
 from typing import Any, Literal
 
 import httpx
 
+from discovery import fulltext
 from discovery import rerank as listwise
-from discovery.papers import Paper, format_id, ids_from_url, parse_id
+from discovery.fulltext import FullText
+from discovery.papers import Paper, default_url, format_id, ids_from_url, parse_id
 from discovery.sources import Skipped, arxiv, openalex, pubmed, semantic_scholar, tavily
 from discovery.store import Store
 
@@ -160,6 +164,68 @@ class Discovery:
         if paper is None:
             raise ValueError(f"No paper found for {paper_id!r}")
         return self.store.save(paper)
+
+    async def get_fulltext(self, paper_id: str, max_chars: int = fulltext.DEFAULT_MAX_CHARS) -> dict[str, Any]:
+        paper = await self.get_paper(paper_id)
+        text, skipped = await self._fulltext(paper)
+        return {
+            "paperId": paper.paper_id,
+            "title": paper.title,
+            "source": text.source,
+            "url": text.url,
+            **text.fit(max_chars),
+            "figures": [asdict(f) for f in text.figures],
+            "skipped": skipped,
+        }
+
+    async def check_quotes(self, paper_id: str, quotes: list[str]) -> dict[str, Any]:
+        paper = await self.get_paper(paper_id)
+        text, _ = await self._fulltext(paper)
+        checked = []
+        for passage in quotes:
+            section = text.find(passage)
+            checked.append(
+                {
+                    "text": passage,
+                    "verbatim": section is not None,
+                    "section": section.title if section else None,
+                    "link": fulltext.text_link(text.url, passage) if section else None,
+                }
+            )
+        return {"paperId": paper.paper_id, "source": text.source, "quotes": checked}
+
+    async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str]]:
+        """The paper's full text from the first source that has it, and why the others didn't."""
+        if cached := self.store.get_fulltext(paper.paper_id):
+            return cached, []
+        url = paper.url or default_url(paper.ids)
+        attempts: list[tuple[str, Callable[[], Awaitable[FullText | None]]]] = []
+        if pmcid := paper.ids.get("pmcid"):
+            pmc_url = f"https://pmc.ncbi.nlm.nih.gov/articles/{pmcid}/"
+            attempts.append(("pmc", lambda: self._pmc(pmcid, pmc_url, paper.abstract)))
+        if arxiv_id := paper.ids.get("arxiv"):
+            attempts.append(("arxiv", lambda: self._web(f"https://arxiv.org/html/{arxiv_id}")))
+        # PubMed and arXiv abstract pages hold no more than the record already does.
+        for page in dict.fromkeys(filter(None, [paper.open_access_pdf, url])):
+            if "arxiv.org" not in page and "pubmed.ncbi" not in page:
+                attempts.append(("web", lambda page=page: self._web(page)))
+        skipped = [] if attempts else ["no PMC, arXiv or publisher copy is known"]
+        for name, attempt in attempts:
+            try:
+                if found := await attempt():
+                    self.store.save_fulltext(paper.paper_id, found)
+                    return found, skipped
+                skipped.append(f"{name}: no full text there")
+            except (Skipped, httpx.HTTPError, ET.ParseError) as error:
+                skipped.append(f"{name}: {error}")
+        return fulltext.from_abstract(paper.abstract, url), skipped
+
+    async def _pmc(self, pmcid: str, url: str, abstract: str | None) -> FullText | None:
+        return fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
+
+    async def _web(self, url: str) -> FullText | None:
+        markdown = await tavily.extract(self.client, url)
+        return fulltext.from_markdown(markdown, url) if markdown else None
 
     async def _papers(self, paper_ids: list[str], role: str) -> tuple[list[Paper], list[str]]:
         """The records for `paper_ids`, and a note for each that could not be loaded."""

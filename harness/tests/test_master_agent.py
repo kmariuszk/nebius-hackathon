@@ -48,7 +48,7 @@ async def test_master_searches_each_sub_query_then_reranks(papers_mcp):
 
     events = await run(agent, "Find papers on melanoma T cells. Seed: 10.1/seed")
 
-    assert sorted(model.requests[0].tools_dict) == ["get_paper", "rerank", "resolve_seed", "search"]
+    assert sorted(model.requests[0].tools_dict) == ["get_paper", "reader", "rerank", "resolve_seed", "search"]
     # Both search runs answer before the master's next turn, and it sees each one's candidates.
     responses = [p.function_response for p in model.requests[2].contents[-1].parts if p.function_response]
     assert [r.name for r in responses] == ["search", "search"]
@@ -67,5 +67,6 @@ def test_master_runs_on_super_vl_with_the_search_agent_as_a_tool():
     search_tool = agent.tools[0]
     assert isinstance(search_tool, AgentTool) and search_tool.agent.name == "search"
     assert search_tool.agent.model.model == "openai/nvidia/Nemotron-3_5-Lightning"
-    assert agent.tools[1].tool_filter == ["resolve_seed", "get_paper", "rerank"]
+    assert agent.tools[1].agent.name == "reader"
+    assert agent.tools[2].tool_filter == ["resolve_seed", "get_paper", "rerank"]
     assert "Never invent" in agent.instruction

@@ -84,6 +84,12 @@ async def elink(client: httpx.AsyncClient, pmids: list[str], linkname: str) -> d
     return links
 
 
+async def pmc_article(client: httpx.AsyncClient, pmcid: str) -> str:
+    """The PMC article's JATS XML, body included when PMC may share it."""
+    response = await _get(client, "efetch", {"db": "pmc", "id": pmcid})
+    return response.text
+
+
 async def pmid_for(client: httpx.AsyncClient, term: str) -> str | None:
     """The single PMID a field query such as `10.1038/x[doi]` or `PMC123[pmcid]` finds."""
     found = await esearch(client, term, limit=2)

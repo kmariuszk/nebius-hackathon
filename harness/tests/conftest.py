@@ -81,6 +81,27 @@ class FakePapers:
             ranked = [{"rank": 1, "paperId": "pmid:1", "title": "Single-cell melanoma atlas", "reason": "Same cells."}]
             return {"ranked": ranked, "backend": "super_vl", "skipped": []}
 
+        @self.server.tool()
+        async def get_fulltext(paper_id: str, max_chars: int = 40_000) -> dict[str, Any]:
+            self.calls.append(("get_fulltext", {"paper_id": paper_id}))
+            sections = [{"title": "Results", "text": FULLTEXT}]
+            figures = [{"figureId": "F2", "label": "Figure 2", "caption": "TOX expression by T cell state."}]
+            return {"paperId": paper_id, "source": "pmc", "url": "https://pmc/PMC1/", "sections": sections,
+                    "figures": figures, "truncated": False, "omittedSections": [], "skipped": []}
+
+        @self.server.tool()
+        async def check_quotes(paper_id: str, quotes: list[str]) -> dict[str, Any]:
+            self.calls.append(("check_quotes", {"paper_id": paper_id, "quotes": quotes}))
+            checked = [
+                {"text": q, "verbatim": q in FULLTEXT, "section": "Results" if q in FULLTEXT else None,
+                 "link": f"https://pmc/PMC1/#:~:text={q[:10]}" if q in FULLTEXT else None}
+                for q in quotes
+            ]
+            return {"paperId": paper_id, "source": "pmc", "quotes": checked}
+
+
+FULLTEXT = "We profiled 40,000 T cells from 12 melanomas. TOX marked every exhausted clone."
+
 
 @pytest.fixture
 def papers_mcp(monkeypatch: pytest.MonkeyPatch) -> Iterator[FakePapers]:
