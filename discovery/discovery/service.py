@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import Awaitable, Iterable
 from typing import Any, Literal
 
 import httpx
 
 from discovery import rerank as listwise
+from discovery import rerank_vl
 from discovery.papers import Paper, format_id, ids_from_url, parse_id
 from discovery.sources import Skipped, arxiv, openalex, pubmed, semantic_scholar, tavily
 from discovery.store import Store
@@ -25,6 +27,8 @@ SearchSource = Literal["pubmed", "openalex", "web"]
 Strategy = Literal["keyword", "web", "pubmed_links", "citing", "recommend"]
 SEARCH_SOURCES: tuple[SearchSource, ...] = ("pubmed", "openalex", "web")
 SEED_STRATEGIES: tuple[Strategy, ...] = ("pubmed_links", "citing", "recommend")
+RerankBackend = Literal["super_vl", "rerank_vl"]
+RERANK_BACKENDS: tuple[RerankBackend, ...] = ("super_vl", "rerank_vl")
 
 # PubMed similar articles taken per seed; the list is ranked, so the top is enough.
 SIMILAR_PER_SEED = 20
@@ -104,8 +108,14 @@ class Discovery:
         seed_ids: list[str] | None = None,
         exclude_ids: list[str] | None = None,
         k: int = 20,
+        backend: RerankBackend | None = None,
     ) -> dict[str, Any]:
         k = max(1, k)
+        backend = backend or os.environ.get("RERANK_BACKEND", "").strip() or "super_vl"
+        if backend not in RERANK_BACKENDS:
+            raise ValueError(
+                f"Unknown rerank backend {backend!r} (RERANK_BACKEND): use one of {', '.join(RERANK_BACKENDS)}"
+            )
         seeds, skipped = await self._papers(seed_ids or [], "seed")
         # Seeds and excluded papers are never ranked, under any of their IDs.
         seen = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
@@ -125,13 +135,25 @@ class Discovery:
             if not seen & set(paper.aliases()):
                 seen |= set(paper.aliases())
                 unique.append(paper)
-        result = {"ranked": [], "model": listwise.model_id(), "seconds": 0.0}
-        if unique:
-            result = await listwise.rerank(self.client, goal, seeds, unique, k)
-            skipped += result.pop("warnings")
-        else:
+        if not unique:
+            model = rerank_vl.model_id() if backend == "rerank_vl" else listwise.model_id()
+            result = {"ranked": [], "model": model, "seconds": 0.0}
             skipped.append("no candidates to rank")
-        return {**result, "backend": "super_vl", "candidates": len(unique), "skipped": skipped}
+            return {**result, "backend": backend, "candidates": 0, "skipped": skipped}
+        if backend == "rerank_vl":
+            try:
+                result = await rerank_vl.rerank(self.client, goal, unique, k)
+            except Skipped as error:
+                skipped.append(f"rerank_vl: {error}; ranked with super_vl")
+                backend = "super_vl"
+            except (httpx.HTTPError, KeyError, IndexError, TypeError) as error:
+                log.error("rerank_vl failed", exc_info=error)
+                skipped.append(f"rerank_vl: {type(error).__name__}: {error}; ranked with super_vl")
+                backend = "super_vl"
+        if backend == "super_vl":
+            result = await listwise.rerank(self.client, goal, seeds, unique, k)
+        skipped += result.pop("warnings")
+        return {**result, "backend": backend, "candidates": len(unique), "skipped": skipped}
 
     async def resolve_seed(
         self, doi: str | None = None, pmid: str | None = None, title: str | None = None
