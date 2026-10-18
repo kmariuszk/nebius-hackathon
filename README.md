@@ -2,9 +2,9 @@
 
 Research canvas for the Nebius hackathon.
 
-- `client/`: the canvas app, from tldraw's Multiplayer starter kit ([tldraw-sync-cloudflare](https://github.com/tldraw/tldraw-sync-cloudflare)), with tldraw installed from npm.
+- `client/`: the canvas app, from tldraw's Multiplayer starter kit ([tldraw-sync-cloudflare](https://github.com/tldraw/tldraw-sync-cloudflare)), with tldraw installed from npm and the Cloudflare Worker ported to a plain Node server so it can run on a Nebius VM.
   - `client/client/`: the React frontend. Each URL path is a room, so everyone on `/<room>` shares one live board with cursors and presence.
-  - `client/worker/`: the sync server, a Cloudflare Worker with one Durable Object per room. Room state is saved in the Durable Object's SQLite storage, and images and videos go to an R2 bucket.
+  - `client/server/server.ts`: the sync server. It keeps one tldraw `TLSocketRoom` per room and saves each room to its own SQLite file. It also stores uploaded images and videos on disk, fetches bookmark previews for pasted links, and serves the built frontend.
 - `harness/`: the agents, on Google ADK with Nemotron models on Nebius Token Factory. One folder per agent; see [harness/README.md](harness/README.md), including how to add an agent.
 - `discovery/`: the papers MCP the agents search with (PubMed, OpenAlex, Semantic Scholar, Tavily); see [discovery/README.md](discovery/README.md).
 - `board/`: Python scripts that generate SVG for the planning Miro board.
@@ -22,7 +22,7 @@ cd harness && uv run adk web harness/agents   # terminal 2: ADK's dev UI on http
 
 ## Run the client
 
-You need Node 20.19+ (or 22.12+) and pnpm.
+You need Node 22.18+ and pnpm. Run `corepack enable` once to get the pnpm version pinned in `client/package.json`.
 
 ```zsh
 cd client
@@ -30,9 +30,31 @@ pnpm install
 pnpm dev
 ```
 
-`pnpm dev` starts the frontend and the sync server together at http://localhost:5173, which sends you to a random room. Open the same room URL in another tab or on another machine to collaborate. Locally, the Durable Objects and R2 are simulated and saved under `client/.wrangler/`, so you don't need a Cloudflare account.
+`pnpm dev` starts Vite at http://localhost:5173 and the sync server on port 5858. Vite forwards `/api` requests, including the sync websocket, to the server. The app sends you to a random room. Open the same room URL in another tab or on another machine to collaborate. Rooms and uploads are saved under `client/.data/`, so they survive restarts.
 
-To deploy, you need a Cloudflare account and an R2 bucket named as in `client/wrangler.toml`. Then run `pnpm build` and `pnpm exec wrangler deploy` from `client/`.
+To run it the way it's deployed, run `pnpm build` and then `pnpm start`. This serves the app and the API together at http://localhost:5858.
+
+## Run in Docker
+
+```zsh
+docker build -t board client
+docker run -p 5858:5858 -v board-data:/data board
+```
+
+The app is then at http://localhost:5858. Rooms and uploads are saved in the `board-data` volume.
+
+## Write to a board from another service
+
+Send `POST /api/rooms/<room>/shapes` with a JSON array of shapes, and everyone in the room sees them right away. Each shape needs a `type` and its full `props`. The server fills in the id, the page and the stacking order, and replies with `{ "ids": [...] }`. To update a shape in place later, give it your own id, like `shape:paper-2401-12345`. If any shape is invalid, the server writes nothing and replies 400 with the field that failed.
+
+This route has no auth, just like the websocket: anyone who can reach the server can edit any room.
+
+`client/server/addShape.ts` is a working example that adds a sticky note:
+
+```zsh
+cd client
+node server/addShape.ts <room> "Hello from the server"
+```
 
 ## Working with tldraw
 
