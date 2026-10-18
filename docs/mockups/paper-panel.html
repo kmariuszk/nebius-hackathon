@@ -1,0 +1,629 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paper Discovery Canvas · new-paper card mockup</title>
+<style>
+:root{
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781; --hair:#e1e0d9; --axis:#c3c2b7;
+  --surface:#fcfcfb; --page:#f4f3ef; --panel:#ffffff; --ring:rgba(11,11,11,.10);
+  --fit-low:#86b6ef; --fit-medium:#2a78d6; --fit-high:#104281;
+  --warn:#fab219; --warn-ink:#7a5200; --warn-bg:#fff6df; --ok:#006300;
+  --ana:#eb6834; --igor:#1baf7a; --ralph:#6250d6;
+  --sans:system-ui,-apple-system,"Segoe UI",sans-serif;
+  --serif:"Iowan Old Style",Charter,Georgia,serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font-family:var(--sans);color:var(--ink);background:var(--page);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+a{color:inherit}
+[hidden]{display:none!important}
+
+/* top bar */
+.top{position:fixed;inset:0 0 auto 0;height:56px;background:#fff;border-bottom:1px solid var(--hair);display:flex;align-items:center;gap:14px;padding:0 16px;z-index:30}
+.brand{display:flex;align-items:center;gap:8px;font-weight:650;white-space:nowrap}
+.logo{width:24px;height:24px;border-radius:6px;background:var(--fit-high);display:grid;place-items:center}
+.sep{width:1px;height:24px;background:var(--hair)}
+.board-name{font-weight:600;white-space:nowrap}
+.question{display:flex;align-items:center;gap:8px;background:var(--page);border:1px solid var(--hair);border-radius:999px;padding:5px 12px;min-width:0;flex:0 1 auto}
+.question span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.question b{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:650}
+.seg{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.seg .opts{display:flex;background:var(--page);border:1px solid var(--hair);border-radius:8px;padding:2px}
+.seg button{border:0;background:transparent;padding:4px 10px;border-radius:6px;font-size:12.5px;color:var(--ink2)}
+.seg button[aria-pressed=true]{background:#fff;box-shadow:0 0 0 1px var(--ring),0 1px 2px rgba(0,0,0,.06);font-weight:600;color:var(--ink)}
+.spacer{flex:1}
+.viewtoggle{position:fixed;top:68px;left:480px;z-index:15}
+.viewtoggle .opts{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+body.nopanel .viewtoggle{left:16px}
+.avatars{display:flex;padding-left:6px}
+.av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;font-size:12px;font-weight:650;border:2px solid #fff;margin-left:-6px;flex:none}
+.av.bot{background:var(--ink)}
+.btn{border:1px solid var(--hair);background:#fff;border-radius:8px;padding:6px 12px;font-weight:550;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--page)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:#2a2a28}
+.btn.ghost{border-color:transparent;background:transparent}
+.btn.ghost:hover{background:var(--page)}
+.btn[disabled]{opacity:.4;cursor:not-allowed}
+.count{background:#fff;color:var(--ink);border-radius:999px;padding:0 7px;font-size:12px;font-weight:700}
+
+/* canvas */
+.canvas{position:fixed;inset:56px 0 0 0;background-color:var(--page);background-image:radial-gradient(#d9d7cf 1px,transparent 1px);background-size:20px 20px;overflow:hidden}
+#graph{position:absolute;inset:0;width:100%;height:100%}
+.node{cursor:pointer}
+.node-label{font-size:12px;fill:var(--ink);font-weight:600;paint-order:stroke;stroke:var(--page);stroke-width:4px;stroke-linejoin:round}
+.node-sub{font-size:11px;fill:var(--ink2);paint-order:stroke;stroke:var(--page);stroke-width:4px;stroke-linejoin:round}
+.frame rect{fill:rgba(255,255,255,.6);stroke:var(--axis)}
+.frame text{font-size:12px;fill:var(--ink2);font-weight:650}
+.edge{stroke:var(--axis);stroke-width:1.5;fill:none}
+.edge.similar{stroke-dasharray:5 4}
+.edge.hl{stroke:var(--ink2);stroke-width:2}
+.edge-label{font-size:10.5px;fill:var(--ink2);paint-order:stroke;stroke:var(--page);stroke-width:4px;stroke-linejoin:round}
+.pulse{fill:none;stroke:var(--fit-medium);stroke-width:3;animation:pulse 1s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.sticky{width:150px;margin:6px;padding:10px 10px 8px;background:#fff1a8;box-shadow:0 1px 2px rgba(0,0,0,.08),0 4px 10px rgba(0,0,0,.06);font-size:12.5px;line-height:1.35;color:var(--ink)}
+.sticky .who{margin-top:6px;font-size:11px;color:var(--ink2);display:flex;align-items:center;gap:5px}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.mockflag{position:absolute;top:12px;left:calc(50% + 232px);transform:translateX(-50%);font-size:11.5px;color:var(--ink2);background:#fff;border:1px dashed var(--axis);border-radius:999px;padding:3px 12px;white-space:nowrap}
+
+/* tooltip */
+.tip{position:fixed;z-index:50;max-width:300px;background:var(--ink);color:#fff;border-radius:8px;padding:8px 10px;font-size:12px;pointer-events:none;box-shadow:0 6px 20px rgba(0,0,0,.2)}
+.tip b{display:block;font-size:12.5px;margin-bottom:3px}
+.tip .t2{color:#c3c2b7;margin-top:4px}
+
+/* legend + tools */
+.legend{position:fixed;right:16px;bottom:16px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px var(--ring),0 4px 12px rgba(0,0,0,.06);padding:12px 14px;font-size:12px;color:var(--ink2);width:236px;z-index:10}
+.legend h4{margin:0 0 6px;font-size:10.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.legend .row{display:flex;align-items:center;gap:8px;margin:5px 0}
+.legend .hidden-link{border-top:1px solid var(--hair);margin-top:8px;padding-top:8px}
+.legend button{border:0;background:none;padding:0;text-decoration:underline;color:var(--ink2)}
+.tools{position:fixed;bottom:16px;left:calc(50% + 232px);transform:translateX(-50%);background:#fff;border-radius:12px;box-shadow:0 0 0 1px var(--ring),0 4px 12px rgba(0,0,0,.08);display:flex;padding:4px;gap:2px;z-index:10}
+.tools button{width:36px;height:36px;border:0;background:transparent;border-radius:8px;display:grid;place-items:center;color:var(--ink2)}
+.tools button.on{background:#e6effc;color:var(--fit-high)}
+
+/* panel */
+.panel{position:fixed;top:68px;left:12px;bottom:12px;width:452px;background:var(--panel);border-radius:12px;box-shadow:0 0 0 1px var(--ring),0 12px 32px rgba(0,0,0,.12);display:flex;flex-direction:column;z-index:20;transition:transform .18s,opacity .18s}
+.panel.closed{transform:translateX(-24px);opacity:0;pointer-events:none}
+.p-body{overflow:auto;padding:16px 20px 8px;flex:1}
+.p-foot{border-top:1px solid var(--hair);padding:12px 14px;display:flex;gap:6px;align-items:center;background:#fff;border-radius:0 0 12px 12px}
+.grow{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--hair);border-radius:999px;padding:2px 9px;font-size:12px;color:var(--ink2);background:#fff;white-space:nowrap;text-decoration:none}
+.chip.dark{background:var(--ink);color:#fff;border-color:var(--ink);font-weight:700;letter-spacing:.06em;font-size:10.5px}
+.chip.warn{background:var(--warn-bg);border-color:#f3d48a;color:var(--warn-ink);font-weight:600}
+.chip.link{color:var(--ink);cursor:pointer}
+.chip.link:hover{border-color:var(--ink)}
+.chip.muted{color:var(--muted);border-style:dashed}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block;flex:none}
+.sq{width:10px;height:10px;border-radius:2px;border:2px solid var(--ink);display:inline-block;flex:none;background:#fff}
+.x{margin-left:auto;border:0;background:none;font-size:20px;line-height:1;color:var(--muted);padding:0 2px}
+.p-body{position:relative}
+.p-body > .chips:first-child{padding-right:26px}
+.p-body > .chips:first-child .x{position:absolute;top:14px;right:14px}
+.title{font-size:18px;font-weight:650;line-height:1.3;margin:10px 0 4px}
+.title a{text-decoration:none}
+.title a:hover{text-decoration:underline}
+.meta{color:var(--ink2);font-size:13px}
+.ids{margin-top:10px}
+.attrib{margin-top:10px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.reading{margin-top:10px;font-size:12.5px;color:var(--ink2);display:flex;align-items:center;gap:8px;background:var(--page);border-radius:8px;padding:8px 10px}
+.sec{border-top:1px solid var(--hair);padding:14px 0;margin-top:14px}
+.sec + .sec{margin-top:0}
+.sec h3{margin:0 0 8px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.tag-ai{white-space:nowrap;flex:none;display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--ink2);background:#efeee9;border-radius:4px;padding:1px 6px;letter-spacing:.03em;text-transform:none}
+.tag-paper{display:inline-flex;align-items:center;gap:3px;font-size:10.5px;font-weight:700;color:var(--ink2);border:1px solid var(--hair);border-radius:4px;padding:0 6px;letter-spacing:.03em;text-transform:none;font-family:var(--serif)}
+.for{font-size:12px;color:var(--muted);margin-bottom:4px}
+.why{font-size:15px;line-height:1.5;margin:0}
+.why .unv{text-decoration:underline dotted var(--warn) 2px;text-underline-offset:4px}
+.m{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;font-weight:700;vertical-align:2px;margin-left:2px;cursor:pointer}
+.m.w{background:var(--warn);color:var(--ink)}
+.rel{margin-top:10px}
+.prov{margin-top:8px;font-size:11.5px;color:var(--muted)}
+.unv-note{margin-top:8px;font-size:12px;color:var(--warn-ink);display:flex;gap:6px}
+.ev{position:relative;padding:6px 8px 6px 14px;margin:0 0 10px;border-left:3px solid var(--ink);border-radius:0 6px 6px 0;transition:background .15s}
+.ev.unv{border-left-color:var(--warn)}
+.ev.cite{border-left-color:var(--axis)}
+.ev.hl{background:#eef4fd}
+.ev .n{position:absolute;left:-10px;top:6px;width:17px;height:17px;border-radius:50%;background:var(--ink);color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;border:2px solid #fff}
+.ev.unv .n{background:var(--warn);color:var(--ink)}
+.ev.cite .n{background:var(--ink2)}
+.ev blockquote{margin:0;font-family:var(--serif);font-size:15px;line-height:1.5}
+.qmeta{margin-top:6px;font-size:12px;color:var(--ink2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.qmeta a{color:var(--ink);text-underline-offset:2px;cursor:pointer}
+.ok{color:var(--ok);font-weight:600}
+.bad{color:var(--warn-ink);font-weight:600}
+.closest{margin-top:6px;font-size:12px;color:var(--ink2)}
+.closest q{font-family:var(--serif)}
+.small{font-size:11.5px;color:var(--muted);margin-top:6px}
+.fig{border:1px solid var(--hair);border-radius:8px;overflow:hidden;margin-top:4px}
+.fig svg{display:block;width:100%;height:auto;background:#fff}
+.fig .cap{padding:8px 10px;font-size:12px;color:var(--ink2);border-top:1px solid var(--hair);background:var(--surface)}
+.fig .cap .from{font-family:var(--serif);font-size:13px;color:var(--ink)}
+.fig .cap .whyfig{margin-top:6px;display:flex;gap:6px;align-items:baseline}
+.gaps{margin:0;padding:0;list-style:none}
+.gaps li{display:flex;gap:8px;padding:3px 0;font-size:13px;color:var(--ink2)}
+.gaps li::before{content:"?";flex:none;width:17px;height:17px;border-radius:50%;border:1.5px solid var(--muted);color:var(--muted);font-size:10.5px;font-weight:700;display:grid;place-items:center;margin-top:1px}
+.kv{display:grid;grid-template-columns:112px 1fr;gap:8px 10px;font-size:13px;align-items:start;margin:0}
+.kv dt{color:var(--muted);padding-top:2px}
+.kv dd{margin:0}
+details{border-top:1px solid var(--hair);padding:10px 0}
+summary{cursor:pointer;font-weight:600;font-size:13.5px;list-style:none;display:flex;align-items:center;gap:8px}
+summary::-webkit-details-marker{display:none}
+summary::before{content:"▸";color:var(--muted);transition:transform .15s;display:inline-block}
+details[open] summary::before{transform:rotate(90deg)}
+.dbody{padding:8px 0 4px 18px}
+.dbody h5{margin:10px 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);display:flex;gap:8px;align-items:center}
+.dbody ul{margin:0;padding-left:18px}
+.abs{font-family:var(--serif);font-size:14px;line-height:1.55}
+.abs mark{background:#e2ecfb;padding:0 2px;border-radius:2px;color:inherit}
+.note{display:flex;gap:8px;align-items:flex-start;background:#fff8cc;border-radius:6px;padding:8px;font-size:13px;margin-bottom:8px}
+.note .av{width:20px;height:20px;font-size:10px;margin:0;border:0}
+.addnote{width:100%;border:1px solid var(--hair);border-radius:6px;padding:7px 9px;font:inherit;font-size:13px}
+.votes{display:flex;gap:6px;align-items:center;margin-top:10px;font-size:12px;color:var(--ink2);flex-wrap:wrap}
+.vote{display:inline-flex;align-items:center;gap:5px;border-radius:999px;padding:2px 9px 2px 2px;background:var(--page)}
+.vote .av{width:20px;height:20px;font-size:10px;margin:0;border:0}
+.skel{height:11px;border-radius:6px;background:linear-gradient(90deg,#eeede8 25%,#f8f7f3 50%,#eeede8 75%);background-size:200% 100%;animation:sh 1.4s infinite;margin:8px 0}
+@keyframes sh{to{background-position:-200% 0}}
+.loading{font-size:12.5px;color:var(--ink2);display:flex;align-items:center;gap:8px}
+.spin{width:12px;height:12px;border:2px solid var(--hair);border-top-color:var(--ink2);border-radius:50%;animation:rot .8s linear infinite;flex:none}
+@keyframes rot{to{transform:rotate(360deg)}}
+.catch{background:var(--ink);color:#fff;border-radius:12px 12px 0 0;padding:10px 12px 10px 16px;display:flex;align-items:center;gap:8px;font-size:13px}
+.catch .say{flex:1;line-height:1.35}
+.catch .k{font-size:11px;color:#c3c2b7;font-weight:600;letter-spacing:.04em;white-space:nowrap}
+.catch button{background:rgba(255,255,255,.14);border:0;color:#fff;border-radius:6px;padding:4px 9px;font-size:12.5px;white-space:nowrap}
+.catch button:hover{background:rgba(255,255,255,.24)}
+.sugg{display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:13px}
+.sugg:hover{background:var(--page)}
+
+/* list view */
+.list{position:fixed;inset:56px 0 0 0;background:var(--page);overflow:auto;padding:64px 32px 40px 496px;z-index:5}
+.list.full{padding-left:32px}
+.list .inner{max-width:780px}
+.list h2{font-size:15px;margin:0 0 4px}
+.list .sub{color:var(--ink2);font-size:13px;margin-bottom:16px}
+.lrow{display:flex;gap:14px;background:#fff;border-radius:10px;box-shadow:0 0 0 1px var(--ring);padding:14px 16px;margin-bottom:10px;cursor:pointer}
+.lrow:hover{box-shadow:0 0 0 1px var(--axis),0 4px 12px rgba(0,0,0,.05)}
+.lrow.sel{box-shadow:0 0 0 2px var(--ink)}
+.rk{font-size:20px;font-weight:700;color:var(--ink2);width:26px;flex:none;text-align:right}
+.lt{font-weight:650;font-size:15px;margin:6px 0 2px}
+.lwhy{margin-top:6px;font-size:13.5px}
+.lev{margin-top:6px;font-size:12px;color:var(--ink2);display:flex;gap:12px;flex-wrap:wrap}
+
+/* chat */
+.chat{position:fixed;top:68px;right:12px;bottom:12px;width:372px;background:#fff;border-radius:12px;box-shadow:0 0 0 1px var(--ring),0 12px 32px rgba(0,0,0,.12);display:flex;flex-direction:column;z-index:20}
+.chat header{padding:12px 14px;border-bottom:1px solid var(--hair)}
+.chat header b{display:flex;align-items:center;gap:8px}
+.chat header small{display:block;color:var(--muted);font-size:11.5px;margin-top:2px}
+.chat .body{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px;font-size:13px}
+.msg-u{align-self:flex-end;background:var(--page);border-radius:10px 10px 2px 10px;padding:8px 10px;max-width:85%}
+.tool{border:1px solid var(--hair);border-radius:8px;padding:7px 10px;font-size:12.5px}
+.tool .h{display:flex;gap:6px;align-items:center;font-weight:600}
+.tool .d{color:var(--ink2);margin-top:2px}
+.tool .lbl{color:var(--muted);font-size:11.5px;margin-top:3px}
+.chat .foot{border-top:1px solid var(--hair);padding:10px 12px}
+.chat textarea{width:100%;border:1px solid var(--hair);border-radius:8px;padding:8px;font:inherit;font-size:13px;resize:none;height:58px;margin-top:6px}
+
+.toast{position:fixed;bottom:72px;left:calc(50% + 232px);transform:translateX(-50%);background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;font-size:13px;z-index:60;display:flex;gap:14px;align-items:center;max-width:560px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
+.toast button{background:none;border:0;color:#fff;text-decoration:underline;font-weight:600}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand"><div class="logo"><svg width="14" height="14" viewBox="0 0 16 16"><circle cx="5" cy="5" r="3" fill="#fff"/><circle cx="11.5" cy="11" r="2.5" fill="#86b6ef"/><path d="M7 7 L10 9.5" stroke="#fff" stroke-width="1.5"/></svg></div></div>
+  <div class="sep"></div>
+  <div class="board-name">Melanoma immune cells</div>
+  <div class="question" title="The board's research question"><b>Question</b><span>Which single-cell methods help study melanoma immune cells?</span></div>
+  <div class="seg"><span>Rank for</span><div class="opts" id="goal">
+    <button data-goal="evidence" aria-pressed="true">Evidence on melanoma</button>
+    <button data-goal="method" aria-pressed="false">Reusable method</button></div></div>
+  <div class="spacer"></div>
+  <div class="avatars" title="On this board now">
+    <div class="av" style="background:var(--ana)">A</div><div class="av" style="background:var(--igor)">I</div><div class="av" style="background:var(--ralph)">R</div>
+    <div class="av bot" title="Agent"><svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" stroke-width="1.5"/><circle cx="6" cy="9" r="1.2" fill="#fff"/><circle cx="10" cy="9" r="1.2" fill="#fff"/><path d="M8 4.5V2" stroke="#fff" stroke-width="1.5"/></svg></div>
+  </div>
+  <button class="btn primary" id="catchBtn">Catch me up <span class="count" id="newCount">3</span></button>
+  <button class="btn" id="chatBtn">Chat</button>
+</header>
+
+<main class="canvas" id="canvas">
+  <svg id="graph" viewBox="0 0 1440 844" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <marker id="a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#c3c2b7"/></marker>
+      <marker id="ahl" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#52514e"/></marker>
+    </defs>
+    <g id="g"></g>
+  </svg>
+  <div class="mockflag">Mockup: the 5 seeds are real; new papers, quotes and numbers are placeholders</div>
+</main>
+
+<section class="list" id="list" hidden></section>
+<div class="seg viewtoggle"><div class="opts" id="view">
+  <button data-view="canvas" aria-pressed="true">Canvas</button>
+  <button data-view="list" aria-pressed="false">Ranked list</button></div></div>
+
+<aside class="legend" id="legend">
+  <h4>How to read the board</h4>
+  <div class="row"><span class="sq"></span>In your collection (seed or kept)</div>
+  <div class="row"><span class="sw" style="background:var(--fit-medium)"></span>Suggested by the agent</div>
+  <div class="row" style="margin-top:8px">Fit to your question:</div>
+  <div class="row"><span class="sw" style="background:var(--fit-low)"></span>Low <span class="sw" style="background:var(--fit-medium);margin-left:8px"></span>Medium <span class="sw" style="background:var(--fit-high);margin-left:8px"></span>High</div>
+  <div class="row">Bigger = more links on the board</div>
+  <div class="row"><span class="chip dark" style="padding:0 6px">NEW</span>nobody has voted yet</div>
+  <div class="row"><svg width="22" height="8"><line x1="0" y1="4" x2="22" y2="4" stroke="#52514e" stroke-width="1.5"/></svg>cites <svg width="22" height="8" style="margin-left:8px"><line x1="0" y1="4" x2="22" y2="4" stroke="#52514e" stroke-width="1.5" stroke-dasharray="5 4"/></svg>similar</div>
+  <div class="hidden-link"><span id="hiddenCount">2</span> discarded papers hidden · <button>Show</button></div>
+</aside>
+
+<nav class="tools" aria-label="Tools">
+  <button class="on" title="Select"><svg width="16" height="16" viewBox="0 0 16 16"><path d="M3 2 L3 13 L6 10 L8.5 14.5 L10.3 13.6 L7.9 9.2 L12 9 Z" fill="currentColor"/></svg></button>
+  <button title="Hand"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M5 8V4a1 1 0 0 1 2 0v3V3a1 1 0 0 1 2 0v4V4a1 1 0 0 1 2 0v5.5C11 12.5 9.5 14 7.5 14S4.5 13 3.5 11L2.6 9.2a1 1 0 0 1 1.7-1L5 9"/></svg></button>
+  <button title="Note"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M2.5 2.5h11v7l-4 4h-7z M9.5 13.5v-4h4"/></svg></button>
+  <button title="Arrow"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M3 13 L13 3 M7 3h6v6"/></svg></button>
+  <button title="Text"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3.5h10 M8 3.5v10"/></svg></button>
+  <button title="Frame"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M4.5 1.5v13 M11.5 1.5v13 M1.5 4.5h13 M1.5 11.5h13"/></svg></button>
+</nav>
+
+<aside class="panel" id="panel"></aside>
+<aside class="chat" id="chat" hidden></aside>
+<div class="tip" id="tip" hidden></div>
+<div class="toast" id="toast" hidden></div>
+
+<script>
+const PEOPLE={Ana:'var(--ana)',Igor:'var(--igor)',Ralph:'var(--ralph)'};
+const FIT_COLOR={high:'#104281',medium:'#2a78d6',low:'#86b6ef'};
+const FIT_LABEL={high:'High fit',medium:'Medium fit',low:'Low fit'};
+const GOAL_TEXT={evidence:'evidence on melanoma immune cells',method:'a reusable single-cell method'};
+const BOT='<svg width="14" height="14" viewBox="0 0 16 16"><rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="6" cy="9" r="1.2" fill="currentColor"/><circle cx="10" cy="9" r="1.2" fill="currentColor"/><path d="M8 4.5V2" stroke="currentColor" stroke-width="1.5"/></svg>';
+
+// Seeds are the real example set from the brief. Everything else is placeholder content.
+const P={
+  s1:{kind:'seed',label:'Tirosh 2016',x:590,y:175,title:'Dissecting the multicellular ecosystem of metastatic melanoma by single-cell RNA-seq',authors:'Tirosh I, et al.',venue:'Science',year:2016,doi:'10.1126/science.aad0501',pmid:'27124452',by:'Ana'},
+  s2:{kind:'seed',label:'Sade-Feldman 2018',x:1150,y:178,title:'Defining T Cell States Associated with Response to Checkpoint Immunotherapy in Melanoma',authors:'Sade-Feldman M, et al.',venue:'Cell',year:2018,doi:'10.1016/j.cell.2018.10.038',pmid:'30388456',by:'Ana'},
+  s3:{kind:'seed',label:'Oliveira 2021',x:890,y:525,title:'Phenotype, specificity and avidity of antitumour CD8+ T cells in melanoma',authors:'Oliveira G, et al.',venue:'Nature',year:2021,doi:'10.1038/s41586-021-03704-y',pmid:'34290406',by:'Igor'},
+  s4:{kind:'seed',label:'Oliveira 2022',x:1095,y:650,title:'Landscape of helper and regulatory antitumour CD4+ T cells in melanoma',authors:'Oliveira G, et al.',venue:'Nature',year:2022,doi:'10.1038/s41586-022-04682-5',pmid:'35508657',by:'Igor'},
+  s5:{kind:'seed',label:'Smalley 2021',x:715,y:262,title:'Single-Cell Characterization of the Immune Microenvironment of Melanoma Brain and Leptomeningeal Metastases',authors:'Smalley I, et al.',venue:'Clinical Cancer Research',year:2021,doi:'10.1158/1078-0432.CCR-21-1694',pmid:'34035069',by:'Ana'},
+  k1:{kind:'kept',label:'Kowalski 2022',x:925,y:672,title:'Tissue-resident memory CD8+ T cells and survival in stage III melanoma',authors:'Kowalski A, et al.',venue:'J Immunother Cancer',year:2022,keptBy:'Ana',when:'2 days ago',placeholder:true},
+
+  n1:{kind:'new',label:'Lindqvist 2024',x:1060,y:500,placeholder:true,
+    title:'Spatial and single-cell maps of exhausted CD8+ T-cell niches in metastatic melanoma',
+    authors:'Lindqvist E, Okafor C, Brandt M, … Haddad R',venue:'Nature Medicine',year:2024,type:'Original research',oa:true,
+    added:'Added by the agent for Ana · today 09:12',score:{evidence:.86,method:.62},
+    relation:{evidence:'Same disease · adds a spatial method',method:'Single-cell + spatial method, in melanoma'},
+    why:{evidence:[{t:'Profiles the same exhausted CD8+ T-cell states as three of your seeds, in melanoma metastases,',ev:['q1','c1']},{t:' and adds where in the tissue those cells sit.',ev:['q2']}],
+         method:[{t:'Pairs single-cell RNA-seq with spatial transcriptomics on the same lesions, a combination you could reuse',ev:['q1']},{t:', and the code is public.',ev:['q3']}]},
+    model:'Written by Nemotron 3.5 Lightning · 0.8 s',
+    quotes:[{id:'q1',ok:true,text:'We combined single-cell RNA sequencing with spatial transcriptomics on 31 metastatic melanoma lesions to locate exhausted CD8+ T-cell states within the tumour microenvironment.'},
+            {id:'q2',ok:true,text:'Exhausted CD8+ T cells clustered in perivascular niches, and these niches were enriched in lesions from patients who did not respond to anti-PD-1 therapy.'},
+            {id:'q3',ok:true,text:'Code and processed data are publicly available.'}],
+    cites:['s1','s2','s3'],shared:9,
+    figure:{kind:'fig',ref:'Fig. 2b–c · page 5',caption:'UMAP of 48,210 T cells (b) and their positions on a tissue section (c). Exhausted CD8+ cluster in dark blue.',why:'Shows the exhausted CD8+ state from your seeds mapped onto tissue, the paper’s main new result.',model:'Picked by Nemotron 3.5 Super VL from 6 figures · 3.1 s'},
+    gaps:['Whether it supports or challenges your seeds’ findings: not assessed','Methods and supplement: not read yet (abstract and one figure only)'],
+    cluster:'CD8 / CD4 T-cell states',closest:'k1',foundBy:['Cites 3 of your seeds · OpenAlex','Semantic Scholar recommendation'],
+    tldr:['Question: where do exhausted CD8+ T cells sit inside melanoma metastases?','Method: single-cell RNA-seq plus spatial transcriptomics on 31 lesions.','Finding: they gather around blood vessels, more so in patients who did not respond.'],
+    abstract:'Exhausted CD8+ T cells are linked to poor response to immune checkpoint blockade, but where they reside within tumours is unclear. We combined single-cell RNA sequencing with spatial transcriptomics on 31 metastatic melanoma lesions to locate exhausted CD8+ T-cell states within the tumour microenvironment. Exhausted CD8+ T cells clustered in perivascular niches, and these niches were enriched in lesions from patients who did not respond to anti-PD-1 therapy. Code and processed data are publicly available.',
+    notes:[{who:'Ana',text:'Does their spatial panel cover CD4 too?'}],
+    say:'The strongest new paper since yesterday. It cites three of your seeds and maps exhausted CD8+ T cells onto tissue.'},
+
+  n2:{kind:'new',label:'Chen 2023',x:620,y:560,placeholder:true,
+    title:'Paired single-cell RNA and TCR sequencing of tumour-infiltrating lymphocytes in non-small-cell lung cancer',
+    authors:'Chen L, Varga D, Osei K, … Ruiz M',venue:'Cancer Cell',year:2023,type:'Original research',oa:false,
+    added:'Added by the agent for Igor · yesterday 17:40',score:{evidence:.31,method:.81},
+    relation:{evidence:'Same method · other cancer',method:'Same method · other cancer'},
+    why:{evidence:[{t:'Uses the same single-cell approach as your seeds, but in lung cancer, so it adds little evidence about melanoma itself.',ev:['q1','c1']}],
+         method:[{t:'Describes a paired RNA and TCR sequencing workflow for tumour T cells, close to the approach in your seeds,',ev:['q1','c1']},{t:' and says it carries over to other solid tumours.',ev:['q2'],unv:true}]},
+    model:'Written by Nemotron 3.5 Lightning · 0.7 s',
+    quotes:[{id:'q1',ok:true,text:'We performed paired single-cell RNA and T-cell receptor sequencing on 212,000 tumour-infiltrating lymphocytes from 36 patients with non-small-cell lung cancer.'},
+            {id:'q2',ok:false,text:'The workflow generalises to other solid tumours.',closest:'We provide a reproducible analysis workflow.'}],
+    cites:['s1'],similar:['s3'],shared:4,
+    figure:{kind:'ego'},
+    gaps:['Full text isn’t open access, so no figures or methods were read','One quote wasn’t found word for word in the abstract','Lung cancer, not melanoma: whether the results carry over isn’t assessed'],
+    cluster:null,closest:'s3',foundBy:['Semantic Scholar recommendation','Similar abstract · embeddings'],
+    tldr:['Question: what states do clonally expanded T cells take in lung tumours?','Method: paired single-cell RNA and TCR sequencing, 36 patients.','Finding: expanded CD8+ clones share exhaustion programmes across tumour regions.'],
+    abstract:'We performed paired single-cell RNA and T-cell receptor sequencing on 212,000 tumour-infiltrating lymphocytes from 36 patients with non-small-cell lung cancer. Clonally expanded CD8+ T cells showed exhaustion programmes shared across tumour regions. We provide a reproducible analysis workflow.',
+    notes:[],say:''},
+
+  n3:{kind:'new',label:'Park 2026',x:1300,y:255,placeholder:true,loading:true,
+    title:'Clonal dynamics of tumour-reactive T cells during anti-PD-1 therapy in melanoma',
+    authors:'Park J, Moreau P, Ilić S, et al.',venue:'bioRxiv',year:2026,type:'Preprint',oa:true,
+    added:'Added by the agent for Ana · 4 min ago',score:{evidence:.62,method:.55},
+    relation:{evidence:'Same disease · follows patients through treatment',method:'Same method, repeated over time'},
+    why:{evidence:[{t:'Follows the T-cell states from your checkpoint-response seed through the course of anti-PD-1 treatment.',ev:['q1','c1']}],
+         method:[{t:'Repeats single-cell and TCR sequencing on serial biopsies, a design you could reuse for treatment studies.',ev:['q1']}]},
+    model:'Written by Nemotron 3.5 Lightning · 0.9 s',
+    quotes:[{id:'q1',ok:true,text:'We tracked tumour-reactive T-cell clones in serial biopsies from 14 patients with melanoma before and during anti-PD-1 therapy.'}],
+    cites:['s2','s3'],shared:5,figure:{kind:'loading'},
+    gaps:['Preprint: not peer reviewed yet','Posted 6 days ago, so too new for citations to say much'],
+    cluster:'Checkpoint response',closest:'s2',foundBy:['Tavily web search · recent preprints','Cites 2 of your seeds'],
+    notes:[],say:'A preprint from last week. The agent is still reading it, so the summary and figure are on their way.'},
+
+  n4:{kind:'new',label:'Ibrahim 2025',x:925,y:232,placeholder:true,
+    title:'Biomarkers of response to immune checkpoint blockade: a pan-cancer review',
+    authors:'Ibrahim N, Sørensen K, et al.',venue:'Nature Reviews Clinical Oncology',year:2025,type:'Review',oa:false,
+    added:'Added by the agent for Ana · today 09:12',score:{evidence:.24,method:.21},
+    relation:{evidence:'Review citing 2 of your seeds',method:'Review citing 2 of your seeds'},
+    why:{evidence:[{t:'Summarises checkpoint-response biomarkers across cancers and cites two of your seeds.',ev:['c1']},{t:' Good background, but it reports other studies rather than new data.',ev:['q1']}],
+         method:[{t:'A review of biomarkers, not a method paper; it cites two of your seeds.',ev:['q1','c1']}]},
+    model:'Written by Nemotron 3.5 Lightning · 0.6 s',
+    quotes:[{id:'q1',ok:true,text:'In this Review, we summarise biomarkers of response and resistance to immune checkpoint blockade across tumour types.'}],
+    cites:['s1','s2'],shared:14,figure:{kind:'ego'},
+    gaps:['A review, so it has no new data of its own','Full text isn’t open access, so which seed findings it discusses isn’t checked'],
+    cluster:null,closest:'s2',foundBy:['Cites 2 of your seeds · OpenAlex'],
+    tldr:['Question: which biomarkers predict response to checkpoint blockade?','Method: narrative review across tumour types.','Finding: no single biomarker is enough; combined signatures do better.'],
+    abstract:'In this Review, we summarise biomarkers of response and resistance to immune checkpoint blockade across tumour types. We discuss tumour-intrinsic and immune features and argue that combined signatures outperform single markers.',
+    notes:[],say:'A review. Useful background, but it has no new data, so it ranks low.'},
+};
+const EDGES=[['n1','s1','cites'],['n1','s3','cites'],['n1','s2','cites'],['n1','k1','similar'],['n2','s1','cites'],['n2','s3','similar'],
+  ['n3','s2','cites'],['n3','s3','cites'],['n4','s1','cites'],['n4','s2','cites'],['k1','s3','cites'],['k1','s4','cites'],
+  ['s4','s3','cites'],['s2','s1','cites'],['s5','s1','cites']];
+const FRAMES=[{label:'Tumour ecosystem',x:500,y:80,w:300,h:250},{label:'Checkpoint response',x:1060,y:80,w:340,h:250},{label:'CD8 / CD4 T-cell states',x:800,y:420,w:380,h:320}];
+const STICKIES=[{x:1200,y:432,rot:-2,who:'Ana',text:'Does their spatial panel cover CD4 too?'},{x:500,y:672,rot:1.5,who:'Ralph',text:'Grant needs melanoma-only cohorts. Can we filter out other cancers?'}];
+
+const state={sel:'n1',goal:'evidence',view:'canvas',chat:false,catchup:null,hidden:new Set(),votes:{n2:{Ana:'keep',Igor:'discard'}},working:new Set(['n3']),pulse:null,hlEv:null};
+let undoSnap=null;
+
+const $=s=>document.querySelector(s);
+const hidden=id=>state.hidden.has(id);
+const isSugg=id=>!!P[id].why;
+const fitOf=id=>{const s=P[id].score[state.goal];return s>=.7?'high':s>=.45?'medium':'low'};
+const votesOf=id=>state.votes[id]||{};
+const isSplit=id=>{const v=Object.values(votesOf(id));return v.includes('keep')&&v.includes('discard')};
+const isNew=id=>P[id].kind==='new'&&!Object.keys(votesOf(id)).length;
+const degree=id=>EDGES.filter(e=>(e[0]===id||e[1]===id)&&!hidden(e[0])&&!hidden(e[1])).length;
+const rOf=id=>14+4*degree(id);
+const square=id=>P[id].kind==='seed'||P[id].kind==='kept';
+const half=id=>square(id)?Math.round(rOf(id)*.8):rOf(id);
+const ranking=()=>Object.keys(P).filter(id=>isSugg(id)&&!hidden(id)).sort((a,b)=>P[b].score[state.goal]-P[a].score[state.goal]);
+const evList=n=>[...n.quotes.map(q=>({...q,type:'quote'})),...(n.cites?[{id:'c1',type:'cite'}]:[])];
+const evNum=(n,id)=>evList(n).findIndex(e=>e.id===id)+1;
+const avatar=p=>`<span class="av" style="background:${PEOPLE[p]}">${p[0]}</span>`;
+const fitChip=id=>`<span class="chip"><span class="sw" style="background:${FIT_COLOR[fitOf(id)]}"></span>${FIT_LABEL[fitOf(id)]}</span>`;
+const linkFor=(n,kind)=>n.placeholder?`data-act="placeholder" data-what="${kind}"`:(kind==='pmid'?`href="https://pubmed.ncbi.nlm.nih.gov/${n.pmid}/" target="_blank"`:`href="https://doi.org/${n.doi}" target="_blank"`);
+
+/* ---------- graph ---------- */
+function boundary(id,ux,uy,pad){const r=half(id);return square(id)?r/Math.max(Math.abs(ux),Math.abs(uy))+pad:r+pad}
+function drawGraph(){
+  let h='';
+  FRAMES.forEach(f=>h+=`<g class="frame"><rect x="${f.x}" y="${f.y}" width="${f.w}" height="${f.h}" rx="10"/><text x="${f.x+12}" y="${f.y+22}">${f.label}</text></g>`);
+  EDGES.forEach(([a,b,t])=>{
+    if(hidden(a)||hidden(b))return;
+    const A=P[a],B=P[b],dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy),ux=dx/d,uy=dy/d;
+    const hl=state.sel===a||state.sel===b||state.pulse===a||state.pulse===b;
+    const sa=boundary(a,ux,uy,3),sb=boundary(b,ux,uy,t==='cites'?6:3);
+    const x1=A.x+ux*sa,y1=A.y+uy*sa,x2=B.x-ux*sb,y2=B.y-uy*sb;
+    h+=`<line class="edge ${t} ${hl?'hl':''}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" ${t==='cites'?`marker-end="url(#${hl?'ahl':'a'})"`:''}/>`;
+    if(hl&&(state.sel===a||state.sel===b))h+=`<text class="edge-label" x="${(x1+x2)/2}" y="${(y1+y2)/2-4}" text-anchor="middle">${t}</text>`;
+  });
+  Object.keys(P).forEach(id=>{
+    if(hidden(id))return;
+    const n=P[id],r=half(id),sel=state.sel===id;
+    let s=`<g class="node" data-id="${id}">`;
+    if(state.pulse===id)s+=square(id)?`<rect class="pulse" x="${n.x-r-9}" y="${n.y-r-9}" width="${2*r+18}" height="${2*r+18}" rx="12"/>`:`<circle class="pulse" cx="${n.x}" cy="${n.y}" r="${r+9}"/>`;
+    if(sel)s+=square(id)?`<rect x="${n.x-r-6}" y="${n.y-r-6}" width="${2*r+12}" height="${2*r+12}" rx="11" fill="none" stroke="#0b0b0b" stroke-width="2"/>`:`<circle cx="${n.x}" cy="${n.y}" r="${r+6}" fill="none" stroke="#0b0b0b" stroke-width="2"/>`;
+    if(square(id)){
+      s+=`<rect x="${n.x-r}" y="${n.y-r}" width="${2*r}" height="${2*r}" rx="8" fill="#fff" stroke="#0b0b0b" stroke-width="2.5"/>`;
+      s+=`<path d="M${n.x-5} ${n.y-7} h10 v14 l-5 -4 l-5 4 z" fill="#0b0b0b"/>`;
+      if(n.kind==='kept')s+=`<circle cx="${n.x+r}" cy="${n.y-r}" r="9" fill="#0b0b0b" stroke="#fff" stroke-width="2"/><path d="M${n.x+r-4} ${n.y-r} l3 3 l5 -6" stroke="#fff" stroke-width="2" fill="none"/>`;
+    }else{
+      s+=`<circle cx="${n.x}" cy="${n.y}" r="${r}" fill="${FIT_COLOR[fitOf(id)]}" stroke="#fcfcfb" stroke-width="2"/>`;
+    }
+    if(state.working.has(id))s+=`<circle cx="${n.x}" cy="${n.y}" r="${r+11}" fill="none" stroke="#52514e" stroke-width="2" stroke-dasharray="4 7"><animateTransform attributeName="transform" type="rotate" from="0 ${n.x} ${n.y}" to="360 ${n.x} ${n.y}" dur="6s" repeatCount="indefinite"/></circle>`;
+    if(isNew(id))s+=`<g transform="translate(${n.x+r*0.45},${n.y-r-12})"><rect width="36" height="17" rx="8.5" fill="#0b0b0b"/><text x="18" y="12.3" text-anchor="middle" font-size="9.5" font-weight="700" fill="#fff" letter-spacing=".6">NEW</text></g>`;
+    if(isSplit(id))s+=`<g transform="translate(${n.x+r*0.45},${n.y-r-12})"><rect width="66" height="17" rx="8.5" fill="#fff6df" stroke="#fab219"/><text x="33" y="12.3" text-anchor="middle" font-size="10" font-weight="650" fill="#7a5200">⚖ Split vote</text></g>`;
+    s+=`<text class="node-label" x="${n.x}" y="${n.y+r+17}" text-anchor="middle">${n.label}</text>`;
+    const sub=state.working.has(id)?'Agent is reading…':n.kind==='kept'?`Kept by ${n.keptBy}`:'';
+    if(sub)s+=`<text class="node-sub" x="${n.x}" y="${n.y+r+31}" text-anchor="middle">${sub}</text>`;
+    h+=s+'</g>';
+  });
+  STICKIES.forEach(t=>h+=`<foreignObject x="${t.x}" y="${t.y}" width="170" height="120"><div xmlns="http://www.w3.org/1999/xhtml" class="sticky" style="transform:rotate(${t.rot}deg)">${t.text}<div class="who"><span class="dot" style="background:${PEOPLE[t.who]}"></span>${t.who}</div></div></foreignObject>`);
+  h+=`<g transform="translate(676,606)"><path d="M0 0 L0 16 L4.5 12 L7.5 19 L10 18 L7 11 L13 11 Z" fill="#eb6834" stroke="#fff" stroke-width="1.5"/><rect x="13" y="16" rx="4" width="34" height="18" fill="#eb6834"/><text x="30" y="29" font-size="11" fill="#fff" text-anchor="middle" font-weight="600">Ana</text></g>`;
+  $('#g').innerHTML=h;
+}
+
+/* ---------- figures ---------- */
+function rng(seed){let s=seed;return()=>{s=(s*16807)%2147483647;return(s-1)/2147483646}}
+function figN1(){
+  const R=rng(11);let d='';
+  [[70,62,'#c3c2b7'],[140,128,'#c3c2b7'],[58,140,'#c3c2b7'],[160,58,'#c3c2b7'],[112,96,'#104281']].forEach(([cx,cy,c])=>{
+    for(let k=0;k<46;k++){const a=R()*6.283,rr=Math.sqrt(R())*25;d+=`<circle cx="${(cx+Math.cos(a)*rr).toFixed(1)}" cy="${(cy+Math.sin(a)*rr*.8).toFixed(1)}" r="1.9" fill="${c}"/>`}});
+  let t=`<path d="M242 42 C300 18 382 34 392 92 C402 152 332 182 272 172 C220 164 206 82 242 42Z" fill="#f6f3ec" stroke="#c3c2b7"/>`;
+  t+=`<path d="M246 78 C286 92 300 122 352 132" stroke="#d8cfc0" stroke-width="7" fill="none" stroke-linecap="round"/><path d="M300 44 C312 80 342 96 376 82" stroke="#d8cfc0" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+  for(let k=0;k<70;k++){const a=R()*6.283,rr=Math.sqrt(R());t+=`<circle cx="${(312+Math.cos(a)*rr*70).toFixed(1)}" cy="${(104+Math.sin(a)*rr*56).toFixed(1)}" r="2" fill="#c3c2b7"/>`}
+  [[260,82],[284,96],[300,116],[322,127],[344,131],[308,64],[326,86],[352,90],[368,84]].forEach(([x,y])=>{for(let k=0;k<3;k++)t+=`<circle cx="${(x+(R()-.5)*14).toFixed(1)}" cy="${(y+(R()-.5)*14).toFixed(1)}" r="2.6" fill="#104281"/>`});
+  return `<svg viewBox="0 0 410 192"><text x="10" y="18" font-size="12" font-weight="700" fill="#52514e">b</text><text x="222" y="18" font-size="12" font-weight="700" fill="#52514e">c</text>${d}<line x1="118" y1="112" x2="146" y2="168" stroke="#52514e"/><text x="150" y="180" font-size="10" fill="#0b0b0b" text-anchor="middle">Exhausted CD8+</text>${t}<text x="356" y="150" font-size="10" fill="#52514e">vessel</text><line x1="352" y1="138" x2="346" y2="134" stroke="#52514e"/><text x="10" y="184" font-size="9.5" fill="#898781">UMAP 1</text><text x="232" y="186" font-size="9.5" fill="#898781">tissue section</text></svg>`;
+}
+function ego(id){
+  const n=P[id];const nb=EDGES.filter(e=>(e[0]===id||e[1]===id)&&!hidden(e[0])&&!hidden(e[1])).map(e=>({o:e[0]===id?e[1]:e[0],t:e[2]}));
+  const cx=110,cy=72,k=nb.length;let s='';
+  nb.forEach((b,i)=>{const x=290,y=72+(i-(k-1)/2)*52;
+    const dash=b.t==='similar'?'stroke-dasharray="5 4"':'';s+=`<line x1="${cx+18}" y1="${cy}" x2="${x-15}" y2="${y}" stroke="#52514e" stroke-width="1.5" ${dash}/>`;
+    s+=`<text x="${(cx+x)/2}" y="${(cy+y)/2-6}" font-size="10" fill="#52514e" text-anchor="middle" style="paint-order:stroke;stroke:#fff;stroke-width:4px">${b.t}</text>`;
+    s+=square(b.o)?`<rect x="${x-12}" y="${y-12}" width="24" height="24" rx="6" fill="#fff" stroke="#0b0b0b" stroke-width="2"/>`:`<circle cx="${x}" cy="${y}" r="12" fill="${FIT_COLOR[fitOf(b.o)]}"/>`;
+    s+=`<text x="${x+20}" y="${y+4}" font-size="11.5" font-weight="600" fill="#0b0b0b">${P[b.o].label}</text>`});
+  s+=`<circle cx="${cx}" cy="${cy}" r="17" fill="${FIT_COLOR[fitOf(id)]}" stroke="#0b0b0b" stroke-width="2"/><text x="${cx}" y="${cy+34}" font-size="11.5" font-weight="700" text-anchor="middle">${n.label}</text>`;
+  return `<svg viewBox="0 0 410 ${Math.max(144,k*52+40)}">${s}</svg>`;
+}
+/* ---------- panel ---------- */
+function catchStrip(id){
+  if(!state.catchup)return'';const {list,i}=state.catchup;
+  return `<div class="catch"><span class="k">${i+1} OF ${list.length} NEW</span><span class="say">${P[id].say||''}</span>${i>0?'<button data-act="prev">‹</button>':''}${i<list.length-1?'<button data-act="next">Next ›</button>':'<button data-act="endcatch">Done</button>'}</div>`;
+}
+function whyHtml(n){
+  return n.why[state.goal].map(s=>`<span class="${s.unv?'unv':''}">${s.t}</span>${s.ev.map(e=>`<span class="m ${s.unv?'w':''}" data-ev="${e}" title="Jump to evidence ${evNum(n,e)}">${evNum(n,e)}</span>`).join('')}`).join('');
+}
+function evidenceHtml(id){
+  const n=P[id];let h='';
+  n.quotes.forEach(q=>{
+    h+=`<div class="ev ${q.ok?'':'unv'} ${state.hlEv===q.id?'hl':''}" id="ev-${q.id}"><span class="n">${evNum(n,q.id)}</span><blockquote>“${q.text}”</blockquote>
+      <div class="qmeta">Abstract · ${q.ok?'<span class="ok">✓ Exact match</span> · <a data-act="placeholder" data-what="quote">Open on PubMed, highlighted ↗</a>':'<span class="bad">⚠ Not found word for word in the abstract</span>'}</div>
+      ${q.ok?'':`<div class="closest">Closest sentence: <q>${q.closest}</q></div>`}</div>`});
+  if(n.cites){
+    h+=`<div class="ev cite ${state.hlEv==='c1'?'hl':''}" id="ev-c1"><span class="n">${evNum(n,'c1')}</span>
+      <div style="font-size:13px;margin-bottom:6px">Cites <b>${n.cites.length} of your 5 seeds</b>${n.similar?` · similar to ${n.similar.map(s=>P[s].label).join(', ')}`:''} · shares ${n.shared} references with them</div>
+      <div class="chips">${n.cites.map(s=>`<span class="chip link" data-pulse="${s}" data-open="${s}"><span class="sq"></span>${P[s].label}</span>`).join('')}</div>
+      <div class="small">Source: OpenAlex reference lists. A citation shows a link, not agreement.</div></div>`;
+  }
+  const f=n.figure;
+  if(f.kind==='fig')h+=`<div class="fig">${figN1()}<div class="cap"><div class="from">${f.ref}. ${f.caption}</div><div class="whyfig"><span class="tag-ai">✦ AI</span><span>${f.why}</span></div><div class="small">${f.model}</div></div></div>`;
+  if(f.kind==='ego')h+=`<div class="fig">${ego(id)}<div class="cap">No open-access PDF, so there’s no figure to show. This is how it links to your board instead.</div></div>`;
+  if(f.kind==='loading')h+=`<div class="fig"><div style="padding:14px"><div class="loading"><span class="spin"></span>Finding the most relevant figure · Nemotron 3.5 Super VL</div><div class="skel" style="height:110px;margin-top:12px"></div></div></div>`;
+  return h;
+}
+function suggPanel(id){
+  const n=P[id],rank=ranking().indexOf(id)+1,total=ranking().length,v=votesOf(id);
+  const status=n.kind==='kept'?`<span class="chip"><span class="sq"></span>Kept by ${n.keptBy}</span>`:isNew(id)?'<span class="chip dark">NEW</span>':'';
+  const type=n.type==='Preprint'?'<span class="chip warn">Preprint · not peer reviewed</span>':`<span class="chip">${n.type}</span>`;
+  const votes=Object.keys(v).length?`<div class="votes">${isSplit(id)?'<span class="chip warn">⚖ Split vote</span>':''}${Object.entries(v).map(([p,d])=>`<span class="vote">${avatar(p)}${d==='keep'?'Kept':'Discarded'}</span>`).join('')}</div>`:'';
+  const unv=n.why[state.goal].some(s=>s.unv)?`<div class="unv-note">⚠ The underlined part relies on a quote we couldn’t find word for word.</div>`:'';
+  const connected=EDGES.filter(e=>(e[0]===id||e[1]===id)&&!hidden(e[0])&&!hidden(e[1])).map(e=>{const o=e[0]===id?e[1]:e[0];const rel=e[2]==='cites'&&e[1]===id?'cited by':e[2];return `<span class="chip link" data-pulse="${o}" data-open="${o}">${square(o)?'<span class="sq"></span>':`<span class="sw" style="background:${FIT_COLOR[fitOf(o)]}"></span>`}${P[o].label} <span style="color:var(--muted)">· ${rel}</span></span>`}).join('');
+  const about=n.loading?`<div class="loading"><span class="spin"></span>Summarising · Nemotron 3.5 Lightning</div><div class="skel"></div><div class="skel" style="width:80%"></div><div class="skel" style="width:60%"></div>`
+    :`<h5>Summary <span class="tag-ai">✦ AI</span></h5><ul>${n.tldr.map(t=>`<li>${t}</li>`).join('')}</ul><div class="small">Written by Nemotron 3.5 Lightning from the abstract only.</div>
+      <h5>Original abstract <span class="tag-paper">❝ from the paper</span></h5><div class="abs">${n.quotes.filter(q=>q.ok).reduce((a,q)=>a.replace(q.text,`<mark>${q.text}</mark>`),n.abstract)}</div>`;
+  const keepBtn=n.kind==='kept'?`<button class="btn primary" data-act="more">Find more like this</button>`:`<button class="btn primary" data-act="keep" title="Add to your collection. The agent searches around it on the next run.">Keep</button>`;
+  return `${catchStrip(id)}<div class="p-body">
+    <div class="chips">${status}${fitChip(id)}<span class="chip">#${rank} of ${total} suggestions</span>${type}<button class="x" data-act="close" title="Close">×</button></div>
+    <h2 class="title"><a ${linkFor(n,'doi')}>${n.title}</a></h2>
+    <div class="meta">${n.authors} · <i>${n.venue}</i> · ${n.year}</div>
+    <div class="ids chips"><a class="chip link" ${linkFor(n,'doi')}>DOI ↗</a><a class="chip link" ${linkFor(n,'pmid')}>PubMed ↗</a>${n.oa?`<a class="chip link" ${linkFor(n,'pdf')}>Open-access PDF ↗</a>`:'<span class="chip muted">No open-access PDF</span>'}</div>
+    <div class="attrib">${BOT}${n.added}</div>${votes}
+    ${state.working.has(id)?`<div class="reading"><span class="spin"></span>The agent is still reading this paper. Sections fill in as they’re ready.</div>`:''}
+    <section class="sec"><h3>Why it matters for your question <span class="tag-ai">✦ AI</span></h3>
+      <div class="for">Ranked for ${GOAL_TEXT[state.goal]}</div>
+      <p class="why">${whyHtml(n)}</p>${unv}
+      <div class="chips rel"><span class="chip">${n.relation[state.goal]}</span></div>
+      <div class="prov">${n.model} · every numbered claim links to the evidence below</div></section>
+    <section class="sec"><h3>Evidence <span class="tag-paper">❝ from the paper</span></h3>${evidenceHtml(id)}</section>
+    <section class="sec"><h3>Couldn’t check</h3><ul class="gaps">${n.gaps.map(g=>`<li>${g}</li>`).join('')}${n.loading?'<li>Still reading, so more may show up here</li>':''}</ul></section>
+    <section class="sec"><h3>On this board</h3><dl class="kv">
+      <dt>Cluster</dt><dd>${n.cluster?`<span class="chip">${n.cluster}</span>`:'<span style="color:var(--muted)">Not in a cluster yet</span>'}</dd>
+      <dt>Linked to</dt><dd class="chips">${connected}</dd>
+      <dt>Closest in your collection</dt><dd><span class="chip link" data-pulse="${n.closest}" data-open="${n.closest}"><span class="sq"></span>${P[n.closest].label}</span></dd>
+      <dt>Found by</dt><dd class="chips">${n.foundBy.map(f=>`<span class="chip">${f}</span>`).join('')}</dd></dl></section>
+    <details ${state.openAbout?'open':''}><summary>About the paper</summary><div class="dbody">${about}</div></details>
+    <details ${n.notes.length?'open':''}><summary>Notes (${n.notes.length})</summary><div class="dbody">${n.notes.map(x=>`<div class="note">${avatar(x.who)}<div>${x.text}</div></div>`).join('')}<input class="addnote" placeholder="Add a note. Everyone on this board sees it."></div></details>
+  </div>
+  <div class="p-foot">
+    ${n.kind==='kept'?'':'<button class="btn" data-act="discard" title="Hide it. The agent shows fewer papers like this.">Discard</button>'}
+    <span class="grow"></span>
+    <button class="btn ghost" data-act="ask" title="Open chat with this paper as context">Ask agent</button>
+    <button class="btn ghost" data-act="deeper" ${n.oa&&!state.working.has(id)?'':'disabled'} title="${n.oa?'Read the full text for more quotes and figures':'No open-access full text to read'}">Dig deeper</button>
+    ${keepBtn}
+  </div>`;
+}
+function seedPanel(id){
+  const n=P[id];
+  const sugg=EDGES.filter(e=>e[0]===id||e[1]===id).map(e=>e[0]===id?e[1]:e[0]).filter(o=>isSugg(o)&&!hidden(o));
+  return `<div class="p-body">
+    <div class="chips"><span class="chip"><span class="sq"></span>In your collection · ${n.kind==='seed'?'Seed':'Kept'}</span><button class="x" data-act="close">×</button></div>
+    <h2 class="title"><a ${linkFor(n,'doi')}>${n.title}</a></h2>
+    <div class="meta">${n.authors} · <i>${n.venue}</i> · ${n.year}</div>
+    <div class="ids chips"><a class="chip link" ${linkFor(n,'doi')}>DOI ↗</a><a class="chip link" ${linkFor(n,'pmid')}>PubMed ↗</a></div>
+    <div class="attrib">${n.kind==='seed'?`${avatar(n.by)} Added as a seed by ${n.by}`:`${avatar(n.keptBy)} Kept by ${n.keptBy} from a suggestion · ${n.when}`}</div>
+    <section class="sec"><h3>Suggestions linked to this paper</h3>
+      ${sugg.length?sugg.map(o=>`<div class="sugg" data-open="${o}" data-pulse="${o}"><span class="sw" style="background:${FIT_COLOR[fitOf(o)]}"></span><b>${P[o].label}</b><span style="color:var(--ink2)">${P[o].relation[state.goal]}</span>${isNew(o)?'<span class="chip dark" style="margin-left:auto">NEW</span>':''}</div>`).join(''):'<div style="color:var(--muted)">None yet.</div>'}</section>
+  </div>
+  <div class="p-foot"><span class="grow"></span><button class="btn ghost" data-act="ask">Ask agent</button><button class="btn primary" data-act="more">Find more like this</button></div>`;
+}
+function drawPanel(){
+  const p=$('#panel');
+  if(!state.sel||hidden(state.sel)){p.classList.add('closed');return}
+  p.classList.remove('closed');
+  p.innerHTML=isSugg(state.sel)?suggPanel(state.sel):seedPanel(state.sel);
+}
+
+/* ---------- list, chat, chrome ---------- */
+function drawList(){
+  const l=$('#list');l.hidden=state.view!=='list';if(l.hidden)return;
+  l.classList.toggle('full',!state.sel);
+  const ids=ranking();
+  l.innerHTML=`<div class="inner"><h2>${ids.length} suggestions, ranked for ${GOAL_TEXT[state.goal]}</h2><div class="sub">Same papers and evidence as the canvas. Seeds and discarded papers are left out.</div>
+  ${ids.map((id,i)=>{const n=P[id];const ok=n.quotes.filter(q=>q.ok).length,bad=n.quotes.length-ok;
+    return `<div class="lrow ${state.sel===id?'sel':''}" data-open="${id}"><div class="rk">${i+1}</div><div style="flex:1;min-width:0">
+      <div class="chips">${fitChip(id)}<span class="chip">${n.relation[state.goal]}</span>${n.type==='Preprint'?'<span class="chip warn">Preprint</span>':n.type==='Review'?'<span class="chip">Review</span>':''}${isNew(id)?'<span class="chip dark">NEW</span>':''}${isSplit(id)?'<span class="chip warn">⚖ Split vote</span>':''}${n.kind==='kept'?`<span class="chip"><span class="sq"></span>Kept</span>`:''}</div>
+      <div class="lt">${n.title}</div><div class="meta">${n.authors} · <i>${n.venue}</i> · ${n.year}</div>
+      <div class="lwhy">${n.why[state.goal].map(s=>s.t).join('')}</div>
+      <div class="lev"><span class="ok">✓ ${ok} quote${ok===1?'':'s'} verified</span>${bad?`<span class="bad">⚠ ${bad} unverified</span>`:''}<span>Cites ${n.cites.length} of your seeds</span><span>${n.gaps.length} things not checked</span></div></div></div>`}).join('')}</div>`;
+}
+function drawChat(){
+  const c=$('#chat');c.hidden=!state.chat;$('#legend').hidden=state.chat;if(!state.chat)return;
+  const sel=state.sel&&!hidden(state.sel)?`<span class="chip"><span class="sw" style="background:${square(state.sel)?'#fff':FIT_COLOR[fitOf(state.sel)]};${square(state.sel)?'border:2px solid #0b0b0b;border-radius:2px':''}"></span>${P[state.sel].label}</span>`:'';
+  c.innerHTML=`<header><b>${BOT} Agent <button class="x" data-act="closechat">×</button></b><small>Only you see this chat. What the agent adds to the board, everyone sees.</small></header>
+  <div class="body">
+    <div class="msg-u">Find more papers around our CD8 seeds. Melanoma first.</div>
+    <div class="tool"><div class="h"><span class="ok">✓</span>search · find_candidates</div><div class="d">212 candidates: OpenAlex citing + co-citation, Semantic Scholar, Tavily</div><div class="lbl">Nemotron 3.5 Lightning · 6.2 s · $0.01</div></div>
+    <div class="tool"><div class="h"><span class="ok">✓</span>score_candidates</div><div class="d">Scored 212 papers in parallel · 3 explanations unverified</div><div class="lbl">Nemotron 3.5 Lightning · 41 s · $0.04</div></div>
+    <div class="tool"><div class="h"><span class="ok">✓</span>rerank</div><div class="d">Ranked the top 100 with all seed abstracts in context</div><div class="lbl">Nemotron 3.5 Super VL · 18 s · $0.06</div></div>
+    <div class="tool"><div class="h"><span class="ok">✓</span>canvas · add_papers</div><div class="d">Placed 4 papers next to their closest cluster</div><div class="lbl">0.3 s</div></div>
+    <div>I added 4 papers. The strongest is <b>Lindqvist 2024</b>: it cites three of your seeds and maps exhausted CD8+ T cells onto tissue. <b>Chen 2023</b> is lung cancer, so I ranked it low for melanoma evidence.</div>
+  </div>
+  <div class="foot"><div class="chips" style="font-size:12px;color:var(--muted)">Context: ${sel||'nothing selected'}</div><textarea placeholder="Ask about this paper or the board…"></textarea></div>`;
+}
+function drawChrome(){
+  $('.tools').hidden=state.view==='list';if(state.view==='list')$('#legend').hidden=true;
+  document.body.classList.toggle('nopanel',!state.sel||hidden(state.sel));
+  document.querySelectorAll('#goal button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.goal===state.goal));
+  document.querySelectorAll('#view button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.view===state.view));
+  const nNew=Object.keys(P).filter(id=>isNew(id)&&!hidden(id)).length;$('#newCount').textContent=nNew;
+  $('#hiddenCount').textContent=2+state.hidden.size;
+}
+function render(){drawGraph();drawPanel();drawList();drawChat();drawChrome()}
+
+/* ---------- interactions ---------- */
+function select(id){state.sel=id;state.hlEv=null;render();$('.p-body')&&($('.p-body').scrollTop=0)}
+function snapshot(){undoSnap=JSON.stringify({k:Object.fromEntries(Object.entries(P).map(([i,n])=>[i,[n.kind,n.keptBy]])),h:[...state.hidden],v:state.votes,w:[...state.working],sel:state.sel})}
+function undo(){const s=JSON.parse(undoSnap);Object.entries(s.k).forEach(([i,[k,b]])=>{P[i].kind=k;P[i].keptBy=b});state.hidden=new Set(s.h);state.votes=s.v;state.working=new Set(s.w);state.sel=s.sel;hideToast();render()}
+let toastT;
+function toast(msg,withUndo){const t=$('#toast');t.innerHTML=`<span>${msg}</span>${withUndo?'<button id="undoBtn">Undo</button>':''}`;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(hideToast,6000);if(withUndo)$('#undoBtn').onclick=undo}
+function hideToast(){$('#toast').hidden=true}
+function step(d){const c=state.catchup;c.i=Math.max(0,Math.min(c.list.length-1,c.i+d));select(c.list[c.i])}
+
+const tip=$('#tip');
+$('#graph').addEventListener('mousemove',e=>{const g=e.target.closest('[data-id]');if(!g){tip.hidden=true;return}const id=g.dataset.id,n=P[id];
+  tip.innerHTML=isSugg(id)?`<b>${n.title}</b>${FIT_LABEL[fitOf(id)]} · ${n.relation[state.goal]}<div class="t2">${n.why[state.goal][0].t}</div>`:`<b>${n.title}</b>${n.kind==='seed'?'Seed':'Kept by '+n.keptBy} · ${n.venue} ${n.year}`;
+  tip.style.left=Math.min(e.clientX+16,innerWidth-320)+'px';tip.style.top=(e.clientY+16)+'px';tip.hidden=false});
+$('#graph').addEventListener('mouseleave',()=>tip.hidden=true);
+$('#graph').addEventListener('click',e=>{const g=e.target.closest('[data-id]');if(g){state.catchup=null;select(g.dataset.id)}else if(!e.target.closest('foreignObject')){state.sel=null;render()}});
+
+document.addEventListener('click',e=>{
+  const a=e.target.closest('[data-act]');
+  if(a){e.preventDefault();const id=state.sel,n=P[id];
+    switch(a.dataset.act){
+      case'close':state.sel=null;state.catchup=null;render();break;
+      case'closechat':state.chat=false;render();break;
+      case'next':step(1);break;case'prev':step(-1);break;
+      case'endcatch':state.catchup=null;render();toast('You’re caught up. 3 new papers reviewed.');break;
+      case'keep':snapshot();n.kind='kept';n.keptBy='Ralph';state.votes[id]={...votesOf(id),Ralph:'keep'};render();toast(`Kept. ${n.label} is in your collection now; the agent searches around it on the next run.`,true);break;
+      case'discard':snapshot();state.hidden.add(id);state.votes[id]={...votesOf(id),Ralph:'discard'};
+        if(state.catchup){state.catchup.list=state.catchup.list.filter(x=>x!==id);if(state.catchup.list.length){state.catchup.i=Math.min(state.catchup.i,state.catchup.list.length-1);state.sel=state.catchup.list[state.catchup.i]}else{state.catchup=null;state.sel=null}}else state.sel=null;
+        render();toast(`Hidden. The agent will show fewer papers like ${n.label}.`,true);break;
+      case'ask':state.chat=true;render();break;
+      case'deeper':state.working.add(id);render();toast(`The agent is reading the full text of ${n.label} for more quotes and figures.`);break;
+      case'more':toast(`Run started: the agent is searching around ${n.label}. New papers will appear next to it.`);break;
+      case'placeholder':toast({quote:'In the app this opens PubMed with the sentence highlighted, using a #:~:text= link.',doi:'Placeholder paper: in the app this opens doi.org.',pmid:'Placeholder paper: in the app this opens PubMed.',pdf:'Placeholder paper: in the app this opens the open-access PDF.'}[a.dataset.what]);break;
+    }return}
+  const o=e.target.closest('[data-open]');if(o&&!e.target.closest('#graph')){state.catchup=null;state.pulse=null;select(o.dataset.open);return}
+  const m=e.target.closest('[data-ev]');if(m){const el=document.getElementById('ev-'+m.dataset.ev);el&&el.scrollIntoView({behavior:'smooth',block:'center'})}
+});
+document.addEventListener('mouseover',e=>{
+  const p=e.target.closest('[data-pulse]');const pid=p?p.dataset.pulse:null;if(pid!==state.pulse){state.pulse=pid;drawGraph()}
+  const m=e.target.closest('[data-ev]');const ev=m?m.dataset.ev:null;
+  document.querySelectorAll('.ev.hl').forEach(x=>x.classList.remove('hl'));if(ev){const el=document.getElementById('ev-'+ev);el&&el.classList.add('hl')}
+});
+$('#goal').addEventListener('click',e=>{const b=e.target.closest('button');if(!b||b.dataset.goal===state.goal)return;state.goal=b.dataset.goal;render();toast(`Re-ranked for ${GOAL_TEXT[state.goal]}. Colours now show fit for that goal.`)});
+$('#view').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;state.view=b.dataset.view;render()});
+$('#chatBtn').onclick=()=>{state.chat=!state.chat;render()};
+$('#catchBtn').onclick=()=>{const list=ranking().filter(id=>isNew(id));if(!list.length){toast('Nothing new since your last visit.');return}state.catchup={list,i:0};state.view='canvas';select(list[0])};
+
+// Deep links for screenshots: #sel=n2&goal=method&view=list&chat=1&catchup=1&about=1
+const q=new URLSearchParams(location.hash.slice(1));
+if(q.get('goal'))state.goal=q.get('goal');
+if(q.get('view'))state.view=q.get('view');
+if(q.get('chat'))state.chat=true;
+if(q.get('about'))state.openAbout=true;
+if(q.has('sel'))state.sel=q.get('sel')||null;
+render();
+if(q.get('catchup'))$('#catchBtn').click();
+</script>
+</body>
+</html>
