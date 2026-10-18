@@ -27,8 +27,22 @@
     constructor(status, message) { super(message); this.status = status; }
   }
 
+  // Demo-grade identity (matches client/identity.ts): a member ID made once per
+  // browser and trusted by the server as `Authorization: Bearer <memberId>`.
+  const MEMBER_KEY = 'pdc.memberId';
+  const ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+  function getMemberId() {
+    let id = localStorage.getItem(MEMBER_KEY);
+    if (!id || !/^m_[a-z0-9]{10}$/.test(id)) {
+      const bytes = crypto.getRandomValues(new Uint8Array(10));
+      id = 'm_' + Array.from(bytes, (b) => ALPHABET[b % ALPHABET.length]).join('');
+      localStorage.setItem(MEMBER_KEY, id);
+    }
+    return id;
+  }
+
   function headers(json) {
-    const h = { Accept: 'application/json' };
+    const h = { Accept: 'application/json', Authorization: `Bearer ${getMemberId()}` };
     if (json) h['Content-Type'] = 'application/json';
     const name = localStorage.getItem('ml-name');
     if (name) h['X-Display-Name'] = name;
