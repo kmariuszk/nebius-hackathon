@@ -14,6 +14,8 @@ trigger:
   - "cascade workflow"
 ```
 
+> **Ask first.** Force-pushes, rebases of shared branches and anything that pushes to `main` change history other people depend on. An agent following this workflow must stop and get the person's explicit go before each of them; `.claude/settings.json` denies them so they can't run unprompted.
+
 ## Concept
 
 ```
@@ -91,6 +93,7 @@ git push -o merge_request.create \
 MRs must be merged in order: Task-1, then Task-2, then Task-3, etc.
 
 ### After Each Merge - Rebase Remaining Branches
+Ask the person before force-pushing any branch.
 ```bash
 # After task-N is merged
 git checkout feat/<feature-name>
@@ -105,6 +108,7 @@ done
 ```
 
 ### Automated Rebase Script
+For a person to run, not an agent: it force-pushes every listed branch.
 ```bash
 #!/bin/bash
 set -e
@@ -171,15 +175,8 @@ git push --force-with-lease origin task-N-<description>
 
 ## Completion
 
-After all MRs are merged:
+After all MRs are merged, open a final pull request from the base branch to `main` and let a person review and merge it. Never push to `main` directly.
 
 ```bash
-# Final merge to main
-git checkout main
-git pull origin main
-git merge feat/<feature-name>
-git push origin main
-
-# Or create final MR
-glab mr create --source-branch feat/<feature-name> --target-branch main
+gh pr create --base main --head feat/<feature-name>
 ```

@@ -10,7 +10,8 @@
 	"scripts": {
 		"dev": "concurrently -k -n vite,server \"vite --host\" \"node --watch server/server.ts\"",
 		"build": "tsc && vite build",
-		"start": "node server/server.ts"
+		"start": "node server/server.ts",
+		"test": "node --test \"server/**/*.test.ts\""
 	},
 	"dependencies": {
 		"@tldraw/sync": "^5.5.2",

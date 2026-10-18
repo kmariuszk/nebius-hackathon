@@ -1,16 +1,28 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git *)",
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git fetch*)",
       "Bash(mkdir *)",
       "Bash(ls *)",
-      "Bash(cat *)",
-      "Bash(head *)",
-      "Bash(tail *)",
       "Bash(tree *)",
       "Bash(pwd)"
     ],
     "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git push *main*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git -c *)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(~/.ssh/**)",
       "Bash(rm -rf /)",
       "Bash(sudo *)"
     ]

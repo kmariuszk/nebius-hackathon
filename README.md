@@ -85,7 +85,11 @@ The app is then at http://localhost:5858. Rooms and uploads are saved in the `bo
 
 ## Write to a board from another service
 
-Send `POST /api/rooms/<room>/shapes` with a JSON array of shapes, and everyone in the room sees them right away. Each shape needs a `type` and its full `props`. The server fills in the id, the page and the stacking order, and replies with `{ "ids": [...] }`. To update a shape in place later, give it your own id, like `shape:paper-2401-12345`. If any shape is invalid, the server writes nothing and replies 400 with the field that failed.
+Send `POST /api/rooms/<room>/shapes` with a JSON array of shapes, and everyone in the room sees them right away. Each shape needs a `type` and its full `props`. The server fills in the id, the page and the stacking order, and replies with `{ "ids": [...] }`. Give a shape your own id, like `shape:paper-2401-12345`, if you want to change it later; posting an id that already exists is refused with 409, so a create never wipes a shape someone has moved or edited.
+
+To change shapes, send `PATCH /api/rooms/<room>/shapes` with a JSON array of patches, each with the shape's `id` and only the fields to change. `props` and `meta` are merged key by key, and position, rotation, page and stacking order stay as they were unless the patch sets them. An unknown id gets 404.
+
+If any shape or patch is invalid, the server writes nothing and replies 400 with the field that failed.
 
 This route has no auth, just like the websocket: anyone who can reach the server can edit any room.
 
