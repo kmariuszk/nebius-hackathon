@@ -1,7 +1,7 @@
 """The papers MCP: the paper tools every agent uses (docs/Concept.md, Papers MCP tools).
 
-Scoring, rerank, clustering, full text and figures are still to come; the
-tools here are the ones the search agent needs.
+Scoring so far is embedding similarity only; verdicts, rerank, clustering,
+full text and figures are still to come.
 """
 
 from __future__ import annotations
@@ -15,7 +15,8 @@ from discovery.service import SEARCH_SOURCES, SEED_STRATEGIES, Discovery, Search
 INSTRUCTIONS = """\
 Tools for finding biomedical and computational research papers. Papers are identified by prefixed IDs \
 such as doi:10.1038/s41586-021-03704-y, pmid:34290406, pmcid:PMC9187974 or arxiv:2401.01234. \
-Use `search` for a query, `find_candidates` to expand from seed papers, and `get_paper` for a full record.
+Use `search` for a query, `find_candidates` to expand from seed papers, `score_candidates` to rank the \
+candidates against the research question and seeds, and `get_paper` for a full record.
 """
 
 
@@ -73,6 +74,29 @@ def build_server(discovery: Discovery) -> MCPServer:
         return await discovery.find_candidates(
             seed_ids, exclude_ids, strategies or SEED_STRATEGIES, since, limit, query
         )
+
+    @server.tool()
+    async def score_candidates(
+        question: str,
+        candidate_ids: list[str],
+        seed_ids: list[str] | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Rank candidate papers by how close their title and abstract are in meaning to
+        the research question and to the nearest seed paper.
+
+        Args:
+            question: The research question (not a sub-query).
+            candidate_ids: Paper IDs to rank, such as the IDs from `search` and `find_candidates`.
+            seed_ids: Paper IDs of the researcher's seed papers.
+            limit: Most papers to return.
+
+        Returns the top papers (ID, title, year, score from 0 to 1, similarity to the
+        question and to the closest seed, which seed that is), how many candidates
+        were scored, and the IDs that could not be found and why. Seeds are never
+        returned as candidates.
+        """
+        return await discovery.score_candidates(question, candidate_ids, seed_ids, limit)
 
     @server.tool()
     async def resolve_seed(

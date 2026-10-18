@@ -9,8 +9,9 @@ import httpx
 from discovery.server import build_server
 from discovery.service import Discovery
 from discovery.store import Store
+from discovery.vectors import VectorStore
 
-DEFAULT_DB = Path(__file__).resolve().parents[1] / "data" / "papers.sqlite3"
+DATA = Path(__file__).resolve().parents[1] / "data"
 
 logging.basicConfig(level=logging.INFO)
 client = httpx.AsyncClient(
@@ -18,8 +19,9 @@ client = httpx.AsyncClient(
     follow_redirects=True,
     headers={"User-Agent": "paper-discovery-canvas/0.1 (Nebius hackathon)"},
 )
-store = Store(os.environ.get("DISCOVERY_DB", DEFAULT_DB))
-build_server(Discovery(client, store)).run(
+store = Store(os.environ.get("DISCOVERY_DB", DATA / "papers.sqlite3"))
+vectors = VectorStore(os.environ.get("DISCOVERY_VECTORS", DATA / "vectors"))
+build_server(Discovery(client, store, vectors)).run(
     "streamable-http",
     host=os.environ.get("DISCOVERY_HOST", "127.0.0.1"),
     port=int(os.environ.get("DISCOVERY_PORT", "8001")),

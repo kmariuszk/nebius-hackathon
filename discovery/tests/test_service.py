@@ -10,6 +10,7 @@ from mcp import Client
 from discovery.server import build_server
 from discovery.service import Discovery
 from discovery.store import Store
+from discovery.vectors import VectorStore
 
 FIXTURE = (Path(__file__).parent / "fixtures" / "pubmed_34290406.xml").read_text()
 
@@ -68,12 +69,12 @@ def fake_apis(request: httpx.Request) -> httpx.Response:
 
 
 @pytest.fixture
-def discovery(monkeypatch):
+def discovery(monkeypatch, tmp_path):
     for name in ("OPENALEX_API_KEY", "TAVILY_API_KEY", "NCBI_API_KEY", "SEMANTIC_SCHOLAR_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr("discovery.sources.pubmed._throttle.interval", 0)
     monkeypatch.setattr("discovery.sources.semantic_scholar._throttle.interval", 0)
-    return Discovery(httpx.AsyncClient(transport=httpx.MockTransport(fake_apis)), Store())
+    return Discovery(httpx.AsyncClient(transport=httpx.MockTransport(fake_apis)), Store(), VectorStore(tmp_path))
 
 
 async def test_search_reports_sources_without_keys_as_skipped(discovery):
@@ -103,7 +104,7 @@ async def test_find_candidates_merges_strategies_and_drops_seeds(discovery):
 async def test_tools_over_mcp(discovery):
     async with Client(build_server(discovery)) as client:
         tools = {tool.name for tool in (await client.list_tools()).tools}
-        assert tools == {"search", "find_candidates", "resolve_seed", "get_paper"}
+        assert tools == {"search", "find_candidates", "score_candidates", "resolve_seed", "get_paper"}
         result = await client.call_tool("search", {"query": "melanoma", "sources": ["pubmed"]})
         assert not result.is_error
         assert result.structured_content["countsBySource"] == {"pubmed": 2}

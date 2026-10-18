@@ -5,7 +5,9 @@ description = "Papers MCP and discovery pipeline for the paper discovery canvas"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     "httpx>=0.28",
+    "lancedb>=0.40.0",
     "mcp==2.3.0",
+    "numpy>=2.5.4",
     "python-dotenv>=1.0",
 ]
 

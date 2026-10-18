@@ -81,6 +81,10 @@ class Paper:
                 merged[f.name] = getattr(other, f.name)
         return Paper(**merged)
 
+    def embedding_text(self) -> str:
+        """What the paper is embedded as: its title, and its abstract when there is one."""
+        return f"{self.title}\n\n{self.abstract}" if self.abstract else self.title
+
     def to_record(self) -> dict[str, Any]:
         """The full record, in the camelCase shape of docs/Concept.md's paper record."""
         return {
