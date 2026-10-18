@@ -48,7 +48,7 @@ If pasting goes wrong, click the **Melanoma immune cells** example under the box
 | 2 | Paste, then press **↑**. | "One box: my question and the five papers I already trust." | 15 s |
 | 3 | The demo board opens. | "Finding and reading candidates takes a few minutes, so here's the same question we started an hour ago." | 15 s |
 | 4 | Click **Catch me up**. On the first paper (Ibáñez-Molero 2026), see the steps below the table. | "The agent walks me through what's new, and every claim points at its source." | 60 s |
-| 5 | **Keep** Ibáñez-Molero. Press **Next ›** on Daugherty-Lopès (a preprint). **Discard** Lopez de Rodas (a review). | "Keep pins it to our collection, and the agent searches around it next. Discard tells it what we don't want." | 30 s |
+| 5 | **Keep** Ibáñez-Molero. Press **Next ›** on Daugherty-Lopès (a preprint). **Discard** Lopez de Rodas (a review). The tour then returns to Daugherty-Lopès, because it's still new: press **Done** to end the tour and see the whole board. | "Keep pins it to our collection, and the agent searches around it next. Discard tells it what we don't want." | 30 s |
 | 6 | Switch **Looking for** (top bar) to **Methods to reuse**. | "Ranking depends on what you're looking for. Liu 2022 is weak evidence but the best method, so it jumps to number 1." | 15 s |
 | 7 | Drag Daugherty-Lopès into the **Tumour ecosystem** cluster. Drag a **Note** from the toolbar onto Ibáñez-Molero and type a note. Press **Update suggestions**, then **See what it did**. | "The team owns the board. We move things, regroup and add notes, and the agent catches up when we tell it to. Every step shows the Nemotron model, time and cost." | 35 s |
 | 8 | Close on the board. | "Ranked, traceable, and the researcher stays in control." | 10 s |
