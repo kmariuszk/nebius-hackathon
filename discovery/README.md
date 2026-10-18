@@ -18,8 +18,14 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `exclude_ids`, `k`, `backend` (super_vl, rerank_vl) | `ranked` (summary, `rank`, `score`, `reason`), `backend`, `model`, `seconds`, `candidates`, `skipped` |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
+| `get_fulltext` | `paper_id`, `max_chars` (40,000) | `source` (pmc, web, abstract), `url`, `sections` (`title`, `text`), `figures` (`figureId`, `label`, `caption`), `truncated`, `omittedSections`, `skipped` |
+| `check_quotes` | `paper_id`, `quotes` | each quote with `verbatim`, `section` and a `link` that highlights it (`#:~:text=`) |
 
-Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Scoring, clustering, full text and figures from `docs/Concept.md` are still to come.
+Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Scoring, clustering and figure images from `docs/Concept.md` are still to come.
+
+### Where full text comes from
+
+`get_fulltext` tries, in order: PMC's JATS XML through E-utilities (`efetch db=pmc`, which also serves author manuscripts), arXiv's HTML page through Tavily Extract, then the open-access PDF or the DOI landing page through Tavily Extract. A page under 3,000 characters is treated as a landing page or paywall. When nothing works it returns the abstract with `source: "abstract"`, and `skipped` says why. Full text is cached in SQLite, so `check_quotes` checks against every section, including the ones `max_chars` cut. Back matter (acknowledgements, funding, author contributions and so on) is dropped, Methods sections go last, and no section takes more than a sixth of the budget. Figures (label and caption, no image yet) come from PMC only.
 
 ### How ranking works today
 
@@ -40,10 +46,10 @@ Concept.md's ranking pipeline puts a numeric score before this step: `score_cand
 
 | Source | Used for | Key |
 | --- | --- | --- |
-| PubMed E-utilities | Keyword search, records with abstracts, similar/citing/reference links | None; `NCBI_API_KEY` raises the limit from 3 to 10 requests a second |
+| PubMed E-utilities | Keyword search, records with abstracts, similar/citing/reference links, PMC full text | None; `NCBI_API_KEY` raises the limit from 3 to 10 requests a second |
 | OpenAlex | Keyword search across fields, DOI lookups, papers citing the seeds | `OPENALEX_API_KEY` (free); required since keyless use shares a tiny per-IP budget |
 | Semantic Scholar | Recommendations from the seeds, steered away from excluded papers | Optional `SEMANTIC_SCHOLAR_API_KEY` |
-| Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv; each hit is resolved to a paper ID | `TAVILY_API_KEY` |
+| Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv, each hit resolved to a paper ID; Extract for arXiv and publisher full text | `TAVILY_API_KEY` |
 | arXiv | Records for arXiv hits | None |
 | Token Factory | `rerank` with Super VL | `TF_API_KEY` |
 | NVIDIA API | `rerank` with Rerank VL | `NVIDIA_API_KEY`, only for `RERANK_BACKEND=rerank_vl` or `backend: rerank_vl` |

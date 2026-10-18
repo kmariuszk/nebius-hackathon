@@ -1,4 +1,4 @@
-"""SQLite store of paper records, keyed by paper ID with every alias indexed.
+"""SQLite store of paper records and their full texts, keyed by paper ID with every alias indexed.
 
 Saving a paper that shares any identifier with a stored one merges the two
 under the stored paper's ID, which is how candidates from different sources
@@ -12,6 +12,7 @@ import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
 
+from discovery.fulltext import FullText
 from discovery.papers import Paper, format_id, parse_id
 
 SCHEMA = """
@@ -23,6 +24,11 @@ CREATE TABLE IF NOT EXISTS papers (
 CREATE TABLE IF NOT EXISTS paper_aliases (
     alias TEXT PRIMARY KEY,
     paper_id TEXT NOT NULL REFERENCES papers (paper_id)
+);
+CREATE TABLE IF NOT EXISTS fulltexts (
+    paper_id TEXT PRIMARY KEY REFERENCES papers (paper_id),
+    record TEXT NOT NULL,
+    updated_at TEXT NOT NULL
 );
 """
 
@@ -60,6 +66,24 @@ class Store:
         """The stored paper with this ID or alias, or None."""
         found = self._find([format_id(*parse_id(paper_id))])
         return self._load(found) if found else None
+
+    def save_fulltext(self, paper_id: str, text: FullText) -> None:
+        """Keep a stored paper's full text, so quote checks don't fetch it again."""
+        with self._db:
+            self._db.execute(
+                "INSERT INTO fulltexts (paper_id, record, updated_at) VALUES (?, ?, ?) "
+                "ON CONFLICT (paper_id) DO UPDATE SET record = excluded.record, "
+                "updated_at = excluded.updated_at",
+                (paper_id, json.dumps(text.to_record()), datetime.now(UTC).isoformat()),
+            )
+
+    def get_fulltext(self, paper_id: str) -> FullText | None:
+        """The saved full text of the stored paper with this ID or alias, or None."""
+        found = self._find([format_id(*parse_id(paper_id))])
+        row = found and self._db.execute(
+            "SELECT record FROM fulltexts WHERE paper_id = ?", (found,)
+        ).fetchone()
+        return FullText.from_record(json.loads(row[0])) if row else None
 
     def _find(self, aliases: list[str]) -> str | None:
         for alias in aliases:
