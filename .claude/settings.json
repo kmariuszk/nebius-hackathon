@@ -1,0 +1,56 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git show*)",
+      "Bash(git fetch*)",
+      "Bash(mkdir *)",
+      "Bash(ls *)",
+      "Bash(tree *)",
+      "Bash(pwd)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git push *main*)",
+      "Bash(git reset --hard*)",
+      "Bash(git clean*)",
+      "Bash(git -c *)",
+      "Read(./.env)",
+      "Read(./.env.local)",
+      "Read(~/.ssh/**)",
+      "Bash(rm -rf /)",
+      "Bash(sudo *)"
+    ]
+  },
+  "model": "sonnet",
+  "enabledPlugins": {
+    "superpowers@claude-plugins-official": true,
+    "context7@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "pr-review-toolkit@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "claude-mem@thedotmack": true,
+    "github@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "playwright@claude-plugins-official": true,
+    "ui-ux-pro-max@ui-ux-pro-max-skill": true,
+    "academic-research-skills@academic-research-skills": true,
+    "huggingface-skills@claude-plugins-official": true,
+    "marketing-skills@marketingskills": true,
+    "agent-skills@addy-agent-skills": true,
+    "ponytail@ponytail": true
+  },
+  "context": {
+    "include": [
+      ".claude/rules.md",
+      ".claude/config.yaml",
+      "CLAUDE.md"
+    ]
+  }
+}

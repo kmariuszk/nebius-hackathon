@@ -1,6 +1,74 @@
 # Mockups
 
-## Current: v4, the discovery board
+## Current: v5, the paper splits into widgets
+
+The same board as v4, but opening a paper no longer shows one card. The paper splits into widgets around its node. Download [`flashcard-v5.html`](flashcard-v5.html) and open it in a browser (online, for the figures). Everything else (the list, chat, filters, notes, links, Catch me up) works as in v4 below.
+
+We found the v4 card still overwhelming: you didn't know where to look. In v5, each widget answers one question and always sits in the same place:
+
+```
+                       [ Title ]
+ [ The paper at a glance ]  ●  [ Why it matters to you ]
+ [ Figure from the paper ] [Keep · Discard] [ Team notes ]
+```
+
+- **Title, on top:** title, plus first author, journal and year. A Preprint or Review flag only appears when it applies.
+- **Why it matters to you, on the right:** the summary written for your question, next to the node and in the paper's fit colour. Underlined words still show their quote on hover.
+- **The paper at a glance, on the left:** a small diagram of 3–4 steps (samples, method, readout, finding), each marked "✓ Same" or "＋ New" compared with your seeds. Hover a step to see the abstract sentence it comes from. It replaces v4's "Compared with your seeds" strip and three-line summary.
+- **Figure from the paper:** under the diagram. The **?** panel has a switch to hide it from the first view.
+- **Actions, under the node:** Keep and Discard. During Catch me up, the agent's line and Next/Prev sit here too.
+- **More, or clicking the node again:** adds "What supports this" (all quotes, what wasn't checked, how it was found) and the team's notes.
+
+![v5: an opened paper](shots-v5/1-open.png)
+
+**What to try:**
+
+- Hover "three of your seeds": the widgets fade and those seeds and their citation links light up on the board.
+- Catch me up: each paper's widgets grow out of its node.
+- Drop a Note on any widget to pin it to that paper.
+- Open Daugherty-Lopès 2024: its diagram fills in once the agent finishes reading.
+- Open both the list and the chat: the widgets switch to two columns.
+
+**Less metadata in the first view.** The citation count and "added by the agent for Ana at 09:12" moved under More. PMID and DOI are gone (the title links to the paper). The model and time labels stay in the chat. ALL-CAPS titles are shown in sentence case.
+
+**What it needs from the backend:** one more field per paper for the diagram, `glance[]`: 3–4 steps, each with a label (Samples, Method…), a short text, the ID of the quote it comes from, and `same`, `adds` or `other` against the seeds. The agent extracts it from the abstract; the app draws it, so no image model is involved.
+
+**If there's little time to build it:** the cheapest win is separating the title from the why text. The diagram comes next.
+
+### Editing the board
+
+People can change everything the agent made. Each edit counts as a change, and the agent waits until someone presses **Update suggestions**, as agreed in the brainstorm. Click "N changes" in the toolbar to see what the agent will catch up on.
+
+- **Notes:** click a note to edit it, on the board or in the open paper's notes widget. × deletes it, with Undo. Editing someone else's note shows "edited by you".
+- **Clusters:** the agent groups papers by how similar their abstracts are (embeddings), and marks its clusters **AI**. A cluster's box fits around its papers. You can:
+  - click its name to rename or ungroup it (renaming removes the AI tag);
+  - drag the cluster to move it with its papers;
+  - drag its edges or corners to make it bigger. Papers without a cluster that end up inside join it, and it can't be made smaller than its own papers;
+  - drag a paper in or out. The target cluster lights up while you drag. A paper dragged out offers "Start a new cluster".
+- **Papers you found:** drop a PDF on the board (or on a cluster, to put it there), paste a DOI, or use **Paper** in the toolbar. It's read, then waits as "Not linked yet". On Update suggestions the agent links it to its seeds and says which cluster fits it best, but leaves it where you put it. In the mockup every added paper becomes Sievers 2023 (Cancer Cell), a real paper that cites four of the seeds.
+- **Update suggestions:** the chat shows your changes, then each step the agent took, with model and time.
+
+**What it needs from the backend:**
+- clusters stored with the board: `id`, `label`, `by` (agent or a person), the member papers, and the size a person gave them;
+- user-added papers: the file or DOI, and whether the agent has read and linked them yet;
+- a list of pending changes that Update suggestions sends to the agent in one go.
+
+| | |
+|---|---|
+| ![Clusters with AI tags](shots-v5/12-clusters.png) | ![Renaming a cluster](shots-v5/13-cluster-rename.png) |
+| ![Dragging a paper into a cluster](shots-v5/14-drag-into.png) | ![A paper dragged out](shots-v5/15-dropped-out.png) |
+| ![Making a cluster bigger](shots-v5/22-cluster-resized.png) | ![Dropping a PDF](shots-v5/19-dropzone.png) |
+| ![A paper you added, not linked yet](shots-v5/16-paper-added.png) | ![Editing a note in the open paper](shots-v5/18-note-edit.png) |
+| ![What the agent will catch up on](shots-v5/23-changes-list.png) | ![After Update suggestions](shots-v5/24-update-log.png) |
+
+| | |
+|---|---|
+| ![More: what supports this](shots-v5/2-more.png) | ![Hovering "three of your seeds"](shots-v5/3-peek.png) |
+| ![Catch me up](shots-v5/5-catchup.png) | ![Still reading](shots-v5/6-reading.png) |
+| ![A review without a figure](shots-v5/7-review.png) | ![A seed](shots-v5/8-seed.png) |
+| ![List and chat open: two columns](shots-v5/9-narrow.png) | ![A note dropped on the paper](shots-v5/11-note-drop.png) |
+
+## Earlier: v4, the discovery board
 
 A clickable mockup of the whole board: the canvas, the new-paper card, the ranked list, chat, filters and notes. Download [`flashcard-v4.html`](flashcard-v4.html) and open it in a browser. It's one self-contained file with no build step. The figures load from PubMed Central, so you need to be online.
 

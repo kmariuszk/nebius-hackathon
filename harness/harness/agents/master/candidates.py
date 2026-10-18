@@ -37,21 +37,29 @@ class SearchTool(AgentTool):
         self._build = build
 
     async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
+        answer: dict[str, Any] = {}
         agent = self._build()
-        agent.after_tool_callback = partial(record, tool_context)
+        agent.after_tool_callback = partial(record, tool_context, answer)
         run = AgentTool(agent=agent, include_plugins=self.include_plugins)
-        return await run.run_async(args=args, tool_context=tool_context)
+        text = await run.run_async(args=args, tool_context=tool_context)
+        # A run that ends with `done` has no text reply, so AgentTool returns "";
+        # the answer `done` accepted is the result.
+        return answer or text
 
 
 def record(
     parent: ToolContext,
+    answer: dict[str, Any],
     *,
     tool: BaseTool,
     args: dict[str, Any],
     tool_context: ToolContext,
     tool_response: Any,
 ) -> None:
-    """After a search agent's tool call: add the IDs it returned to the master's pool."""
+    """After a search agent's tool call: add the IDs it returned to the master's pool,
+    and keep the answer `done` accepted."""
+    if tool.name == "done" and isinstance(tool_response, dict) and "error" not in tool_response:
+        answer.update(tool_response)
     ids = paper_ids(tool.name, tool_response)
     if ids:
         count = sum(key.startswith(f"{PREFIX}{parent.function_call_id}:") for key in parent.state.to_dict())

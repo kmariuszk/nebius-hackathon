@@ -21,12 +21,12 @@
 		"noFallthroughCasesInSwitch": true,
 		"types": [
 			"vite/client",
-			"./worker-configuration.d.ts"
+			"node"
 		]
 	},
 	"include": [
 		"client",
-		"worker",
+		"server",
 		"vite.config.ts"
 	]
 }
