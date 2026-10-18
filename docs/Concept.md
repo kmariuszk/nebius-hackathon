@@ -4,70 +4,94 @@ Oct 18, 2026 · @g
 
 ## Overview
 
-We are building a paper discovery canvas for the Research Paper Discovery track: seed papers go in, and ranked, explained new papers come out on a shared tldraw canvas where a research team and an agent work together.
+We are building a paper discovery canvas for the Research Paper Discovery track: seed papers go in, and ranked, explained new papers come out on a tldraw canvas, a "crazy board" of papers, quotes, figures and notes that the researcher and an agent build together.
 
-**The problem.** Researchers already hold a collection of relevant papers, but keyword search misses related work. The brief asks for a ranked list of new papers with metadata, source links and relevance explanations, deployed on Nebius.
+**The problem.** Researchers already hold a collection of relevant papers, but keyword search misses related work, and the tools that exist are fragmented: a graph plugin in one place, a summariser in another, a plain list everywhere. The brief asks for a ranked list of new papers with metadata, source links and relevance explanations, deployed on Nebius.
 
 **What makes our version different:**
 
-- **A canvas, not a list.** Papers become cards linked by citations, sized by link count and coloured by rating, with the researchers' notes beside them.
-- **A board the whole team shares.** Several researchers work on one live board, with cursors, shared notes, collaborative keep or discard triage, and an agent that works for all of them.
-- **Evidence a judge can click.** Every explanation carries an abstract quote verified by exact match, the citation links that tie it to the seeds and, where possible, a real figure chosen by Nemotron 3.5 Super VL.
-- **Our own harness on Google ADK, behind ACP.** The UI speaks ACP and every capability sits behind MCP, so the agent can be replaced without touching the UI.
-- **Its own MCP server.** Researchers can work with the board from Claude, Cursor or their own agent.
+- **A canvas, not a list.** Papers become cards linked by citations, sized by link count and coloured by rating, with quotes, figures and the researcher's notes beside them. Filters restructure the graph by citation, cluster or year.
+- **You watch the agent build it.** Cards appear as soon as the agent is confident they are relevant, then fill in while reader agents summarise them. The research process is part of the demo.
+- **Your reading becomes the agent's context.** Passages a researcher highlights in a paper become knowledge nodes on the board, and the agent sees them along with sticky notes and the current selection.
+- **Evidence a judge can click.** Every explanation carries a quote verified by exact match against the abstract or the full text, the citation links that tie it to the seeds and, where possible, a real figure chosen by Nemotron 3.5 Super VL.
+- **"Catch me up."** Back on a board after a while, the researcher asks the agent what changed and it walks them through it, zooming in on each new paper and back out. No video, just the board.
+- **MCP first, with our own harness.** Every board capability is an MCP tool, so the same board works from our Google ADK harness (behind ACP) and from Claude, Cursor or a researcher's own agent.
 
-**Track decision.** We are not entering the Britannica vs Wikipedia track, so Hermes and the self-hosted embedding and rerank containers are out. We keep its NVIDIA models where they add value (see NVIDIA model routing) and build our own harness on Google ADK.
+**Multiplayer is a supporting feature.** The client is already the tldraw Multiplayer starter, so a board can be shared by link and a team can work on it live. The team agreed it has no wow factor on its own, so the pitch mentions it rather than leads with it.
+
+**Track decision.** We are entering the Nebius Research Paper Discovery track (healthcare and life sciences), not the NVIDIA Britannica vs Wikipedia track, so Hermes and the self-hosted embedding and rerank containers are out. We still use NVIDIA's models wherever they do a real job (see NVIDIA model routing) and build our own harness on Google ADK.
+
+**Side awards.** Best use of Nemotron, which we target by giving each job its own Nemotron model; and a Hugging Face side challenge (most likes one week after the hackathon), which is not a focus.
 
 **Track requirements:** Token Factory for LLM inference and embeddings; the app deployed on Nebius and hosted separately from the model endpoint; Tavily optional. Source board: [Miro mindmap and wireframes](https://miro.com/app/board/uXjVEY7-bbE=/).
 
 ## Product scope
 
-The demo path is seed upload, a discovery run, the shared canvas, triage and chat; everything else on the board is faked or cut.
+The demo path is seed upload, a discovery run that fills the board live, the paper overlay with highlights and quotes, chat that points at cards, and the catch-me-up tour; everything else is faked or cut. The whole product is one board: new papers, triage and notes all happen there, not on separate screens.
 
 **User flows (rows on the Miro board):**
 
-1. **Onboarding with seed papers (main path, Frames 13, 15, 14).** The researcher enters a question, drops seed PDFs or DOIs with rough context, and the agent starts shaping the board.
+1. **Onboarding with seed papers (main path, Frames 13, 15, 14).** The researcher enters a question or a free-text topic, drops seed PDFs or DOIs with rough context, and the agent starts shaping the board.
 2. **Onboarding with a question only (Frames 4, 5).** A cold start: the app shows 8 to 10 search hits, the researcher picks 3 to 5 as seeds, and the main path continues.
-3. **New paper (Frames 1 to 3).** A "New" card appears linked into its cluster. Its panel shows a project-specific summary, verified quotes, link and abstract, why it matters, its connected nodes and cluster, a relevant figure, and Keep or Discard.
-4. **Recurring user (Frames 11, 12).** "Your projects" lists new papers per board. Clicking opens a one-at-a-time triage queue: Keep puts the paper on the canvas, Discard hides it.
-5. **Toggling chat (Frames 7, 8).** The chat panel slides in on the right with the agent's plan, tool cards and approval prompts.
-6. **Working together.** A researcher invites colleagues by link. Everyone sees cursors, notes and triage votes live, and anyone can ask the agent for a run.
+3. **New paper (Frames 1 to 3).** A "New" card appears linked into its cluster as soon as the agent is confident it is relevant, with a "working" badge while a reader agent summarises it. Clicking the card zooms in and opens the paper overlay on top of the canvas (not a split screen). The overlay is a small sub-board for that paper: a project-specific summary, verified quotes, link and abstract, why it matters, its connected nodes and cluster, its key figures, the PDF with highlights, room for the researcher's own notes, and Keep or Discard.
+4. **Recurring user (Frames 11, 12).** "Your projects" lists the boards with a count of new papers. On a board the new papers are already placed in context; "Catch me up" has the agent zoom in on each one in turn, explain it and zoom back out, and the researcher keeps or discards it on the spot.
+5. **Reading and highlighting.** The researcher reads the PDF in the overlay and highlights passages. The agent categorises each highlight (method, dataset, result and so on), the category sets its colour, and the highlight becomes a knowledge node on the board linked to its paper. Later agents work from these nodes, not from the whole paper.
+6. **Toggling chat (Frames 7, 8).** The chat panel slides in on the right with the agent's plan, tool cards and approval prompts. Papers the agent mentions are clickable and zoom the canvas to their card; when it answers a question, the cards behind the answer are highlighted on that researcher's screen.
+7. **Ranked list.** A list view beside the canvas shows the new papers ranked, with metadata, source link and relevance explanation, as the brief asks. Clicking a row zooms to the card.
+8. **Working together.** A researcher invites colleagues by link. Everyone sees cursors, notes and triage votes live, and anyone can ask the agent for a run.
+
+**Demo plan.** Start from a question and seeds and let the judges watch the board build itself. Open a paper, highlight a passage and show the node it creates, then ask the chat a question and watch the cards light up. Finally switch to a board prepared half an hour earlier, press "Catch me up", and let the agent tour the papers it found in the meantime: a researcher that is always working for you.
 
 **Feature triage:**
 
 | Feature | Decision | How |
 | --- | --- | --- |
-| Onboarding with seed papers (PDF or DOI) | Build | OpenAlex resolves DOIs; Nemotron Parse reads PDFs and their bibliographies |
+| Onboarding with seed papers (PDF, DOI or free-text topic) | Build | OpenAlex resolves DOIs; Nemotron Parse reads PDFs and their bibliographies |
 | Question-only onboarding | Build | Cold start: the user picks 3 to 5 seeds from search hits |
-| Candidate discovery | Build | OpenAlex papers citing or sharing references with 2+ seeds; Semantic Scholar recommendations; Tavily for recent work |
+| Candidate discovery | Build | The master agent splits the question into about 3 sub-queries and runs a search agent on each: PubMed MCP and OpenAlex keyword search, OpenAlex papers citing or sharing references with 2+ seeds, Semantic Scholar recommendations, Tavily for recent work |
 | Ranking + explanations | Build | Embedding and citation-overlap score, Lightning verdicts, Super VL listwise rerank, quote checked by exact match |
+| Early placement | Build | A card goes on the board once its Lightning verdict clears a threshold; the rerank and the summaries update it in place |
 | Canvas graph | Build | Node size = link count, colour = rating; server-side layout |
-| Paper panel with connections and figure | Build | Connected nodes and cluster as evidence; Parse crops figures, Super VL picks one |
-| Keep or discard triage | Build | Keep adds a seed; Discard adds a negative signal |
-| Shared board with live cursors | Build | One tldraw sync room per board |
-| Invite link, attribution, activity feed | Build | Shows who added, kept or discarded what, the agent included |
+| Filters and "structure by" | Build | Per-viewer filters dim cards by rating, status, year or source; "Structure by" citation, cluster or year re-runs the layout for unpinned cards |
+| Ranked list view | Build | The brief's ranked list, kept in step with the canvas |
+| Paper overlay with summary, quotes and figures | Build | A reader agent summarises the paper on its own, then a context agent relates it to the board; Parse crops figures, Super VL picks the key ones |
+| PDF highlights as knowledge nodes | Build | pdf.js text layer in the overlay; each highlight becomes a `highlight` shape linked to its paper, categorised by the agent |
+| Quotes and figures on the board | Build | `quote` and `figure` shapes next to their paper; quotes are verbatim or rejected |
+| Agent-made tables and diagrams | Build | `add_table` and `add_diagram` canvas tools; diagrams use built-in geo shapes and arrows |
+| Catch-me-up tour | Build | The agent reads the activity feed since the member's last visit and steers their view with `_canvas/focus` |
+| Chat that points at the board | Build | Clickable paper mentions; `_canvas/highlight` marks the cards behind an answer |
+| Keep or discard triage | Build | On the board, in the overlay or during the tour; Keep adds a seed, Discard adds a negative signal |
+| Shared board with live cursors | Build | One tldraw sync room per board, already in the Multiplayer starter |
+| Invite link, attribution, activity feed | Build | Shows who added, kept or discarded what, the agent included; the feed also drives catch-me-up |
 | Chat panel | Build | ACP client in the browser |
 | Own MCP server | Build | The same tools our agent uses |
 | Daily recommender and project dashboard | Fake | Same pipeline with a "published in the last N days" filter behind a re-run button |
 | Login | Fake | Display name plus invite link; real accounts later |
+| Cross-field discovery | Stretch | A search strategy that restates the problem in another field's vocabulary (physics, maths, statistics) and searches with it |
+| Citation context | Stretch | Where a paper is cited (introduction vs method or results) and whether it argues against a thesis; an LLM classifies citation contexts; verify that Semantic Scholar exposes them |
+| Generated visual summaries | Stretch | An image model (Black Forest Labs was suggested) draws a visual summary, labelled as generated and never in place of a real figure |
 | @agent in paper comments | Stretch | A comment thread starts a run scoped to that paper |
-| Papers arguing against a thesis | Stretch | LLM classifies citation contexts; verify that Semantic Scholar exposes them |
 | Roles and private notes | Cut | Everyone on a board is an editor for the demo |
 | LinkedIn and X scraping | Cut | Terms-of-service risk; Tavily covers recent work |
-| Paper editing through MCP | Cut | Weeks of work; see Later work |
+| Paper writing (own editor or Overleaf MCP) | Cut | Over-featured for the hackathon; see Later work |
 | "Future work" chaining | Cut | Unreliable on abstracts alone |
 | Agent rearranging nodes | Cut | People drag cards; the agent only places new ones |
+| Trending-paper cards on the welcome screen | Cut | The team found them ugly and off-topic; new papers live on the board |
+| Separate swipe screen for triage | Cut | Triage stays on the board so each paper is seen in context |
+| Voice chat and generative UI | Cut | Both floated in the discussion and dropped |
 
 **Answers to the board's open questions:**
 
 - **Separate agents for cold start and daily updates?** No. One pipeline; only the date window and the seed set (board contents plus the discarded list) change.
 - **Is the agent reused when a researcher adds a paper they found?** Yes. The added paper becomes a seed and the same pipeline runs around it.
 - **Ranking agent or algorithm?** An algorithm for recall and scoring; the LLM only reranks the top results and explains them.
-- **Save (Tinder-like) or just delete?** Both. Keep turns a paper into a seed and Discard is a negative signal. On a shared board each researcher's vote shows, and split votes mark the paper "contested".
-- **A relevant picture on each card?** Yes, but only a real figure from the paper chosen by Super VL, never a generated image.
+- **Do new papers wait for approval before going on the board?** No. A paper goes on the board as soon as the agent is confident it is relevant, so the researcher sees it in context, and a reader agent starts summarising it straight away. Keep or Discard comes after.
+- **Save (Tinder-like) or just delete?** Both, on the board itself rather than on a separate swipe screen. Keep turns a paper into a seed and Discard is a negative signal. On a shared board each researcher's vote shows, and split votes mark the paper "contested".
+- **A relevant picture on each card?** Yes: a real figure from the paper chosen by Super VL. A generated visual summary is a stretch and is always labelled as generated.
 - **Paper placement agent?** It chooses a cluster or a neighbour; coordinates come from the layout service, because LLMs place things poorly.
-- **Rewritten abstracts?** Fine as a TL;DR labelled as generated, always shown next to the original abstract and the verified quote.
-- **Can users edit placement and links?** Yes, by hand. The agent never moves a card a person has moved.
+- **Rewritten abstracts?** Yes. The reader agent rewrites each abstract in one vocabulary shared across the board, labelled as generated and always shown next to the original abstract and the verified quote.
+- **Summarise in isolation or in context?** Both, in two passes: the reader agent first reads the paper on its own (summary, highlights, quotes, figures), then a context agent explains it against the board's question and links it in.
+- **Can users edit placement, links and what the agent wrote?** Yes, by hand: placement, links, summaries, notes, tables and diagrams. Anything a person has edited counts as human-touched, so the agent never moves or overwrites it. Quotes stay verbatim; people annotate them instead.
 
 ## System architecture
 
@@ -81,39 +105,42 @@ Every change to a board, from a person or an agent, lands in the board's sync ro
 
 | Component | Runs as | Responsibility | Tech |
 | --- | --- | --- | --- |
-| Web app | Static React bundle | Canvas, chat panel, triage inbox, paper panel | tldraw SDK, `@tldraw/sync`, ACP TypeScript SDK |
+| Web app | Static React bundle | Canvas, chat panel, ranked list, paper overlay with PDF viewer and highlights, filters | tldraw SDK, `@tldraw/sync`, ACP TypeScript SDK, pdf.js |
 | Board service | Node, one long-lived Nebius Serverless Endpoint | Sync rooms, canvas MCP, ACP pipe, REST API, invites, activity feed | `TLSocketRoom` with SQLite storage, MCP TypeScript SDK, `ws` |
-| Agent harness | Python process per researcher session, spawned by the board service | Reasoning loop: master agent and sub-agents | Google ADK, `LiteLlm` to Token Factory, ACP Python SDK |
-| Discovery service | Python, second Endpoint | Papers MCP, discovery pipeline, parallel scoring, figures, daily runs | MCP Python SDK, LanceDB, SQLite |
+| Agent harness | Python process per researcher session, spawned by the board service | Reasoning loop: master agent, search sub-agents, background reader and context passes | Google ADK, `LiteLlm` to Token Factory, ACP Python SDK |
+| Discovery service | Python, second Endpoint | Papers MCP, discovery pipeline, parallel scoring, full text, figures, daily runs | MCP Python SDK, LanceDB, SQLite |
 | Model APIs | External | LLMs, embeddings, PDF parsing | Token Factory, NVIDIA hosted API |
-| Scholarly sources | External | Metadata, citations, recommendations, web pages | OpenAlex, Semantic Scholar, PubMed, Tavily |
+| Scholarly sources | External | Metadata, citations, recommendations, keyword search, web pages | OpenAlex, Semantic Scholar, the organisers' PubMed MCP, Tavily |
 
 **Data flow, seeds to shared canvas:**
 
 1. A researcher submits a question and seeds. The browser creates the board over REST, then opens its sync room and an ACP session.
-2. The harness resolves the seeds and finds candidates through the papers MCP.
-3. The discovery service scores candidates with Lightning in parallel, verifies quotes and stores the verdicts; Super VL reranks the top \~100.
-4. The harness calls `add_papers` and `link_papers` on the canvas MCP, which writes into the board's sync room; every connected browser receives the change.
-5. Opening a paper fetches its full record over REST; figures come from Parse, and Super VL picks one.
-6. Keep or Discard goes over REST, is recorded per researcher, and updates the card's status in the room.
+2. The master agent resolves the seeds, splits the question into about 3 sub-queries and runs a search agent on each; they find candidates through the papers MCP.
+3. The discovery service scores candidates with Lightning in parallel, verifies quotes and stores the verdicts.
+4. As soon as a candidate's verdict clears the threshold, the harness calls `add_papers` and `link_papers` on the canvas MCP, which writes into the board's sync room; every connected browser sees the card appear. When scoring finishes, Super VL reranks the top \~100 and `set_rating` updates the placed cards and the ranked list.
+5. For each placed paper a reader agent runs in the background: Parse extracts the full text and figures, and the reader writes a summary, highlights, verbatim quotes and key figures to the board. A context agent then explains why the paper matters for this board and links it in. The card shows a "working" badge until both finish.
+6. Opening a paper fetches its full record over REST and shows the overlay with the PDF and its highlights.
+7. A researcher's highlight is saved as a `highlight` shape in the room, so every collaborator sees it and the agent reads it through `get_board`.
+8. Keep or Discard goes over REST, is recorded per researcher, and updates the card's status in the room.
 
 **Canvas layout rules:**
 
 - A layout service inside the board service places new cards next to the named neighbour or inside the named cluster, avoiding overlaps.
-- Node size = number of links; colour = rating; badges mark new, kept and contested papers.
+- Node size = number of links; colour = rating; badges mark new, working, kept and contested papers.
+- Highlights, quotes, figures and agent notes sit next to their paper card, linked to it.
 - Agents name a cluster or a neighbour (`near`), never coordinates.
-- A card a person has moved is pinned; the agent never moves it again.
+- A card a person has moved is pinned; the agent never moves it again. "Structure by" is a person's action and re-runs the layout for unpinned cards only.
 
 **Design choices:**
 
 - **The sync room is the single source of truth for the canvas.** The canvas MCP writes into it on the server through the room's storage transaction (`updateStore` in older tldraw versions). There is no browser relay, and no dependence on anyone's tab being open.
-- **Shared changes through MCP, per-viewer actions through ACP.** Adding papers changes the board for everyone. Focusing a card or opening a panel goes only to the requesting researcher's client, as an ACP extension notification.
+- **Shared changes through MCP, per-viewer actions through ACP.** Adding papers changes the board for everyone. Focusing a card, opening the overlay or highlighting the cards behind an answer goes only to the requesting researcher's client, as an ACP extension notification.
 - **One owner of agent logic.** We skip the tldraw agent starter kit's in-browser agent loop.
 - **Two Endpoints.** The board service holds stateful WebSockets and agent processes; the discovery service holds stateless tools and scheduled runs. Models stay on Token Factory, separate from the app, as the brief requires.
 
 ## Collaboration on the board
 
-A board is a shared workspace: everyone invited sees the same canvas live, every change is attributed, and the agent acts as one more participant that follows the team's decisions.
+A board is a shared workspace: everyone invited sees the same canvas live, every change is attributed, and the agent acts as one more participant that follows the team's decisions. Most of this comes with tldraw sync, and it is a supporting feature, not the pitch (see Overview). It helps teams that split one project, for example one person on methodology and another on datasets, and researchers wary of AI, who can see who added what.
 
 **Concepts:**
 
@@ -125,6 +152,7 @@ A board is a shared workspace: everyone invited sees the same canvas live, every
 | Paper card | A paper on the canvas with its status (new, kept, contested) and who added it | Sync room shape + `board_papers` |
 | Vote | One researcher's Keep or Discard on one paper | `decisions` |
 | Note | A sticky or comment with its author | Sync room shape, author in shape meta |
+| Highlight | A categorised passage of a paper, linked to its card; a knowledge node agents work from | Sync room shape, author in shape meta |
 | Run | One agent job: who asked, scope, status, cost | `runs` |
 | Event | One line of the activity feed | `events` |
 
@@ -150,7 +178,7 @@ A board is a shared workspace: everyone invited sees the same canvas live, every
 **Rules when people and agents edit at once:**
 
 - **People win.** tldraw sync is server-authoritative with rebase, not a CRDT, so concurrent edits merge record by record; the agent only touches its own cards and fields.
-- **Human-touched cards are locked.** A card a person moved, edited or pinned is never moved by the agent.
+- **Human-touched cards are locked.** A card a person moved, edited or pinned is never moved by the agent, and a summary, note, table or diagram a person edited is never overwritten.
 - **The agent proposes, people decide.** It never deletes a person's card or note, and never votes.
 - **Every agent write is traceable.** It carries `meta.createdBy = "agent"`, `meta.onBehalfOf` (the member ID) and `meta.runId`, so a whole run can be reviewed or undone.
 
@@ -162,25 +190,32 @@ A board is a shared workspace: everyone invited sees the same canvas live, every
 
 ## Agent design
 
-The harness is built on Google ADK and owns only the reasoning loop; search, scoring, figures and board edits live behind MCP, so another agent could replace it without losing features.
+The harness is built on Google ADK and owns only the reasoning loop; search, scoring, reading, figures and board edits live behind MCP, so another agent could replace it without losing features.
 
 **ADK agents and their models:**
 
 | Agent | Model | Job | Main tools |
 | --- | --- | --- | --- |
-| `master` | Nemotron 3.5 Super VL | Plans the run, talks to the researcher, decides when the evidence is enough, places results | Canvas MCP, papers MCP |
-| `search` | Nemotron 3.5 Lightning | Expands seeds into candidates | `find_candidates`, `search` |
-| `figures` | Nemotron 3.5 Super VL | Picks and describes the figure that best supports relevance | `get_figures`, `pick_figure` |
+| `master` | Nemotron 3.5 Super VL | Plans the run, splits the question into sub-queries, talks to the researcher, places results, gives the catch-me-up tour | Canvas MCP, papers MCP, `search` (as a tool), `process_papers` |
+| `search` | Nemotron 3.5 Lightning | Runs one sub-query: keyword search, expansion from the seeds, recommendations, recent work | `search`, `find_candidates` |
+| `reader` | Nemotron 3.5 Super VL | Reads one paper on its own: summary, rewritten abstract, highlights, verbatim quotes, key figures | `get_fulltext`, `get_figures`, `pick_figure`; canvas `set_summary`, `add_highlight`, `add_quote`, `add_figure` |
+| `context` | Nemotron 3.5 Lightning | Relates one paper to the board: why it matters for the question, which seeds, notes and highlights it connects to | `get_board`, `set_summary`, `link_papers` |
 | Bulk scoring (a tool, not an agent) | Nemotron 3.5 Lightning | Verdict, TL;DR and verified quote for hundreds of candidates | `score_candidates`, run in parallel inside the discovery service |
 
 Bulk scoring is a tool because an LLM looping over 300 papers is slow and costly. `score_candidates` sends one Lightning request per paper in parallel, stores every verdict and returns only the top results to `master`.
 
+The reader and context passes are deliberately separate. The reader looks at the paper in isolation, so its summary and highlights stay faithful to the paper; the context agent then works from those outputs and the board, not from the whole paper again.
+
 ```python
+import asyncio
 import os
 from google.adk.agents import LlmAgent
 from google.adk.models.lite_llm import LiteLlm
+from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
+
+from harness.background import read_then_relate
 
 TF = dict(api_base="https://api.tokenfactory.nebius.com/v1/", api_key=os.environ["TF_API_KEY"])
 super_vl = LiteLlm(model="openai/nvidia/Nemotron-3.5-Super-VL", **TF)
@@ -192,28 +227,42 @@ def build_agent(canvas_url: str, papers_url: str, token: str) -> LlmAgent:
     canvas = McpToolset(connection_params=StreamableHTTPConnectionParams(url=canvas_url, headers=auth))
     papers = McpToolset(connection_params=StreamableHTTPConnectionParams(url=papers_url, headers=auth))
     search = LlmAgent(name="search", model=lightning, tools=[papers],
-                      instruction="Expand the seeds into candidate papers.")
-    figures = LlmAgent(name="figures", model=super_vl, tools=[papers],
-                       instruction="Pick the figure that best supports relevance.")
-    return LlmAgent(name="master", model=super_vl, tools=[canvas, papers],
-                    sub_agents=[search, figures],
-                    instruction="Plan the discovery run, score candidates, then place verified results on the canvas.")
+                      instruction="Run one sub-query: search by keyword, expand from the seeds, return candidate IDs.")
+    reader = LlmAgent(name="reader", model=super_vl, tools=[papers, canvas],
+                      instruction="Read one paper on its own. Write its summary, highlights, verbatim quotes and key figures to the board.")
+    context = LlmAgent(name="context", model=lightning, tools=[canvas],
+                       instruction="Explain why one paper matters for the board's question and link it to what it connects to.")
+    pending: set[asyncio.Task] = set()
+
+    async def process_papers(paper_ids: list[str]) -> dict:
+        """Start the reader pass, then the context pass, for each placed paper in the background."""
+        for paper_id in paper_ids:
+            task = asyncio.create_task(read_then_relate(reader, context, paper_id))
+            pending.add(task)
+            task.add_done_callback(pending.discard)
+        return {"started": len(paper_ids)}
+
+    return LlmAgent(name="master", model=super_vl, tools=[canvas, papers, AgentTool(agent=search), process_papers],
+                    instruction="Split the question into about 3 sub-queries and search each one, score the candidates, "
+                                "place confident papers on the canvas straight away, then process them.")
 ```
 
-`build_agent` runs once per ACP session: the canvas URL and the researcher's board token come from that session's `mcpServers`, so every write is attributed to the right person. The `openai/` prefix tells LiteLLM to treat Token Factory as an OpenAI-compatible endpoint.
+`build_agent` runs once per ACP session: the canvas URL and the researcher's board token come from that session's `mcpServers`, so every write is attributed to the right person. The `openai/` prefix tells LiteLLM to treat Token Factory as an OpenAI-compatible endpoint. Sub-agents are just tools: `search` is wrapped in `AgentTool`, so the master calls it once per sub-query, and when the model emits several calls in one turn ADK can run them concurrently (confirm this on the pinned ADK version). `process_papers` starts each paper's reader and context passes as background tasks with their own runners (`read_then_relate`), so the master keeps working while the cards fill in.
 
 **Discovery and ranking pipeline:**
 
 1. **Resolve seeds** (`resolve_seed`). A DOI becomes an OpenAlex record; a PDF goes through Nemotron Parse for title, DOI and bibliography.
-2. **Generate candidates** (`find_candidates`). OpenAlex papers that cite 2+ seeds or share references with them, Semantic Scholar recommendations, and Tavily for recent preprints.
-3. **Deduplicate.** Drop seeds and the board's discarded papers, first by DOI, then by normalised title.
-4. **Score** (`score_candidates`). Embedding similarity to the question and seeds, citation overlap and recency, then a Lightning JSON verdict per candidate.
-5. **Verify.** The quote must appear verbatim in the abstract; otherwise the explanation is flagged "unverified".
-6. **Rerank** (`rerank`). Super VL ranks the top \~100 listwise with all seed abstracts in context.
-7. **Place** (`add_papers`, `link_papers`). The top results go onto the canvas, and the layout service positions them.
-8. **On open** (`get_figures`, `pick_figure`). Parse extracts figures and Super VL picks the one that best supports relevance.
+2. **Split the question.** The master writes about 3 sub-queries (for example by method, population and outcome) and runs `search` on each.
+3. **Generate candidates** (`search`, `find_candidates`). Keyword search per sub-query through the organisers' PubMed MCP and OpenAlex; OpenAlex papers that cite 2+ seeds or share references with them; Semantic Scholar recommendations; Tavily for recent preprints. The PubMed MCP only matches keywords, so its hits are re-scored by embeddings in the scoring step.
+4. **Deduplicate.** Drop seeds and the board's discarded papers, first by DOI, then by normalised title.
+5. **Score** (`score_candidates`). Embedding similarity to the question and seeds, citation overlap and recency, then a Lightning JSON verdict per candidate.
+6. **Verify.** The quote must appear verbatim in the abstract; otherwise the explanation is flagged "unverified".
+7. **Place early** (`add_papers`, `link_papers`, `mark_working`). Each candidate whose verdict clears the threshold goes onto the canvas straight away with a "working" badge, and the layout service positions it.
+8. **Rerank** (`rerank`). Once scoring finishes, Super VL ranks the top \~100 listwise with all seed abstracts in context; `set_rating` updates the placed cards and the ranked list.
+9. **Read** (`process_papers` → `reader`). For each placed paper, Parse extracts the full text and figures of the open-access PDF, and the reader writes a summary, a rewritten abstract, highlights, quotes checked verbatim against the full text, and the key figures. Papers without an open-access PDF get an abstract-only summary, marked as such.
+10. **Relate** (`context`). The context agent explains why the paper matters for this board and links it to the seeds, notes and highlights it connects to; then the badge clears.
 
-**Memory.** Per board: seeds, kept and discarded papers, verdicts and embeddings, in the discovery service (LanceDB and SQLite). Per researcher: their chat history, in the ADK session. Discarded papers are a negative signal for every later run, whoever discarded them.
+**Memory.** Per board: seeds, kept and discarded papers, verdicts, full text and embeddings, in the discovery service (LanceDB and SQLite); notes, highlights and summaries live in the sync room. Per researcher: their chat history, in the ADK session, and the last activity they saw, for catch-me-up. Discarded papers are a negative signal for every later run, whoever discarded them.
 
 ## Protocols
 
@@ -232,13 +281,13 @@ Three protocols each do one job: tldraw sync keeps the shared canvas consistent,
 - **Server-authoritative.** Clients push diffs; the server commits or rebases them and broadcasts patches to everyone else. Presence (cursors, names, selection) rides the same socket.
 - **Agent writes go in server-side.** The canvas MCP writes through the room's storage transaction (`updateStore` in older tldraw versions), so agent changes reach every client exactly like a person's.
 - **Browser side:** the `useSync` hook connects to the board's `/sync/{boardId}` URL with a ticket.
-- **Custom shapes** (`paper-card`, `cluster`) are registered in both the server schema and the client.
+- **Custom shapes** (`paper-card`, `cluster`, `highlight`, `quote`, `figure`, `table`) are registered in both the server schema and the client.
 
 ### ACP: one researcher's conversation
 
 1. **`initialize`.** The client declares no `fs` or `terminal` capabilities. The agent declares HTTP MCP support plus image and embedded-context prompts.
 2. **`session/new`.** The client sends `cwd` and `mcpServers`: the board's canvas MCP and the papers MCP, each with the researcher's board token as an `Authorization` header.
-3. **`session/prompt`.** User text, the selected paper cards as embedded `resource` blocks, and a viewport screenshot as an `image` block.
+3. **`session/prompt`.** User text, the selected paper cards and highlights as embedded `resource` blocks, and a viewport screenshot as an `image` block.
 4. **`session/update` stream.** Plan, tool calls, thoughts and message chunks; `session/request_permission` before bulk or destructive changes.
 5. **Prompt response.** A stop reason such as `end_turn` or `cancelled`.
 6. **`session/cancel`.** Sent when the researcher presses Stop.
@@ -253,7 +302,9 @@ Three protocols each do one job: tldraw sync keeps the shared canvas consistent,
 | Function call (`event.author` names the sub-agent) | `tool_call`, e.g. "search: find\_candidates" | Collapsible card |
 | Function response | `tool_call_update`, completed or failed | The card's result |
 | Tool confirmation request | `session/request_permission` | Approve and deny buttons |
-| Per-viewer action | Extension notification `_canvas/focus` or `_canvas/open_paper` | That researcher's view moves; nobody else's does |
+| Per-viewer action | Extension notification `_canvas/focus`, `_canvas/open_paper` or `_canvas/highlight` | That researcher's view moves or the cards behind an answer light up; nobody else's view changes |
+
+A catch-me-up tour is an ordinary prompt: the master reads the activity feed since the researcher's last visit, then streams message chunks interleaved with `_canvas/focus` notifications that zoom in on each new paper and back out. Paper mentions in chat messages carry the paper ID, so clicking one sends the same focus locally.
 
 **Board service: the ACP pipe.** It checks a short-lived ticket, spawns one harness per session and forwards lines both ways.
 
@@ -391,7 +442,7 @@ if __name__ == "__main__":
 ### MCP: every capability
 
 - **Two servers.** The canvas MCP lives in the board service at a board-scoped URL (`/mcp/canvas/{boardId}`); the papers MCP lives in the discovery service (`/mcp`). Both use streamable HTTP with the researcher's board token as a bearer token.
-- **Shared changes only through the canvas MCP.** Per-viewer actions (focus, open a panel) go through ACP extension notifications instead.
+- **Shared changes only through the canvas MCP.** Per-viewer actions (focus, open the overlay, highlight cards) go through ACP extension notifications instead.
 - **External agents use the same servers.** A researcher creates a personal token in board settings and adds both URLs to Claude, Cursor or another MCP client.
 - **Tool contracts** are in APIs and data model.
 
@@ -414,7 +465,7 @@ The board service exposes REST, three realtime channels and the canvas MCP; the 
 | Method | Path | Purpose | Request → response |
 | --- | --- | --- | --- |
 | POST | `/boards` | Create a board | `{title, question, context}` → `Board` |
-| GET | `/boards` | Boards the caller belongs to, with inbox counts | → `[Board]` |
+| GET | `/boards` | Boards the caller belongs to, with counts of new papers | → `[Board]` |
 | GET | `/boards/{id}` | Board details, members and seeds | → `Board` |
 | POST | `/boards/{id}/invites` | Create an invite link | `{role, expiresInHours}` → `{url}` |
 | POST | `/invites/{token}/accept` | Join a board | `{displayName}` → `{member, boardToken}` |
@@ -422,9 +473,11 @@ The board service exposes REST, three realtime channels and the canvas MCP; the 
 | POST | `/boards/{id}/runs` | Start a run without chat (onboarding, daily, around one paper) | `{kind, paperId?}` → `Run` |
 | GET | `/boards/{id}/runs/{runId}` | Run status and counts | → `Run` |
 | DELETE | `/boards/{id}/runs/{runId}` | Cancel a run | → 204 |
-| GET | `/boards/{id}/inbox` | New papers waiting for the caller's vote | `?status=pending` → `[PaperCard]` |
+| GET | `/boards/{id}/inbox` | New papers waiting for the caller's vote, for badges and the tour | `?status=pending` → `[PaperCard]` |
+| GET | `/boards/{id}/papers` | The ranked list beside the canvas | `?sort=rank&status=new` → `[PaperCard]` |
 | PUT | `/boards/{id}/papers/{paperId}/vote` | Keep or Discard | `{decision}` → `{status, votes}` |
-| GET | `/boards/{id}/papers/{paperId}` | Full record for the paper panel | → `Paper` |
+| GET | `/boards/{id}/papers/{paperId}` | Full record for the paper overlay | → `Paper` |
+| GET | `/boards/{id}/papers/{paperId}/pdf` | The PDF for the overlay: the uploaded seed, or the open-access copy proxied to avoid CORS | → PDF |
 | GET | `/boards/{id}/activity` | Activity feed, newest first | `?after={seq}` → `[Event]` |
 | POST | `/boards/{id}/ws-tickets` | One-minute ticket for the sync and ACP sockets | → `{ticket}` |
 | GET | `/boards/{id}/export.bib` | Kept papers as BibTeX | → text |
@@ -443,15 +496,21 @@ Runs started over REST use a headless harness session, so onboarding and daily r
 
 | Tool | Input | Output | Notes |
 | --- | --- | --- | --- |
-| `get_board` | none | `{question, seeds, papers, clusters, discardedIds}` | A compact summary, never raw shapes |
+| `get_board` | none | `{question, seeds, papers, clusters, notes, highlights, discardedIds}` | A compact summary, never raw shapes; includes people's sticky notes and highlights |
 | `add_papers` | `{papers: [{paperId, near, rating, reason}], runId}` | `{added, skipped}` | Append-only; the layout service places cards |
 | `link_papers` | `{from, to, relation}` | `{linkId}` | Relation: cites, cited\_by, similar, contradicts or extends |
 | `set_rating` | `{paperId, score, verdict}` | `{ok}` | Score 0 to 1; sets the card colour |
 | `add_note` | `{text, paperId}` | `{noteId}` | Authored as the agent on behalf of the member |
 | `create_cluster` | `{label, paperIds}` | `{clusterId}` | Takes the board lease |
 | `mark_working` | `{paperIds, on}` | `{ok}` | The "working" badge everyone sees |
+| `set_summary` | `{paperId, summary, tldr, rewrittenAbstract, whyItMatters}` | `{ok, skipped}` | Skips fields a person has edited |
+| `add_highlight` | `{paperId, text, page, category, note}` | `{highlightId}` | Anchored by finding `text` in the PDF text layer; the category sets the colour |
+| `add_quote` | `{paperId, text, section}` | `{quoteId}` | Rejected unless `text` appears verbatim in the abstract or full text |
+| `add_figure` | `{paperId, figureId, why}` | `{shapeId}` | Places the cropped figure next to its card |
+| `add_table` | `{title, columns, rows, near}` | `{shapeId}` | For example methods or datasets across papers |
+| `add_diagram` | `{title, nodes, edges, near}` | `{shapeIds}` | Built-in geo shapes and arrows; the layout service places them |
 
-There is no selection tool and no vote tool: selection is per viewer and arrives in the prompt, and only people keep or discard.
+There is no selection tool, no vote tool and no layout tool: selection is per viewer and arrives in the prompt, only people keep or discard, and only people restructure the board.
 
 ### Papers MCP tools (discovery service, `/mcp`)
 
@@ -463,10 +522,11 @@ There is no selection tool and no vote tool: selection is per viewer and arrives
 | `rerank` | `{boardId, paperIds, k}` | `{ranked}` |
 | `search` | `{query, limit}` | `[PaperSummary]` |
 | `get_paper` | `{paperId}` | `Paper` |
+| `get_fulltext` | `{paperId}` | `{sections: [{title, text, page}], source}`, with `source` either the PDF or the abstract only |
 | `get_figures` | `{paperId}` | `[{figureId, caption, imageUrl, page, bbox}]` |
 | `pick_figure` | `{boardId, paperId}` | `{figureId, why}` |
 
-`strategies` is any of citing, coupling, recommend and web. The harness passes `excludeIds` from `get_board`, so the discovery service never needs the board's votes directly.
+`strategies` is any of keyword (PubMed MCP and OpenAlex), citing, coupling, recommend and web, plus crossfield as a stretch. The harness passes `excludeIds` from `get_board`, so the discovery service never needs the board's votes directly.
 
 ### Paper record
 
@@ -487,9 +547,17 @@ There is no selection tool and no vote tool: selection is per viewer and arrives
     "reason": "…",
     "quote": "…",
     "quoteVerified": true,
+    "quoteSource": "fulltext",
     "figure": { "figureId": "fig3", "caption": "…", "imageUrl": "…", "why": "…" },
     "model": "nvidia/Nemotron-3_5-Lightning",
     "runId": "run_…"
+  },
+  "reading": {
+    "summary": "…",
+    "rewrittenAbstract": "…",
+    "whyItMatters": "…",
+    "fullText": true,
+    "highlightIds": ["…"]
   },
   "connections": { "citesSeeds": ["…"], "citedBySeeds": [], "sharedReferences": 7, "cluster": "…" },
   "foundBy": ["coupling", "recommend"],
@@ -510,13 +578,18 @@ There is no selection tool and no vote tool: selection is per viewer and arrives
 | Arrow (built-in, bound to two cards) | Start and end bindings | `relation`, `createdBy` |
 | Note (built-in) | Rich text | `author` |
 | `cluster` (frame) | `label` | `createdBy` |
+| `highlight` (custom) | `paperId`, `text`, `page`, `category` | `author` or `createdBy`, `runId` |
+| `quote` (custom) | `paperId`, `text`, `section`, `verified` | `createdBy`, `runId` |
+| `figure` (custom) | `paperId`, `figureId`, `imageUrl`, `caption` | `createdBy`, `runId` |
+| `table` (custom) | `title`, `columns`, `rows` | `createdBy`, `runId`, `editedByHuman` |
+| Geo shapes (built-in, for diagrams) | Label and kind | `createdBy`, `runId`, `editedByHuman` |
 
 ### Storage
 
 | Table | Key columns | Owner |
 | --- | --- | --- |
 | `boards` | `id`, `title`, `question`, `context`, `created_by` | Board service |
-| `members` | `board_id`, `member_id`, `display_name`, `role` | Board service |
+| `members` | `board_id`, `member_id`, `display_name`, `role`, `last_seen_seq` | Board service |
 | `invites` | `token`, `board_id`, `role`, `expires_at` | Board service |
 | `board_papers` | `board_id`, `paper_id`, `status`, `rating`, `cluster`, `added_by`, `run_id` | Board service |
 | `decisions` | `board_id`, `paper_id`, `member_id`, `decision`, `at` | Board service |
@@ -524,6 +597,7 @@ There is no selection tool and no vote tool: selection is per viewer and arrives
 | `events` | `seq`, `board_id`, `actor`, `type`, `payload` | Board service |
 | `papers` | `paper_id`, `doi`, `pmid`, `title`, `authors`, `year`, `abstract` | Discovery service |
 | `verdicts` | `board_id`, `paper_id`, `score`, `verdict`, `reason`, `quote`, `quote_verified`, `model`, `run_id` | Discovery service |
+| `fulltext` | `paper_id`, `section`, `page`, `text` | Discovery service |
 | `figures` | `paper_id`, `figure_id`, `caption`, `image_path`, `page`, `bbox` | Discovery service |
 | `paper_vectors` (LanceDB) | `paper_id`, `vector`, `text` | Discovery service |
 
@@ -531,14 +605,14 @@ The board service owns everything about the board and its people; the discovery 
 
 ## NVIDIA model routing
 
-Each job goes to the Nemotron model built for it, and the routing is visible in the demo. Hard planning goes to a large reasoning model, repetitive execution to Lightning, as NVIDIA itself positions them.
+Each job goes to the Nemotron model built for it, and the routing is visible in the demo; this is how we compete for Best use of Nemotron. Hard planning goes to a large reasoning model, repetitive execution to Lightning, as NVIDIA itself positions them.
 
 | Job | Model | Runs on |
 | --- | --- | --- |
-| Master agent: planning, chat, final listwise ranking | Nemotron 3.5 Super VL (`nvidia/Nemotron-3.5-Super-VL`) | Token Factory |
-| Reading figures and pages, picking the relevant picture, reading the canvas screenshot | Nemotron 3.5 Super VL | Token Factory |
-| Per-paper work on hundreds of candidates: verdict, TL;DR, quote, citation stance | Nemotron 3.5 Lightning (`nvidia/Nemotron-3_5-Lightning`) | Token Factory |
-| Seed PDF parsing, bibliography extraction, figure cropping | Nemotron Parse | NVIDIA hosted API |
+| Master agent: planning, splitting the question, chat, final listwise ranking, catch-me-up | Nemotron 3.5 Super VL (`nvidia/Nemotron-3.5-Super-VL`) | Token Factory |
+| Reader agent: full text, figures and pages, highlights and quotes, picking figures; reading the canvas screenshot | Nemotron 3.5 Super VL | Token Factory |
+| Per-paper work on hundreds of candidates (verdict, TL;DR, quote, citation stance), search agents, context agent | Nemotron 3.5 Lightning (`nvidia/Nemotron-3_5-Lightning`) | Token Factory |
+| PDF parsing for seeds and placed papers, bibliography extraction, figure cropping | Nemotron Parse | NVIDIA hosted API |
 | Optional rerank by text plus first-page image | Llama Nemotron Rerank VL 1B v2 | NVIDIA hosted API |
 | Embeddings | A Nemotron embedding if Token Factory lists one, else Qwen3-Embedding-8B | Token Factory |
 
@@ -563,11 +637,11 @@ Each job goes to the Nemotron model built for it, and the routing is visible in 
 
 Show judges one results table from this, each trace step labelled with its model, time and cost ("Lightning: scored N candidates in T s"), and the routing table above in the README.
 
-**Skip:** self-deploying the Embed-VL and Rerank-VL containers (GPU work for a track we left), Nano Omni voice input and Content Safety. They don't fit the problem and would read as collecting logos.
+**More models.** The team wants as many Nemotron models as do a real job, since that is what impresses for Best use of Nemotron. If time allows, add the Rerank VL step above and look for one more real job, such as Content Safety on agent-written notes. Not planned: self-deploying the Embed-VL and Rerank-VL containers (GPU work for a track we left) and Nano Omni voice input (voice was floated and dropped).
 
 ## Requirements, risks and first-hour checklist
 
-The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool calling, the ACP pipe) and people and agents editing one board at once; each has a cheap first-hour check or a rule.
+The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool calling, the ACP pipe), PDF handling, a Build list that grew, and people and agents editing one board at once; each has a cheap first-hour check or a rule.
 
 **Hard requirements (Paper Discovery):**
 
@@ -584,9 +658,12 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 | Sync room persistence | A restart loses the board | SQLite storage on a mounted volume; snapshot each board when a run finishes |
 | One harness per collaborator | Memory and token spend grow with the team | Close idle sessions after 10 minutes; queue headless runs |
 | ACP plumbing effort | About half a day for one person | Keep the pipe dumb and reuse the SDKs; fallback is ADK's own API server with SSE |
-| Parse latency | Slow paper panel | Run only on seed PDFs and opened papers; cache figures |
+| Parse latency | Cards stay "working" for long | Run on seeds and placed papers only, in the background; cache full text and figures |
+| PDF access | Many candidates have no open-access PDF | Abstract-only summaries, marked as such; researchers can upload a PDF |
+| PDF highlighting in the overlay | Text selection fights canvas events; agent highlights land in the wrong place | Render pdf.js in the overlay outside tldraw's event handling; anchor agent highlights by searching the quote in the text layer; fallback is highlighting Parse's extracted text instead of the PDF |
+| Scope | The Build list no longer fits the time | Build in demo order: board filling live, overlay with quotes, catch-me-up, then highlights, then tables, diagrams and filters |
 | NVIDIA hosted API for Parse and rerank | Requirement dispute | Confirm with the organisers in one message |
-| Hallucinated explanations | A judge's click fails | Exact-match quote check; "unverified" flag |
+| Hallucinated explanations | A judge's click fails and trust is gone | Exact-match quote check against the abstract or full text; "unverified" flag; `add_quote` rejects anything not verbatim |
 
 **First-hour checklist:**
 
@@ -597,13 +674,17 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 - [ ] Confirm with the organisers that Parse and rerank via NVIDIA's hosted API are allowed
 - [ ] Check the Token Factory catalogue for a Nemotron embedding model
 - [ ] Run our seed papers through OpenAlex and check the candidate count
+- [ ] Try the organisers' PubMed MCP on one sub-query
+- [ ] Check how many of our candidates have an open-access PDF
+- [ ] Render a PDF with pdf.js in an overlay above tldraw and save one text highlight as a shape
 
 ## Open questions and later work
 
 **Open questions:**
 
-- [ ] How many people and hours do we have? That sets how much of the Build list survives.
-- [ ] Is there an NVIDIA side award, and what does it judge?
+- [ ] How many hours do we have? Ralph owns the UI and user flows and the others split the backend and agents; the hours set how much of the Build list survives.
+- [ ] What exactly does Best use of Nemotron judge? The award exists; its criteria aren't in our notes.
+- [ ] Which highlight categories? Method, dataset and result came up; the agent assigns them, but can a researcher override?
 - [ ] Are pluggable agents part of the pitch? If not, ADK's own API server with SSE replaces the ACP layer and saves 2 to 3 hours.
 - [ ] Does a Nebius Serverless Endpoint allow one harness process per session, and how much memory does each need?
 - [ ] Triage policy: does one Keep put a paper on the canvas, or do we want a majority of the board?
@@ -614,12 +695,14 @@ The biggest risks are plumbing nobody sees (WebSockets on Nebius, LiteLLM tool c
 - **Collaboration beyond the demo:** real accounts (ORCID or Google sign-in), enforced roles, private notes, @agent in comment threads, and notifications for new papers.
 - **MCP-over-ACP** once it stabilises, so the client can host tools over the ACP channel.
 - **Scholar-profile onboarding** and personal recommendation settings.
-- **More sources,** such as Hugging Face papers and social media, once terms of service are checked.
+- **More sources,** such as Hugging Face papers and social media, once terms of service are checked, and channels each researcher picks for the daily run.
+- **Floated, not planned:** animated explainers with 3Blue1Brown's Manim, and the agent writing a review paper from the board.
 
 ## Sources
 
 - [Research Paper Discovery notebook and brief](https://gzvqcrohgpzewcnfecrk.supabase.co/storage/v1/object/public/techeurope-assets/track-media/04cf15c6a046.ipynb)
 - [Team Miro board](https://miro.com/app/board/uXjVEY7-bbE=/)
+- [Granola transcript of the team brainstorm, 18 October](https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd)
 - [ACP session setup spec](https://agentclientprotocol.com/protocol/session-setup)
 - [MCP-over-ACP proposal](https://agentclientprotocol.com/rfds/mcp-over-acp.md)
 - [ACP Python SDK examples](https://github.com/agentclientprotocol/python-sdk/blob/main/examples/agent.py)
