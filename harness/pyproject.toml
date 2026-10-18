@@ -30,6 +30,9 @@ module-root = ""
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Live tests call Token Factory; plain `pytest` stays keyless, `pytest -m live` runs them.
+addopts = "-m 'not live'"
+markers = ["live: calls Nemotron on Token Factory; needs TF_API_KEY"]
 filterwarnings = [
     # ADK announces its own experimental features and deprecations on every run.
     "ignore:\\[EXPERIMENTAL\\]:UserWarning",
