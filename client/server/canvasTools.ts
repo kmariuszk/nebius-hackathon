@@ -18,6 +18,8 @@ import { agentShapeId, clusterShapeId, linkShapeId, paperShapeId, slug, type Lin
 import { isAgentShape, isHumanTouched } from '../shared/meta.ts'
 import type { PaperCardProps, PaperQuote } from '../shared/paperCard.ts'
 import { defaultPaperCardProps, NODE_SIZE, type PaperCardShape } from '../shared/shapes.ts'
+import { boardInfo as readBoardInfo } from './boardDb.ts'
+import { recordEvent as recordFeedEvent } from './events.ts'
 import { centre, isFree, MARGIN, placeInside, placeNear, shapeBoxes, type Vec } from './layout.ts'
 import type { PapersClient } from './papersClient.ts'
 import { readRoom, writeRoom, writer, type Txn } from './rooms.ts'
@@ -54,13 +56,8 @@ export interface BoardInfo {
 	removedLinks: RemovedLink[]
 }
 
-/** The "Looking for" goals the board UI starts with (viewerState.currentGoal). */
-const DEFAULT_GOALS = ['new-findings', 'methods']
-
-/** The board's question, goals, discarded papers and removed links live in T08's board DB; defaults until it exists. */
-export function boardInfo(_boardId: string): BoardInfo {
-	return { question: '', goals: DEFAULT_GOALS, discardedIds: [], removedLinks: [] }
-}
+/** The board's question, goals (IDs), papers only discarded so far and links people removed, from T08's board DB. */
+export const boardInfo = (boardId: string): BoardInfo => readBoardInfo(boardId)
 
 export interface BoardEvent {
 	boardId: string
@@ -71,8 +68,8 @@ export interface BoardEvent {
 	payload: unknown
 }
 
-/** T08 stores these and broadcasts them over SSE; a no-op until then. */
-export function recordEvent(_event: BoardEvent) {}
+/** Stored in the activity feed and streamed over SSE (events.ts); never throws. */
+export const recordEvent = (event: BoardEvent) => recordFeedEvent(event)
 
 export function changed(ctx: ToolContext, type: string, payload: unknown) {
 	recordEvent({ boardId: ctx.boardId, actor: 'agent', onBehalfOf: ctx.onBehalfOf, runId: ctx.runId, type, payload })

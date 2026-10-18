@@ -12,10 +12,12 @@ import { paperShapeId } from '../shared/ids.ts'
 import type { PaperCardShape } from '../shared/shapes.ts'
 import { handleCanvasMcp, INSTRUCTIONS } from './canvasMcp.ts'
 import type { PapersClient } from './papersClient.ts'
+import { closeBoardDb, setBoardDbPath } from './boardDb.ts'
 import { closeAllRooms, readRoom, setRoomsDir } from './rooms.ts'
 
 const dir = mkdtempSync(join(tmpdir(), 'canvas-mcp-'))
 setRoomsDir(dir)
+setBoardDbPath(join(dir, 'board.db'))
 
 const papers: PapersClient = {
 	url: 'http://papers.test/mcp',
@@ -49,6 +51,7 @@ before(async () => {
 after(async () => {
 	await new Promise((resolve) => http.close(resolve))
 	closeAllRooms()
+	closeBoardDb()
 	rmSync(dir, { recursive: true, force: true })
 })
 
