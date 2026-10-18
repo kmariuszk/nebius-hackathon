@@ -91,6 +91,35 @@ docker run -p 5858:5858 -v board-data:/data board
 
 The app is then at http://localhost:5858. Rooms and uploads are saved in the `board-data` volume.
 
+## Board REST and SSE API
+
+Everything about a board that isn't a shape (its question, goals, members, votes, removed links, runs and the activity feed) is in one SQLite file, `client/.data/board.db`. A board's row is made the first time its room is used. The routes are under `/api/v1/boards`; writes need `Authorization: Bearer <memberId>`, errors are `{"error": {"code", "message"}}`, and times are ISO 8601 UTC. Set `PAPERS_MCP_URL` for paper records and seeds.
+
+| Method | Path | Request → response |
+| --- | --- | --- |
+| POST | `/boards` | `{title?, question?, context?}` → 201 `Board` (`b_` plus 10 characters, also the room ID) |
+| GET | `/boards` | → `[Board]` the caller made or joined |
+| GET | `/boards/:id` | → `Board`: fields, `goals [{id, label}]`, `members`, `seedCount`, `lastSeq`, `agentActive`, and with a bearer `unvoted` and `newSinceLastSeen` |
+| PATCH | `/boards/:id` | `{title?, question?, context?, goals?}` → `Board` |
+| PUT | `/boards/:id/members/me` | `{displayName?}` → `Member {memberId, displayName, lastSeenSeq, joinedAt}` |
+| POST | `/boards/:id/seen` | `{seq}` → 204 |
+| POST | `/boards/:id/seeds` | `{doi}` or `{pmid}` → 201 `Paper`, a seed card authored by the caller |
+| GET | `/boards/:id/papers` | `?sort=rank\|added&status=new,kept&kind=…&goal=…` → `[PaperRow]` |
+| GET | `/boards/:id/papers/:paperId` | → `Paper`: the papers MCP's record, the card's fields, and `board {kind, status, votes {keep, discard}, addedBy, …}` |
+| PUT | `/boards/:id/papers/:paperId/vote` | `{decision: "keep" \| "discard" \| null}` → `{status, keepBy, discardBy}` |
+| GET | `/boards/:id/papers/:paperId/pdf` | → `application/pdf`, the open-access copy (https and public hosts only) |
+| PUT | `/boards/:id/removed-links` | `{from, to, kind}` → 204 |
+| GET | `/boards/:id/activity` | `?after=<seq>&limit=` → `[Event]`, newest first |
+| GET | `/boards/:id/events` | SSE (`Last-Event-ID` or `?after=` replays what was missed) |
+
+A vote changes the card for everyone: any Keep makes it kept, only Discards discarded, both contested. Discarded papers and removed links reach agents through `get_board`'s `discardedIds` and `removedLinks`.
+
+```zsh
+curl -X PUT localhost:5858/api/v1/boards/demo/papers/pmid%3A34290406/vote \
+  -H 'Authorization: Bearer m_ana0000000' -H 'content-type: application/json' -d '{"decision":"keep"}'
+curl -N localhost:5858/api/v1/boards/demo/events
+```
+
 ## Write to a board from another service
 
 Agents and other services change a board through the canvas MCP at `http://localhost:5858/api/mcp/canvas/<boardId>` (streamable HTTP, stateless). Send `Authorization: Bearer <memberId>` (an `m_…` ID) and optionally `X-Run-Id: run_<12 hex>` and `X-Model: <model>`. The tools are `get_board`, `add_papers`, `set_scores`, `set_card`, `add_quote`, `link_papers`, `mark_working` and `add_note`. Agents never give coordinates (each new paper is placed beside its neighbour, inside its neighbour's cluster if it has one), nothing is deleted, and shapes people moved or edited come back in `skipped`.

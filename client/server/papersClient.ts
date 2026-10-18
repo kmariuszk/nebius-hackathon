@@ -3,8 +3,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { z } from 'zod'
 
 // The board service's client of the papers MCP (interfaces.md I5): paper records for quote checks
-// (T02) and the REST API (T08), and clusters for apply_clusters once discovery has cluster_papers.
-// Records are cached in memory per paper ID; they rarely change.
+// (T02), paper records and seeds for the REST API (T08), and clusters for apply_clusters once
+// discovery has cluster_papers. Records are cached in memory per paper ID; they rarely change.
 
 export const DEFAULT_PAPERS_MCP_URL = 'http://127.0.0.1:8001/mcp'
 const TIMEOUT_MS = 15_000
@@ -18,12 +18,14 @@ const FIRST_LIST_WAIT_MS = 3_000
 /** `get_paper`'s record (discovery's Paper.to_record); fields are null when the sources don't have them. */
 export interface PaperRecord {
 	paperId: string
+	ids?: Record<string, string>
 	title: string
 	authors?: string[]
 	year?: number | null
 	venue?: string | null
 	url?: string | null
 	abstract?: string | null
+	openAccessPdf?: string | null
 	type?: string | null
 	[key: string]: unknown
 }
@@ -49,10 +51,24 @@ const clusterResult = z.object({
 
 export type ClusterResult = z.infer<typeof clusterResult>
 
+/** A seed to look up by its DOI or its PMID. */
+export type SeedQuery = { doi: string } | { pmid: string }
+
+/** Why a call failed: the papers MCP is down, it has no such paper, or it answered with something else. */
+export class PapersError extends Error {
+	code: 'unreachable' | 'not_found' | 'bad_record'
+	constructor(code: PapersError['code'], message: string) {
+		super(message)
+		this.code = code
+	}
+}
+
 export interface PapersClient {
 	readonly url: string
-	/** Throws an Error whose message says why (unreachable, or the papers MCP's own error such as an unknown ID). */
+	/** Throws a PapersError whose message says why (unreachable, or the papers MCP's own error such as an unknown ID). */
 	getPaper(paperId: string): Promise<PaperRecord>
+	/** `resolve_seed`, for the REST seeds route (T08); stand-ins that only serve the canvas tools leave it out. */
+	resolveSeed?(seed: SeedQuery): Promise<PaperRecord>
 	/**
 	 * Whether the papers MCP lists this tool, so canvas tools that need a planned discovery tool are
 	 * hidden until it exists (I5). False while it is unreachable. Clients without it have none.
@@ -118,7 +134,7 @@ export function createPapersClient(url = process.env.PAPERS_MCP_URL || DEFAULT_P
 			return (await c.callTool({ name, arguments: args }, undefined, { timeout })) as ToolResult
 		} catch (e) {
 			await close()
-			throw new Error(`The papers MCP at ${url} is unreachable (${e instanceof Error ? e.message : e})`)
+			throw new PapersError('unreachable', `The papers MCP at ${url} is unreachable (${e instanceof Error ? e.message : e})`)
 		}
 	}
 
@@ -139,6 +155,24 @@ export function createPapersClient(url = process.env.PAPERS_MCP_URL || DEFAULT_P
 			listing = null
 			return names
 		})())
+
+	// a tool that returns one paper record; `what` names the paper in errors: its ID, or the DOI or
+	// PMID it was looked up by
+	async function callForPaper(name: string, args: Record<string, string>, what: string): Promise<PaperRecord> {
+		const result = await call(name, args, TIMEOUT_MS)
+		if (result.isError) {
+			throw new PapersError('not_found', `The papers MCP has no record for ${what}: ${text(result) || 'unknown error'}`)
+		}
+		const record = recordOf(result)
+		if (!record) throw new PapersError('bad_record', `The papers MCP returned no paper record for ${what}`)
+		remember(record.paperId, record)
+		return record
+	}
+
+	function remember(paperId: string, record: PaperRecord) {
+		if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!)
+		cache.set(paperId, record)
+	}
 
 	return {
 		url,
@@ -162,15 +196,15 @@ export function createPapersClient(url = process.env.PAPERS_MCP_URL || DEFAULT_P
 		async getPaper(paperId) {
 			const hit = cache.get(paperId)
 			if (hit) return hit
-			const result = await call('get_paper', { paper_id: paperId }, TIMEOUT_MS)
-			if (result.isError) {
-				throw new Error(`The papers MCP has no record for ${paperId}: ${text(result) || 'unknown error'}`)
-			}
-			const record = recordOf(result)
-			if (!record) throw new Error(`The papers MCP returned no paper record for ${paperId}`)
-			if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value!)
-			cache.set(paperId, record)
+			const record = await callForPaper('get_paper', { paper_id: paperId }, paperId)
+			// the record may name the paper by another of its IDs
+			if (record.paperId !== paperId) remember(paperId, record)
 			return record
+		},
+		resolveSeed(seed) {
+			return 'doi' in seed
+				? callForPaper('resolve_seed', { doi: seed.doi }, seed.doi)
+				: callForPaper('resolve_seed', { pmid: seed.pmid }, `PMID ${seed.pmid}`)
 		},
 	}
 }

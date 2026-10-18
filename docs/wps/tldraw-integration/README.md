@@ -227,7 +227,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | `/api/mcp/canvas/:boardId` | Streamable HTTP MCP | T02 | Every shared board change by an agent |
 | `/api/acp?board=:boardId&member=:memberId` | WebSocket | T03 | One ACP connection, one harness process |
 | `/api/v1/boards/…` | REST | T08 | Boards, members, papers, votes, activity, PDF proxy |
-| `/api/v1/boards/:boardId/events` | SSE | T08 | Activity events as they happen |
+| `/api/v1/boards/:boardId/events` | SSE | T08 | Activity events as they happen (`id: <seq>`, `event: <type>`, `data: <Event>`); reads need no bearer, so an EventSource can listen |
 
 **Identity (demo grade).** A board ID is the room ID in the URL; T08 adds a `boards` row lazily the first time a room is used. The browser makes a `memberId` (`m_` plus 10 random characters) once, keeps it in `localStorage` under `pdc.memberId`, and sends it as `member=` on the ACP socket and as `Authorization: Bearer <memberId>` on the canvas MCP and REST. The server trusts it, as the sync socket trusts anyone today. T11 adds personal tokens for external agents; tickets and real board tokens ([Concept: Protocol gotchas](../../Concept.md#protocol-gotchas)) can replace the bearer later with no tool contract change.
 

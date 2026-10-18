@@ -48,7 +48,7 @@ const close = () => {
 const isTyping = (target: EventTarget | null) =>
 	target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
-export function PaperWidgets({ editor, memberId }: { editor: Editor; memberId: string }) {
+export function PaperWidgets({ editor, boardId, memberId }: { editor: Editor; boardId: string; memberId: string }) {
 	const paperId = useValue(openPaperId)
 	const [toast, setToast] = useState<Toast | null>(null)
 	const endToast = useCallback(() => setToast(null), [])
@@ -72,7 +72,7 @@ export function PaperWidgets({ editor, memberId }: { editor: Editor; memberId: s
 
 	return (
 		<div className="pw">
-			{paperId && <OpenPaper key={paperId} editor={editor} memberId={memberId} paperId={paperId} onToast={setToast} />}
+			{paperId && <OpenPaper key={paperId} editor={editor} boardId={boardId} memberId={memberId} paperId={paperId} onToast={setToast} />}
 			{toast && <ToastView toast={toast} onDone={endToast} />}
 		</div>
 	)
@@ -80,6 +80,7 @@ export function PaperWidgets({ editor, memberId }: { editor: Editor; memberId: s
 
 interface OpenProps {
 	editor: Editor
+	boardId: string
 	memberId: string
 	onToast(toast: Toast): void
 }
@@ -108,7 +109,7 @@ function OpenPaper({ paperId, ...props }: OpenProps & { paperId: string }) {
 	return <Opened {...props} shape={shape} />
 }
 
-function Opened({ editor, memberId, onToast, shape }: OpenProps & { shape: PaperCardShape }) {
+function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { shape: PaperCardShape }) {
 	const shapeId = shape.id
 	const p = shape.props
 	const goal = useValue(currentGoal)
@@ -259,6 +260,7 @@ function Opened({ editor, memberId, onToast, shape }: OpenProps & { shape: Paper
 		}
 		return {
 			editor,
+			boardId,
 			memberId,
 			shape,
 			goal,
@@ -278,7 +280,7 @@ function Opened({ editor, memberId, onToast, shape }: OpenProps & { shape: Paper
 			noteDraft,
 			setNoteDraft,
 		}
-	}, [editor, memberId, shape, goal, more, related, linked, measure, layout, started, peekState, peek, showPop, hidePop, onToast, noteDraft])
+	}, [editor, boardId, memberId, shape, goal, more, related, linked, measure, layout, started, peekState, peek, showPop, hidePop, onToast, noteDraft])
 
 	const relatedIds = useMemo(() => [...related.links.map((l) => l.id), ...related.papers, ...related.notes], [related])
 	const css = fadeCss(shapeId, relatedIds, peekState ? [...relatedIds, ...peekState.paperIds.map(paperShapeId)] : [])

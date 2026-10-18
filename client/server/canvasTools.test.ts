@@ -21,14 +21,17 @@ import {
 } from './canvasTools.ts'
 import { isFree, shapeBoxes } from './layout.ts'
 import type { PapersClient } from './papersClient.ts'
+import { closeBoardDb, setBoardDbPath } from './boardDb.ts'
 import { closeAllRooms, patchShapes, putShapes, readRoom, setRoomsDir, writeRoom } from './rooms.ts'
 
 const dir = mkdtempSync(join(tmpdir(), 'canvas-tools-'))
 setRoomsDir(dir)
+setBoardDbPath(join(dir, 'board.db'))
 after(async () => {
 	// let the storage's throttled tombstone pruning (1 s after a delete) run before its database closes
 	await new Promise((resolve) => setTimeout(resolve, 1100))
 	closeAllRooms()
+	closeBoardDb()
 	rmSync(dir, { recursive: true, force: true })
 })
 
