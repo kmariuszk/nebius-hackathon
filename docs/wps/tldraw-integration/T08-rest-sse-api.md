@@ -7,7 +7,7 @@
 | Depends on | T01 (T02's event hook to record agent activity) |
 | Unblocks | T09 (votes, goals), T10, T11, T13 (badge, agent presence), T14 (removed links) |
 | Milestone | M4 |
-| Status | Not started |
+| Status | Built on `feat/board-db-rest`: board DB (`client/server/boardDb.ts`, not `db.ts`), `api.ts`, `events.ts`, `triage.ts`, `pdfProxy.ts` and their tests; the browser votes through the route. Not yet: `POST /seen` from the browser (no feed UI), people's link deletes sent to `removed-links` (T14) |
 | Owner | TBD |
 
 ## Goal
