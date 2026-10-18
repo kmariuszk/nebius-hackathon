@@ -12,11 +12,11 @@
 
 ## Goal
 
-Researchers shape the board by hand, the v4 way: drag papers, draw a link from a paper's **+** handle to another paper, click a link to name, hide or delete it, and drop a note onto a paper so it's pinned there, moves with it and shows in its card. Every one of these edits is stored with the board, attributed, and respected by the agent.
+Researchers shape the board by hand, the v4 way: drag papers, draw a link from a paper's **+** handle to another paper, click a link to name, hide or delete it, and drop a note onto a paper (or, v5, onto any widget of the open paper) so it's pinned there, moves with it and shows in its Team notes. Every one of these edits is stored with the board, attributed, and respected by the agent.
 
 ## Context
 
-- **Visual spec:** [v4 mockup](../../mockups/README.md), "Editing" and "Three kinds of link"; screenshots `shots-v4/3-hover-handle.png`, `4-new-link-editor.png`, `5-named-link.png`, `6-edit-cites-link.png`, `2-move-paper-note-follows.png`, `9-note-pinned.png`.
+- **Visual spec:** [v4 mockup](../../mockups/README.md), "Editing" and "Three kinds of link"; screenshots `shots-v4/3-hover-handle.png`, `4-new-link-editor.png`, `5-named-link.png`, `6-edit-cites-link.png`, `2-move-paper-note-follows.png`, `9-note-pinned.png`. v5 adds "Drop a Note on any widget to pin it to that paper" (`shots-v5/11-note-drop.png`).
 - v4's link rules: *cites* is a PubMed fact (you can label or hide it; the citation stays in the data); *similar* is the agent's guess (rename or delete it); your own links have whatever label you give them. Labels you write are always visible; "cites" and "similar" show only on hover or focus.
 - [Concept: Rules when people and agents edit at once](../../Concept.md#collaboration-on-the-board): people win; human-touched shapes are locked for the agent.
 
@@ -42,11 +42,12 @@ Researchers shape the board by hand, the v4 way: drag papers, draw a link from a
 
 Every edit sets `meta.editedByHuman` and `meta.labelBy` on the link, so the canvas MCP never relabels or unhides it (T02).
 
-**Label visibility.** A label someone wrote is the arrow's own text label, so it's visible to everyone at all times. The kinds "cites" and "similar" are not stored as text: `LinkLabels.tsx` draws a small pill with the kind on the link under the pointer, on a focused link, and on every link of the open card (T10).
+**Label visibility.** A label someone wrote is the arrow's own text label, so it's visible to everyone at all times. The kinds "cites" and "similar" are not stored as text: `LinkLabels.tsx` draws a small pill with the kind on the link under the pointer, on a focused link, and on every link of the open paper (T10).
 
 **Pinning notes.** The bottom bar's **Note** (T13) can be dragged onto the canvas:
 
-- Dropped on a paper: a note is created beside the paper (placed so it doesn't overlap) with a `note-pin` binding to it (T01), and a toast says "Note pinned to Liu 2022. It moves with the paper and shows in its card."
+- Dropped on a paper: a note is created beside the paper (placed so it doesn't overlap) with a `note-pin` binding to it (T01, props `{dx, dy}` from the note's and the paper's top-left corners), and a toast says "Note pinned to Liu 2022. It moves with the paper."
+- Dropped on any widget of the open paper (v5): the widgets sit outside the canvas, so T10's `PaperWidgets` says which paper is under the pointer; T10 opens Team notes with its input focused, and Enter creates the note, pinned the same way.
 - Dropped on empty canvas: a free note.
 - Dragging an existing note onto a paper pins it; dragging a pinned note well away from its paper (more than one node width) unpins it, with a toast.
 - Notes carry `meta.author` (T01), and their author's name and colour show at the bottom, as in v4.
@@ -61,7 +62,7 @@ Every edit sets `meta.editedByHuman` and `meta.labelBy` on the link, so the canv
 ## Tasks
 
 - [ ] `client/client/editing/` components and `guards.ts`.
-- [ ] Note dragging from T13's bottom bar; pin and unpin via the `note-pin` binding.
+- [ ] Note dragging from T13's bottom bar; pin and unpin via the `note-pin` binding; drops on T10's widgets.
 - [ ] T08: the `removed_links` table and route (small addition to T08's migration).
 
 ## Acceptance criteria
@@ -69,8 +70,8 @@ Every edit sets `meta.editedByHuman` and `meta.labelBy` on the link, so the canv
 1. Hovering a paper shows the **+** handle; dragging it to another paper creates a link and opens the editor; naming it "same patients, other method" shows the label to everyone.
 2. A `cites` link can be labelled and hidden but not deleted; a hidden one disappears for everyone.
 3. Deleting a `similar` link removes it for everyone, and the agent's next `link_papers` for that pair is skipped.
-4. "cites" and "similar" pills appear only on hover, focus or when the paper's card is open.
-5. Dropping a note on Liu 2022 pins it: moving Liu 2022 moves the note in every browser, and the note shows in Liu 2022's card.
+4. "cites" and "similar" pills appear only on hover, focus or when the paper is open.
+5. Dropping a note on Liu 2022, or on one of its open widgets, pins it: moving Liu 2022 moves the note in every browser, and the note shows in Liu 2022's Team notes.
 6. Pressing Delete on a selected paper node does nothing except a toast pointing to Discard.
 
 ## Tests

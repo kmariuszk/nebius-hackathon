@@ -1,0 +1,28 @@
+[
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "user_message_chunk", "content": { "type": "text", "text": "hello board" } } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "agent_thought_chunk", "content": { "type": "text", "text": "The user wants " } } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "agent_thought_chunk", "content": { "type": "text", "text": "an echo." } } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "plan", "entries": [
+		{ "content": "Read the prompt", "priority": "high", "status": "in_progress" },
+		{ "content": "Echo it back", "priority": "medium", "status": "pending" }
+	] } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": {
+		"sessionUpdate": "tool_call", "toolCallId": "call_1", "title": "echo: add_papers", "kind": "edit", "status": "in_progress",
+		"rawInput": { "papers": [{ "paperId": "pmid:1", "title": "A paper" }] },
+		"_meta": { "agent": "echo", "model": "nvidia/Nemotron-3.5-Super-VL", "runId": "run_0123456789ab" }
+	} } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "plan", "entries": [
+		{ "content": "Read the prompt", "priority": "high", "status": "completed" },
+		{ "content": "Echo it back", "priority": "medium", "status": "in_progress" }
+	] } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": {
+		"sessionUpdate": "tool_call_update", "toolCallId": "call_1", "status": "completed",
+		"content": [{ "type": "content", "content": { "type": "text", "text": "Added 1 paper" } }],
+		"rawOutput": { "content": [{ "type": "text", "text": "{\"added\":[\"pmid:1\"],\"updated\":[],\"skipped\":[{\"paperId\":\"pmid:2\",\"reason\":\"seed\"}]}" }], "isError": false },
+		"_meta": { "seconds": 0.4, "tokens": 120, "costUsd": 0.0004 }
+	} } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "You said: " } } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "agent_message_chunk", "content": { "type": "text", "text": "hello board. See [A paper](paper:pmid:1)." } } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "available_commands_update", "availableCommands": [] } } },
+	{ "jsonrpc": "2.0", "method": "session/update", "params": { "sessionId": "s_0123456789ab", "update": { "sessionUpdate": "usage_update", "used": 1500, "size": 128000, "cost": { "amount": 0.0021, "currency": "USD" } } } }
+]

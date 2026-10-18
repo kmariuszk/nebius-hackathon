@@ -71,10 +71,44 @@ The reader's JSON uses the fields of the canvas MCP tools it will call once the 
 
 `source` says what it read: `pmc` or `web` for the full text, `abstract` when no full text was found, which `notes` then says too.
 
+## The ACP adapter: `python -m harness`
+
+The board service pipes each chat panel to one `python -m harness` process, which speaks [ACP](https://agentclientprotocol.com) on stdio ([T04](../docs/wps/tldraw-integration/T04-acp-adapter.md)). Each ACP session gets its agent built with that session's board tools, and every prompt streams back as ACP updates: message and thought chunks, the plan, and a tool card for every tool call, including calls inside sub-agents, each with its model, time and cost. Stop cancels the turn. Nothing but ACP reaches stdout; logs go to stderr (`LOG_LEVEL`, default `INFO`).
+
+```zsh
+uv run python -m harness --echo                   # no model, no keys: plan, one tool card, the prompt echoed back
+uv run python -m harness                          # HARNESS_AGENT, default board_assistant, on Super VL
+HARNESS_MODEL=scripted:script.json uv run python -m harness   # every agent replays recorded turns, no keys
+```
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `HARNESS_AGENT` | `board_assistant` | `board_assistant`, `echo`, any `harness/agents/<name>`, or `module:function` |
+| `HARNESS_MODEL` | unset | `scripted:<path>`: a JSON file of turns per agent name (format in `harness/acp/scripted.py`) |
+| `BOARD_INTERNAL_URL` | unset | Origin used to reach the canvas MCP instead of the one the browser sent; the board service sets it |
+| `MODEL_PRICES_JSON` | unset | Override USD per million input and output tokens, e.g. `{"nvidia/Nemotron-3.5-Super-VL": [0.3, 0.9]}` |
+
+| Path | What it is |
+| --- | --- |
+| `harness/__main__.py` | Stdout guard, flags, SIGTERM and stdin-close shutdown |
+| `harness/acp/` | `adapter.py` (the ACP agent), `worker.py` (one task per session owns the runner and its MCP toolsets), `mapping.py` (prompt blocks to the message, events to updates), `trace.py` (tool cards), `scripted.py`, `prices.py` |
+| `harness/board/` | `tools.py` (`BoardTools`: canvas, papers, viewer, plan), `assistant.py` (`board_assistant`), `prompts.py` (canvas rules and context tags for instructions), `echo.py`, `ids.py` |
+
+To give an agent the board, take a `BoardTools` in `build` (interfaces I1); the adapter passes it when the signature asks for it:
+
+```python
+def build(board: BoardTools | None = None) -> LlmAgent:
+    board = board or BoardTools.from_env()   # adk web: CANVAS_MCP_URL, BOARD_TOKEN
+    return LlmAgent(..., tools=[board.canvas("add_papers", "link_papers"), board.papers("search"), *board.viewer(), board.plan()])
+```
+
+To try it in an ACP client such as Zed, add a [custom agent](https://zed.dev/docs/ai/external-agents#custom-agents) with `"command": "uv", "args": ["run", "--project", "<repo>/harness", "python", "-m", "harness"]`. Plain clients send no canvas MCP, so the agent simply has no canvas tools.
+
+Tests: `uv run pytest` runs the adapter as a real subprocess against scripted models and stand-in canvas and papers MCPs (`tests/test_acp_*.py`), no keys needed. `uv run pytest -m live` runs `board_assistant` on Super VL through the same subprocess (`tests/live/`); it skips unless the harness finds `TF_API_KEY`. `tests/fixtures/echo-session.jsonl` is a recorded echo session for the chat panel's tests.
+
 ## Not built yet
 
-- The ACP adapter (`python -m harness`) that the board service will pipe the chat panel to; `docs/Concept.md` (Harness: ADK behind ACP) has the sketch.
-- Placing papers on the board: the master answers in the chat until the canvas MCP exists.
+- Placing papers on the board from `master`: it has no canvas tools yet, so it answers in the chat; `board_assistant` is the agent that writes to the board.
 - A numeric relevance score (`score_candidates`, from embeddings, citation overlap and recency). The master ranks with the papers MCP's `rerank` alone, so the order and scores are Super VL's judgement, not a formula; see [How ranking works today](../discovery/README.md#how-ranking-works-today).
 - Background reader and context passes (`process_papers`); the reader runs only when the master calls it.
 - Writing the reader's artifacts to the board, and figure images: `get_fulltext` lists PMC figures by label and caption, so the reader picks figures from their captions, not by looking at them.

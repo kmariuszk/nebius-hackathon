@@ -86,3 +86,17 @@ body {
 	position: relative;
 	flex: 1;
 }
+
+/* the canvas and, beside it, the chat panel (T05); the widgets (T10) sit over the canvas */
+.Board {
+	position: absolute;
+	inset: 0;
+	display: flex;
+	flex-direction: row;
+}
+
+.Board-canvas {
+	position: relative;
+	flex: 1;
+	min-width: 0;
+}

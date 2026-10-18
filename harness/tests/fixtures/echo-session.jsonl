@@ -1,0 +1,20 @@
+{"jsonrpc":"2.0","id":0,"method":"initialize","params":{"protocolVersion":1}}
+{"jsonrpc":"2.0","id":0,"result":{"protocolVersion":1,"agentCapabilities":{"loadSession":false,"promptCapabilities":{"image":true,"embeddedContext":true},"mcpCapabilities":{"http":true}},"agentInfo":{"name":"paper-canvas-harness","version":"0.1.0"}}}
+{"jsonrpc":"2.0","id":1,"method":"session/new","params":{"cwd":".","mcpServers":[]}}
+{"jsonrpc":"2.0","id":1,"result":{"sessionId":"s_f07d52cbabbd"}}
+{"jsonrpc":"2.0","id":2,"method":"session/prompt","params":{"sessionId":"s_f07d52cbabbd","prompt":[{"text":"Find papers on exhausted CD8 T cells in melanoma.","type":"text"}]}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"entries":[{"content":"Read the prompt","priority":"medium","status":"in_progress"},{"content":"Echo it back","priority":"medium","status":"pending"}],"sessionUpdate":"plan"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"toolCallId":"tc_69ea035bb4fc","title":"echo: read_prompt","kind":"read","status":"in_progress","rawInput":{"text":"Find papers on exhausted CD8 T cells in melanoma."},"_meta":{"agent":"echo","model":"echo","runId":"run_22dda5283f7b"},"sessionUpdate":"tool_call"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"toolCallId":"tc_69ea035bb4fc","status":"completed","content":[{"content":{"text":"Read 49 characters","type":"text"},"type":"content"}],"rawOutput":{"chars":49},"_meta":{"seconds":0.3,"tokens":0,"costUsd":0},"sessionUpdate":"tool_call_update"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"entries":[{"content":"Read the prompt","priority":"medium","status":"completed"},{"content":"Echo it back","priority":"medium","status":"in_progress"}],"sessionUpdate":"plan"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"Find ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"papers ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"on ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"exhausted ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"CD8 ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"T ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"cells ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"in ","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"content":{"text":"melanoma.","type":"text"},"sessionUpdate":"agent_message_chunk"}}}
+{"jsonrpc":"2.0","method":"session/update","params":{"sessionId":"s_f07d52cbabbd","update":{"entries":[{"content":"Read the prompt","priority":"medium","status":"completed"},{"content":"Echo it back","priority":"medium","status":"completed"}],"sessionUpdate":"plan"}}}
+{"jsonrpc":"2.0","id":2,"result":{"stopReason":"end_turn"}}

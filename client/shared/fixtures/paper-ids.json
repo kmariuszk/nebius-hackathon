@@ -1,0 +1,12 @@
+[
+	["pmid:34290406", "shape:paper-pmid_34290406"],
+	["pmid:1", "shape:paper-pmid_1"],
+	["doi:10.1038/s41586-024-07000-1", "shape:paper-doi_10_1038_s41586-024-07000-1"],
+	["pmcid:PMC11234567", "shape:paper-pmcid_PMC11234567"],
+	["arxiv:2401.01234v2", "shape:paper-arxiv_2401_01234v2"],
+	["openalex:W2741809807", "shape:paper-openalex_W2741809807"],
+	["s2:649def34f8be52c8b66281af98ae884c09aef38b", "shape:paper-s2_649def34f8be52c8b66281af98ae884c09aef38b"],
+	["title:Ibáñez-Molero 2026", "shape:paper-title_Ib__ez-Molero_2026"],
+	["x:🧬cell", "shape:paper-x__cell"],
+	["already_safe-ID", "shape:paper-already_safe-ID"]
+]
