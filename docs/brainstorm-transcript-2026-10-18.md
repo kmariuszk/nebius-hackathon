@@ -1,6 +1,6 @@
 # Hackathon brainstorm: picking a track (Granola transcript)
 
-- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 14:56
+- **Date:** 2026-10-18, started 10:59 (Europe/Berlin); last Granola sync 15:13
 - **Source:** Granola note "New note", https://notes.granola.ai/d/a4b2a746-9f42-444f-b290-da7e3a942dcd
 - **Recorded by:** Ralph van Spanje (microphone only; speakers are not separated, so every line is labelled "Microphone")
 - **Note:** Verbatim auto-transcript. It has transcription errors (e.g. "Nematron"/"Nimotron" = Nemotron, "Free Blue and Brown" = 3Blue1Brown).
@@ -1137,3 +1137,113 @@ Microphone: Naming convention. Yeah, yeah, like .n, for example. Oh yeah, it's t
 Microphone: Yeah.
 
 Microphone: Yeah, yeah, yeah.
+
+---
+
+*[Added in the 15:13 Granola sync]*
+
+---
+
+Microphone: Shift to what is, uh,
+
+Microphone: So you can check my branch.
+
+Microphone: You can start dividing into work packages.
+
+Microphone: So I think that we should split the pipe.
+
+Microphone: On architecture, so one part will be integration with SteelDrop.
+
+Microphone: Well, I think that Separated from package, separated model.
+
+Microphone: It's a system.
+
+Microphone: Yep, definitely. I mean, it's an agent, but it's also the master agent. So there will be 3 parts.
+
+Microphone: Till drone integration, which this agent will use. And then the search engine, which this agent will use. And maybe some small subagents.
+
+Microphone: Yes, so it's— yeah, so basically Canvas, right? Yeah.
+
+Microphone: Then agent, I mean, then we need also MCP for the hypers MCP. All the tools are like predefined there, and then, but we need our harness that's gonna basically power all these agents.
+
+Microphone: Yeah, yeah, we can write it just in Python. Yeah, definitely true.
+
+Microphone: And then, well,
+
+Microphone: I think we're also going to need to integrate the harness to the front end, right?
+
+Microphone: Because like our messages, user messages has to reach the harness somehow and it can be not through MCP only. The harness can communicate with the board through MCP, but there has to be communication between the chatbots. What is this?
+
+Microphone: Isn't it basically REST?
+
+Microphone: Okay, sure, we can use it.
+
+Microphone: So what's this? Like, agent can be separately run separately.
+
+Microphone: Some, some service.
+
+Microphone: Okay.
+
+Microphone: I'm letting my clunker run.
+
+Microphone: I'm gonna go first.
+
+Microphone: Did you make any significant play today? You've had some significant changes here.
+
+Microphone: Serverless deployment.
+
+Microphone: And deploy models. You need to deploy a serverless.
+
+Microphone: I think you can use a VM. Yeah. And then you don't need to make— you can have a proper server because we need databases. Yeah.
+
+Microphone: Well, as I understand, you just provide
+
+Microphone: Yeah, they do.
+
+Microphone: For, yeah, for the whole team. That's why I had to form the team in the first place.
+
+Microphone: You also received another email. There will be for that one where you have a link to accept the invite. I wonder if it's gonna work for you now because I have to find a different link to actually reach it.
+
+Microphone: I go through this one where I could accept the invitation.
+
+Microphone: I wonder if it's gonna work for you now because I have to find a different link to actually reach it.
+
+Microphone: Yes, correct.
+
+Microphone: Something on Discord that's important, maybe. Are you in the Discord? Check it because they're saying something that there is something important in Discord. I've heard something with Nemotron, a PDF or something. No, no. Okay, perfect. Then nothing. They were super desired. I was like, shit.
+
+Microphone: Markets, we're not the only ones.
+
+Microphone: Ah, scoring. Just selected the right. I didn't select any. Competition specs 20 points. Creativity 20 points. Except the thing. I can show you what I see. So this is what I see, and I guess here I can create things if I need them, create resources and stuff like that.
+
+Microphone: Oh, is it?
+
+Microphone: Network free.
+
+Microphone: Yeah, we're gonna basically never break possible.
+
+Microphone: Wow, nice!
+
+Microphone: Bro, there's never— there's nowhere water. Okay.
+
+Microphone: It's like warm water in the toilet.
+
+Microphone: Okay, is it looking good? Like the stuff that you— okay, this is too much, right? It's like crime. Yeah, it's a bit— it can be cool, but this is too much.
+
+Microphone: It's not so bad. Yeah, but this, this is bad. Not this, but this. No, I think it's too much.
+
+Microphone: Oh, but it also went— it used the wrong, uh, not the new design. So let me check.
+
+Microphone: You can create some design system.
+
+Microphone: Yeah, yeah, I think I'm thinking this. I make a nice HTML and then you guys just get your Claude to get it and configure it. I think that's the best way. So I'm now just gonna test a lot, a lot of difference.
+
+Microphone: I'm sorry, it's quite cool actually. Well, wow, yes, it's cool. It is insane.
+
+Microphone: Did you get water somewhere or no?
+
+Microphone: It's a bit too much, but I used the V1 too, so I'll fix it. But
+
+Microphone: I think the legend is too complicated right now. Oh yeah, but that one is gone. Like there's just this little popup that you want. So it is already way better. And now use 2 figures. Awesome.
+
+Microphone: Awesome. And this one needs to be inside, of course, because now it's a bit off. But yeah, so, and you can do then details. Yeah, awesome. Can you also add Filters instead of having this small agenda here, this legend, can we have a popup here where we have like different filters that you can click and then you see different things? Yes, they asked for that. Yeah, good one.
