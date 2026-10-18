@@ -41,16 +41,38 @@
   button { font: inherit; padding: 6px 14px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: inherit; cursor: pointer; }
   button[type=submit] { background: var(--accent); color: #fff; border: none; }
   button:disabled { opacity: .5; cursor: default; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 8px 0; }
+  .card h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 8px; }
+  .card h3 { font-size: 13px; color: var(--muted); margin: 14px 0 6px; }
+  .ranked { list-style: none; margin: 0; padding: 0; }
+  .ranked li { display: grid; grid-template-columns: 2.2em 1fr auto; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+  .ranked li:first-child { border-top: none; }
+  .ranked .n { color: var(--muted); font-variant-numeric: tabular-nums; }
+  .ranked .meta, .ranked .why { grid-column: 2; color: var(--muted); font-size: 13px; }
+  .ranked .why { color: var(--ink); }
+  .ranked button { grid-row: 1 / span 3; grid-column: 3; align-self: start; font-size: 13px; padding: 4px 10px; }
+  .score { font-variant-numeric: tabular-nums; }
+  .tldr { font-size: 16px; font-weight: 600; margin: 0 0 8px; }
+  .badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 99px; background: var(--user); color: var(--ink); margin-right: 6px; }
+  .badge.warn { background: #fff3bf; color: #5c4400; }
+  .chip { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 99px; color: #fff; margin-right: 6px; text-transform: uppercase; letter-spacing: .03em; }
+  .chip.method { background: #3b5bdb; } .chip.result { background: #2b8a3e; }
+  .chip.dataset { background: #9c36b5; } .chip.limitation { background: #c92a2a; }
+  .hl { margin: 8px 0; } .hl q, blockquote { font-style: italic; }
+  .hl .note, .fig .why { color: var(--muted); font-size: 13px; }
+  blockquote { margin: 8px 0; padding: 4px 12px; border-left: 3px solid var(--accent); }
+  blockquote a, .card a { color: var(--accent); font-style: normal; font-size: 13px; }
+  .abstract { color: var(--muted); }
 </style>
 </head>
 <body>
 <header>
   <h1>Master agent</h1>
-  <span>Super VL · search agents on Lightning · rerank on Super VL</span>
+  <span>Super VL · search agents on Lightning · rerank and reader on Super VL</span>
   <button id="reset" type="button">New chat</button>
 </header>
 <main id="log">
-  <p class="status">Ask for papers, e.g. “T cell exhaustion in melanoma and anti-PD-1 resistance. Seed: doi 10.1038/s41586-021-03704-y. Find me 8 new papers.” A first answer takes about two minutes; the steps show up as they happen.</p>
+  <p class="status">Ask for papers, e.g. “T cell exhaustion in melanoma and anti-PD-1 resistance. Seed: doi 10.1038/s41586-021-03704-y. Find me 8 new papers.” A first answer takes about two minutes; the steps show up as they happen. Press “Summarise” on a ranked paper, or ask “Summarise pmid:34290406”, to have the reader agent write its artifacts (about 30 s).</p>
 </main>
 <form id="form">
   <div>
@@ -105,6 +127,7 @@ function unwrap(result) {
 
 function describeCall(name, args) {
   if (name === "search") return `<b>search agent</b> ${esc(args.request ?? "")}`;
+  if (name === "reader") return `<b>reader agent</b> ${esc(args.request ?? "")}`;
   if (name === "rerank") return `<b>rerank</b> ${args.paper_ids?.length ?? 0} candidates, k=${args.k ?? 20}`;
   return `<b>${esc(name)}</b> ${esc(JSON.stringify(args))}`;
 }
@@ -114,14 +137,70 @@ function describeResult(name, data) {
   if (name === "rerank" && data?.ranked) return `<b>rerank</b> → ${data.ranked.length} ranked of ${data.candidates ?? "?"} by ${esc(data.model ?? "")} in ${data.seconds ?? "?"} s`;
   if (name === "resolve_seed" && data?.title) return `<b>resolve_seed</b> → ${esc(data.paperId)} ${esc(data.title)}`;
   if (name === "get_paper" && data?.title) return `<b>get_paper</b> → ${esc(data.title)}`;
+  if (name === "reader" && data?.tldr) return `<b>reader agent</b> → artifacts from ${esc(data.source ?? "?")} for ${esc(data.paperId ?? "")}`;
   return `<b>${esc(name)}</b> → result`;
 }
 
-form.addEventListener("submit", async (e) => {
+const safeUrl = (u) => (/^https?:\/\//.test(u ?? "") ? esc(u) : "#");
+
+// The rerank's papers as a list, each with a button that asks the master to summarise it.
+function renderRanked(data) {
+  const card = add("div", "card");
+  card.innerHTML = `<h2>Ranked by rerank · ${data.ranked.length} of ${data.candidates ?? "?"} candidates</h2>`;
+  const list = document.createElement("ol");
+  list.className = "ranked";
+  for (const p of data.ranked) {
+    const li = document.createElement("li");
+    const meta = [p.year, p.venue, p.paperId].filter(Boolean).map(esc).join(" · ");
+    li.innerHTML = `<span class="n">${p.rank}.</span>
+      <span><a href="${safeUrl(p.url)}" target="_blank" rel="noopener">${esc(p.title ?? p.paperId)}</a>
+        <span class="score"> · ${p.score ?? "?"}</span></span>
+      <span class="meta">${meta}</span>
+      <span class="why">${esc(p.reason ?? "")}</span>`;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = "Summarise";
+    button.onclick = () => ask(`Summarise paper ${p.paperId} ("${p.title}"). What did they find?`);
+    li.appendChild(button);
+    list.appendChild(li);
+  }
+  card.appendChild(list);
+}
+
+// The reader's artifacts as they would sit next to the paper's card on the board.
+function renderArtifacts(a) {
+  const card = add("div", "card");
+  const sourceBadge = a.source === "abstract"
+    ? '<span class="badge warn">abstract only</span>'
+    : `<span class="badge">full text · ${esc(a.source ?? "?")}</span>`;
+  const highlights = (a.highlights ?? []).map((h) => `<div class="hl">
+      <span class="chip ${esc(h.category ?? "")}">${esc(h.category ?? "")}</span><q>${esc(h.text)}</q>
+      <div class="note">${esc(h.note ?? "")}${h.section ? ` · ${esc(h.section)}` : ""}</div></div>`).join("");
+  const quotes = (a.quotes ?? []).map((q) => `<blockquote>${esc(q.text)}<br>
+      <a href="${safeUrl(q.link)}" target="_blank" rel="noopener">${esc(q.section ?? "source")} ↗</a></blockquote>`).join("");
+  const figures = (a.figures ?? []).map((f) => `<div class="fig"><b>${esc(f.label || f.figureId)}</b>
+      <span class="why">${esc(f.why ?? "")}</span></div>`).join("");
+  card.innerHTML = `<h2>Reader artifacts · ${esc(a.paperId ?? "")}</h2>
+    <div>${sourceBadge}</div>
+    <p class="tldr">${esc(a.tldr ?? "")}</p>
+    <p>${esc(a.summary ?? "")}</p>
+    <h3>Plain-language abstract</h3><p class="abstract">${esc(a.rewrittenAbstract ?? "")}</p>
+    ${highlights && `<h3>Highlights</h3>${highlights}`}
+    ${quotes && `<h3>Quotes</h3>${quotes}`}
+    ${figures && `<h3>Key figures</h3>${figures}`}
+    ${a.notes ? `<h3>Notes</h3><p class="abstract">${esc(a.notes)}</p>` : ""}`;
+}
+
+form.addEventListener("submit", (e) => {
   e.preventDefault();
   const text = input.value.trim();
-  if (!text) return;
+  if (!text || send.disabled) return;
   input.value = "";
+  ask(text);
+});
+
+async function ask(text) {
+  if (send.disabled) return;
   send.disabled = true;
   add("div", "msg user", text);
   const status = add("p", "status", "Thinking…");
@@ -149,7 +228,13 @@ form.addEventListener("submit", async (e) => {
         const ev = JSON.parse(line);
         if (ev.type === "session") sessionId = ev.id;
         else if (ev.type === "call") { step(`${ev.at}s · ${describeCall(ev.name, ev.args)}`, ev.args); answer = null; }
-        else if (ev.type === "result") { const data = unwrap(ev.result); step(`${ev.at}s · ${describeResult(ev.name, data)}`, data); answer = null; }
+        else if (ev.type === "result") {
+          const data = unwrap(ev.result);
+          step(`${ev.at}s · ${describeResult(ev.name, data)}`, data);
+          if (ev.name === "rerank" && data?.ranked?.length) renderRanked(data);
+          if (ev.name === "reader" && data?.tldr) renderArtifacts(data);
+          answer = null;
+        }
         else if (ev.type === "thought") step(`${ev.at}s · <b>thinking</b>`, ev.text);
         else if (ev.type === "text") {
           if (!answer) { answer = add("div", "msg agent"); answerText = ""; }
@@ -170,7 +255,7 @@ form.addEventListener("submit", async (e) => {
     send.disabled = false;
     input.focus();
   }
-});
+}
 </script>
 </body>
 </html>

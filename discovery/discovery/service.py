@@ -198,6 +198,13 @@ class Discovery:
         """The paper's full text from the first source that has it, and why the others didn't."""
         if cached := self.store.get_fulltext(paper.paper_id):
             return cached, []
+        if "pmcid" not in paper.ids and "pmid" in paper.ids:
+            # OpenAlex and Semantic Scholar records often lack the PMCID that PubMed's has.
+            try:
+                if record := await self._by_pmid(paper.ids["pmid"]):
+                    paper = self.store.save(record)
+            except httpx.HTTPError as error:
+                log.warning("PubMed lookup for %s failed: %s", paper.paper_id, error)
         url = paper.url or default_url(paper.ids)
         attempts: list[tuple[str, Callable[[], Awaitable[FullText | None]]]] = []
         if pmcid := paper.ids.get("pmcid"):

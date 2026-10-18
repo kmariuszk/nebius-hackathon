@@ -7,6 +7,7 @@ import httpx
 import pytest
 from mcp import Client
 
+from discovery.papers import Paper
 from discovery.server import build_server
 from discovery.service import Discovery
 from discovery.store import Store
@@ -192,6 +193,14 @@ async def test_fulltext_from_pmc_puts_methods_last_and_drops_back_matter(discove
     shortest = await discovery.get_fulltext("pmid:500", max_chars=600)
     assert [s["title"] for s in shortest["sections"]] == ["Abstract", "Results"]
     assert shortest["omittedSections"] == ["Methods"]
+
+
+async def test_fulltext_finds_the_pmcid_an_openalex_record_lacks(discovery):
+    discovery.store.save(Paper(ids={"openalex": "W1", "pmid": "500"}, title="Open access paper"))
+
+    result = await discovery.get_fulltext("openalex:W1")
+
+    assert result["source"] == "pmc" and result["paperId"] == "pmid:500"
 
 
 async def test_check_quotes_accepts_verbatim_passages_only(discovery):
