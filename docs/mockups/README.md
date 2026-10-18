@@ -35,6 +35,32 @@ We found the v4 card still overwhelming: you didn't know where to look. In v5, e
 
 **If there's little time to build it:** the cheapest win is separating the title from the why text. The diagram comes next.
 
+### Editing the board
+
+People can change everything the agent made. Each edit counts as a change, and the agent waits until someone presses **Update suggestions**, as agreed in the brainstorm. Click "N changes" in the toolbar to see what the agent will catch up on.
+
+- **Notes:** click a note to edit it, on the board or in the open paper's notes widget. × deletes it, with Undo. Editing someone else's note shows "edited by you".
+- **Clusters:** the agent groups papers by how similar their abstracts are (embeddings), and marks its clusters **AI**. A cluster's box fits around its papers. You can:
+  - click its name to rename or ungroup it (renaming removes the AI tag);
+  - drag the cluster to move it with its papers;
+  - drag its edges or corners to make it bigger. Papers without a cluster that end up inside join it, and it can't be made smaller than its own papers;
+  - drag a paper in or out. The target cluster lights up while you drag. A paper dragged out offers "Start a new cluster".
+- **Papers you found:** drop a PDF on the board (or on a cluster, to put it there), paste a DOI, or use **Paper** in the toolbar. It's read, then waits as "Not linked yet". On Update suggestions the agent links it to its seeds and says which cluster fits it best, but leaves it where you put it. In the mockup every added paper becomes Sievers 2023 (Cancer Cell), a real paper that cites four of the seeds.
+- **Update suggestions:** the chat shows your changes, then each step the agent took, with model and time.
+
+**What it needs from the backend:**
+- clusters stored with the board: `id`, `label`, `by` (agent or a person), the member papers, and the size a person gave them;
+- user-added papers: the file or DOI, and whether the agent has read and linked them yet;
+- a list of pending changes that Update suggestions sends to the agent in one go.
+
+| | |
+|---|---|
+| ![Clusters with AI tags](shots-v5/12-clusters.png) | ![Renaming a cluster](shots-v5/13-cluster-rename.png) |
+| ![Dragging a paper into a cluster](shots-v5/14-drag-into.png) | ![A paper dragged out](shots-v5/15-dropped-out.png) |
+| ![Making a cluster bigger](shots-v5/22-cluster-resized.png) | ![Dropping a PDF](shots-v5/19-dropzone.png) |
+| ![A paper you added, not linked yet](shots-v5/16-paper-added.png) | ![Editing a note in the open paper](shots-v5/18-note-edit.png) |
+| ![What the agent will catch up on](shots-v5/23-changes-list.png) | ![After Update suggestions](shots-v5/24-update-log.png) |
+
 | | |
 |---|---|
 | ![More: what supports this](shots-v5/2-more.png) | ![Hovering "three of your seeds"](shots-v5/3-peek.png) |

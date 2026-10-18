@@ -1,7 +1,7 @@
 """The papers MCP: the paper tools every agent uses (docs/Concept.md, Papers MCP tools).
 
-Scoring so far is embedding similarity only; verdicts, rerank, clustering,
-full text and figures are still to come.
+Scoring is embedding similarity only so far; verdicts, clustering, full text
+and figures are still to come.
 """
 
 from __future__ import annotations
@@ -15,8 +15,9 @@ from discovery.service import SEARCH_SOURCES, SEED_STRATEGIES, Discovery, Search
 INSTRUCTIONS = """\
 Tools for finding biomedical and computational research papers. Papers are identified by prefixed IDs \
 such as doi:10.1038/s41586-021-03704-y, pmid:34290406, pmcid:PMC9187974 or arxiv:2401.01234. \
-Use `search` for a query, `find_candidates` to expand from seed papers, `score_candidates` to rank the \
-candidates against the research question and seeds, and `get_paper` for a full record.
+Use `search` for a query, `find_candidates` to expand from seed papers, `score_candidates` to rank \
+candidates by embedding similarity, `rerank` to rank the best of them for a goal with reasons, \
+and `get_paper` for a full record.
 """
 
 
@@ -74,6 +75,32 @@ def build_server(discovery: Discovery) -> MCPServer:
         return await discovery.find_candidates(
             seed_ids, exclude_ids, strategies or SEED_STRATEGIES, since, limit, query
         )
+
+    @server.tool()
+    async def rerank(
+        goal: str,
+        paper_ids: list[str],
+        seed_ids: list[str] | None = None,
+        exclude_ids: list[str] | None = None,
+        k: int = 20,
+    ) -> dict[str, Any]:
+        """Rank candidate papers for the researcher's goal, best first, with a reason for each.
+
+        Nemotron 3.5 Super VL reads every candidate's title and abstract, plus the
+        seed papers', in one listwise pass. Takes about a minute for 100 candidates.
+
+        Args:
+            goal: The research question, in the researcher's words.
+            paper_ids: Candidate paper IDs, up to 100; later ones are not ranked.
+            seed_ids: The researcher's seed papers, used as context and never ranked.
+            exclude_ids: Papers the researcher dropped; never ranked, under any of their IDs.
+            k: Most papers to return (at least 1).
+
+        Returns ranked (rank, paper summary, score from 0 to 1, reason), the model and
+        seconds it took, how many candidates were ranked, and what was skipped and why.
+        Off-topic candidates are left out, so ranked can be shorter than k.
+        """
+        return await discovery.rerank(goal, paper_ids, seed_ids, exclude_ids, k)
 
     @server.tool()
     async def score_candidates(

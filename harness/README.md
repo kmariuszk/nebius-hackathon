@@ -20,7 +20,7 @@ cd discovery && uv run python -m discovery    # terminal 1: the papers MCP on :8
 cd harness && uv run adk web harness/agents   # terminal 2: ADK's dev UI on http://localhost:8000
 ```
 
-Pick an agent in the dev UI and chat with it; the events panel shows each tool call and result. `uv run adk run harness/agents/search` does the same in the terminal.
+Pick `master` in the dev UI to talk to the full discovery loop (a question, optionally with seed DOIs or PMIDs; a first answer takes about two minutes), or `search` to try one sub-query. The events panel shows each tool call and result. `uv run adk run harness/agents/master` does the same in the terminal.
 
 ```zsh
 uv run python -m harness.check   # Token Factory models, tool calling on both models, both MCP servers
@@ -53,11 +53,14 @@ uv run pytest                    # offline tests
 
 | Agent | Model | Tools | Status |
 | --- | --- | --- | --- |
-| `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with candidate IDs as JSON |
-| `master`, `reader`, `context` | see `docs/Concept.md` | | To do |
+| `master` | Super VL | `search` agent (as a tool, a fresh one per call), papers `resolve_seed`, `get_paper`, `rerank` | Built; chats with the researcher, runs about three sub-queries in parallel and reranks every candidate they found. Candidate IDs go from the tool results to `rerank` without a model retyping them (`agents/master/candidates.py`). No canvas tools yet |
+| `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with its picks as JSON; the IDs its tools return go to the master's candidate pool |
+| `reader`, `context` | see `docs/Concept.md` | | To do |
 
 ## Not built yet
 
 - The ACP adapter (`python -m harness`) that the board service will pipe the chat panel to; `docs/Concept.md` (Harness: ADK behind ACP) has the sketch.
+- Placing papers on the board: the master answers in the chat until the canvas MCP exists.
+- A numeric relevance score (`score_candidates`, from embeddings, citation overlap and recency). The master ranks with the papers MCP's `rerank` alone, so the order and scores are Super VL's judgement, not a formula; see [How ranking works today](../discovery/README.md#how-ranking-works-today).
 - Background reader and context passes (`process_papers`).
 - Labelling each trace step with its model and time for the demo.
