@@ -120,7 +120,9 @@ Don't wait for it.
 7. Rank. Call `rerank` with `goal` set to the researcher's question plus anything they have told you since \
 about what they want, `seed_ids` set to the seeds, `k` set to {PLACE}, and `paper_ids` set to []. `paper_ids` \
 is filled in for you with the top-scored candidates.
-8. Fit. For every paper you placed (not the seeds), call `set_scores`, all in the same turn, with one entry \
+8. Fit. If the rerank ranked papers that aren't on the board yet, place them first with `add_papers` as \
+in step 5; they are read too. Then for every paper you placed (not the seeds), call `set_scores`, all in the \
+same turn, with one entry \
 per board goal in `goals`: score from 0 to 1, fit low, medium or high, and `why`, one line on what the \
 paper offers for that goal. Base them on the rerank: its score and reason for the papers it ranked, low for \
 the ones it left out. The goal `new-findings` means new results on the question, `methods` means methods \

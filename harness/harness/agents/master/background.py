@@ -179,6 +179,15 @@ class ProcessPapers(BaseToolset):
         if left:
             log.info("the master placed %d papers without reading them; reading them now", len(left))
             self.start(left, state.get("run_id"), state.get(candidates.QUESTION, ""))
+        # New cards start with the badge on, and seeds aren't read: turn theirs off.
+        seeds = [p for p, kind in candidates.placed(state).items() if kind == "seed" and p not in self.started]
+        if seeds:
+            self.started.update(seeds)
+            job = Job(seeds[0], state.get("run_id"), "")
+            task = asyncio.create_task(self.step("process_papers", job, lambda call: call(
+                "mark_working", paperIds=seeds, on=False)))
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
         return None
 
     def start(self, paper_ids: list[str], run_id: str | None, question: str) -> None:
