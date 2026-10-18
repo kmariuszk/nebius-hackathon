@@ -2,7 +2,7 @@
   "mcpServers": {
     "tldraw": {
       "type": "http",
-      "url": "http://localhost:8787/mcp"
+      "url": "https://tldraw-mcp-app.tldraw.workers.dev/mcp"
     }
   }
 }
