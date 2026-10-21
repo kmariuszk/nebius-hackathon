@@ -8,7 +8,7 @@
 | Depends on | H01 (the measurement), H02, [D01](../discovery/D01-validate-optional-arguments.md), [D02](../discovery/D02-scoring-without-timeouts.md) (the bugs that cost the most time) |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (clusters run after ranking), the demo recording |
 | Milestone | W2 One clean run |
-| Status | Not started |
+| Status | Built on branch `w2/rank` (Oct 21); the strict H01 timing runs wait for the Wave 2 integration |
 | Owner | TBD |
 
 ## Goal
@@ -58,12 +58,12 @@ It never calls `add_papers`: a paper the rerank likes that isn't on the board st
 
 ## Tasks
 
-- [ ] `master/agent.py`: `PLACE = 8`, the new Rank step and narration rule, tool filters, `rank_papers` in the tools.
-- [ ] `master/ranking.py`: `RankPapers` toolset and `rank_papers`.
-- [ ] `master/candidates.py`: `note` stores the goals and seed IDs from `get_board`; a `pool_for_rerank(state)` helper.
-- [ ] `master/background.py`: `PAPERS_AT_ONCE`, `CALLS_PER_MINUTE`.
-- [ ] `models.py`: `num_retries=2`.
-- [ ] Tests (below); `harness/README.md`'s master section updated (steps, timings).
+- [x] `master/agent.py`: `PLACE = 8`, the new Rank step and narration rule, tool filters, `rank_papers` in the tools.
+- [x] `master/ranking.py`: `RankPapers` toolset and `rank_papers`.
+- [x] `master/candidates.py`: `note` stores the goals and seed IDs from `get_board`; a `pool_for_rerank(state)` helper.
+- [x] `master/background.py`: `PAPERS_AT_ONCE`, `CALLS_PER_MINUTE`.
+- [x] `models.py`: `num_retries=2`.
+- [x] Tests (below); `harness/README.md`'s master section updated (steps, timings).
 - [ ] Two strict H01 runs and one warm run; numbers recorded.
 
 ## Acceptance criteria

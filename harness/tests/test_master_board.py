@@ -159,8 +159,6 @@ async def test_master_places_scored_papers_reads_them_in_the_background_and_rank
         readers={p: reader_turns(p) for p in ("pmid:1", "pmid:3")},
         contexts={p: context_turns(p) for p in ("pmid:1", "pmid:3")},
     )
-    scores = {"new-findings": {"score": 0.8, "fit": "high", "why": "Same cells."},
-              "methods": {"score": 0.4, "fit": "medium", "why": "Single-cell profiling."}}
     board = board_of(canvas_mcp)
     # The adapter names each agent's Nemotron model for X-Model before the chat starts.
     board.models.update(reader="nvidia/Nemotron-3.5-Super-VL", context="nvidia/Nemotron-3_5-Lightning")
@@ -179,17 +177,15 @@ async def test_master_places_scored_papers_reads_them_in_the_background_and_rank
             {"paperId": "pmid:404", "title": "A paper no tool returned", "near": "pmid:9"},
         ]),
         call("process_papers", paper_ids=[]),
-        call("rerank", goal="melanoma T cells", paper_ids=["pmid:1"], seed_ids=["pmid:9"], k=12),
-        calls(("set_scores", {"paperId": "pmid:1", "scores": scores}),
-              ("set_scores", {"paperId": "pmid:3", "scores": scores})),
+        call("rank_papers"),
         say("1. [Single-cell melanoma atlas](paper:pmid:1) (2024). Same cells."),
     ])
 
     events = await turn(agent, "Find papers on melanoma T cells. Seed: pmid:9")
 
     tools = sorted(model.requests[0].tools_dict)
-    assert tools == ["add_note", "add_papers", "get_board", "get_paper", "link_papers", "process_papers", "reader",
-                     "rerank", "resolve_seed", "score_candidates", "search", "set_scores", "update_plan"]
+    assert tools == ["add_note", "add_papers", "get_board", "get_paper", "link_papers", "process_papers",
+                     "rank_papers", "reader", "resolve_seed", "score_candidates", "search", "update_plan"]
     assert events[-1].content.parts[0].text.startswith("1. [Single-cell melanoma atlas](paper:pmid:1)")
 
     # score_candidates gets the pool without the discarded pmid:2; rerank gets the scored order.
@@ -208,10 +204,10 @@ async def test_master_places_scored_papers_reads_them_in_the_background_and_rank
     ]
     assert not [c for c in canvas_mcp.calls if {"x", "y"} & set(c["args"]) or any(
         {"x", "y"} & set(p) for p in c["args"].get("papers", []))]
-    assert [c["args"]["paperId"] for c in of(canvas_mcp, "set_scores")] == ["pmid:1", "pmid:3"]
+    assert sorted(c["args"]["paperId"] for c in of(canvas_mcp, "set_scores")) == ["pmid:1", "pmid:3"]
 
     # The master's turn ends before the background passes do.
-    assert model.requests[-1].contents[-1].parts[0].function_response.name == "set_scores"
+    assert model.requests[-1].contents[-1].parts[0].function_response.name == "rank_papers"
     first_card = next(i for i, c in enumerate(canvas_mcp.calls) if c["tool"] == "set_card")
     assert first_card > canvas_mcp.calls.index(of(canvas_mcp, "set_scores")[-1])
 
@@ -478,7 +474,7 @@ def test_the_acp_adapter_builds_the_master_with_the_chats_board():
     board = BoardTools("b_1", "m_ana", "http://board/api/mcp/canvas/b_1", {"Authorization": "Bearer m_ana"})
     agent = build_agent("master", board)
     filters = [t.tool_filter for t in agent.tools if hasattr(t, "tool_filter") and t.tool_filter]
-    assert ["get_board", "add_papers", "set_scores", "link_papers", "add_note"] in filters
+    assert ["get_board", "add_papers", "link_papers", "add_note"] in filters
     assert processes(agent).board is board
     assert agent.instruction == master.BOARD_INSTRUCTION
     assert context.build(board).model.model == "openai/nvidia/Nemotron-3_5-Lightning"

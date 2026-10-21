@@ -52,8 +52,8 @@ from harness.board.tools import BoardTools
 
 log = logging.getLogger(__name__)
 
-PAPERS_AT_ONCE = 3
-CALLS_PER_MINUTE = 30
+PAPERS_AT_ONCE = 4
+CALLS_PER_MINUTE = 40
 # Passages the reader found that are tried as quotes; only abstract sentences pass.
 QUOTES_TRIED = 8
 # Seconds a closing chat gives its open passes to clear their badges.

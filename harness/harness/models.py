@@ -27,9 +27,14 @@ def lightning() -> LiteLlm:
 
 
 def token_factory(model_id: str) -> LiteLlm:
-    """Any Token Factory model, through LiteLLM's OpenAI-compatible provider."""
+    """Any Token Factory model, through LiteLLM's OpenAI-compatible provider.
+
+    A failed call, such as a 429, is retried twice (LiteLLM backs off exponentially
+    on a 429), since the limit is shared by the chat, the background and the papers MCP.
+    """
     return LiteLlm(
         model=f"openai/{model_id}",
         api_base=settings.get("TF_BASE_URL", TOKEN_FACTORY_URL),
         api_key=settings.require("TF_API_KEY"),
+        num_retries=2,
     )
