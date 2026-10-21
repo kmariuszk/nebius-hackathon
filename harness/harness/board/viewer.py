@@ -31,6 +31,7 @@ from google.adk.tools import BaseTool, FunctionTool, ToolContext
 from google.genai import types
 from pydantic import BaseModel
 
+from harness.agents.args import PLACEHOLDERS
 from harness.toolsets import error_text, failed, structured
 
 if TYPE_CHECKING:
@@ -48,7 +49,7 @@ NEXT_STEP = "The picture comes with your next step."
 CAPTION_CHARS = 600
 
 
-@dataclass
+@dataclass(frozen=True)
 class PendingImage:
     """A picture a look tool took, for the next model call of the agent that asked, in the same run."""
 
@@ -158,7 +159,7 @@ def look_tools(board: BoardTools) -> list[BaseTool]:
         if target == "papers":
             # a model may send one ID as a string, or "None" for none
             ids = [paper_ids] if isinstance(paper_ids, str) else list(paper_ids or [])
-            if not (ids := [i for i in ids if i and i != "None"]):
+            if not (ids := [i for i in ids if i and i not in PLACEHOLDERS]):
                 return {"ok": False, "error": 'Give paper_ids to look at with target "papers".'}
             params["paperIds"] = ids
         try:
@@ -216,17 +217,29 @@ def look_tools(board: BoardTools) -> list[BaseTool]:
         image = types.Part(file_data=types.FileData(file_uri=url, mime_type=mime))
         board.images.append(PendingImage.taken(tool_context, line, image))
         found: dict[str, Any] = {"ok": True, "image": f"{name} of {paper_id}", "note": NEXT_STEP}
-        if figure_number(label) not in ("", figure_number(name)):
+        if (wanted := figure_key(label)) is not None and figure_key(name) != wanted:
             found["note"] = f"{label} has no picture, so this is {name}. {NEXT_STEP}"
         return found
 
     return [FunctionTool(look_at_board), FunctionTool(look_at_figure)]
 
 
-def figure_number(label: Any) -> str:
-    """The number in a figure's label: "Figure 2", "Fig. 2" and "2" are all "2"."""
-    found = re.search(r"\d+[A-Za-z]?", str(label or ""))
-    return found.group(0).upper() if found else ""
+def figure_key(label: Any) -> tuple[str, int] | None:
+    """A figure label's series and number, panel letters ignored: "Figure 2B" is ("main", 2),
+    "Extended Data Fig. 3" is ("extended", 3), "Figure 1—figure supplement 2" and "Fig. S3" are
+    ("supplement", 2) and ("supplement", 3). None when the label has no number."""
+    lower = str(label or "").lower()
+    if (first := re.search(r"\d+", lower)) is None:
+        return None
+    after = lower.find("supplement")
+    number = (after >= 0 and re.search(r"\d+", lower[after:])) or first
+    if "extended" in lower:
+        series = "extended"
+    elif after >= 0 or lower[first.start() - 1 : first.start()] == "s":
+        series = "supplement"
+    else:
+        series = "main"
+    return series, int(number.group(0))
 
 
 def pick_figure(figures: Any, label: str = "") -> dict[str, Any] | None:
@@ -235,8 +248,8 @@ def pick_figure(figures: Any, label: str = "") -> dict[str, Any] | None:
         f for f in figures or []
         if isinstance(f, dict) and isinstance(f.get("imageUrl"), str) and f["imageUrl"].startswith(("https://", "http://"))
     ]
-    if wanted := figure_number(label):
-        named = next((f for f in shown if figure_number(f.get("label")) == wanted or f.get("figureId") == label), None)
+    if (wanted := figure_key(label)) is not None:
+        named = next((f for f in shown if figure_key(f.get("label")) == wanted or f.get("figureId") == label), None)
         if named:
             return named
     return shown[0] if shown else None
