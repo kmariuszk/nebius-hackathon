@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
-import json
 import logging
 import mimetypes
 import re
@@ -31,6 +30,8 @@ from acp import RequestError
 from google.adk.tools import BaseTool, FunctionTool, ToolContext
 from google.genai import types
 from pydantic import BaseModel
+
+from harness.toolsets import error_text, failed, structured
 
 if TYPE_CHECKING:
     from harness.board.tools import BoardTools
@@ -201,9 +202,9 @@ def look_tools(board: BoardTools) -> list[BaseTool]:
             return {"ok": False, "error": f"Couldn't fetch the figures: {error}"}
         finally:
             await toolset.close()
-        if isinstance(result, dict) and result.get("isError"):
-            return {"ok": False, "error": f"Couldn't fetch the figures: {mcp_text(result)}"}
-        figure = pick_figure(mcp_structured(result).get("figures"), label)
+        if failed(result):
+            return {"ok": False, "error": f"Couldn't fetch the figures: {error_text(result)}"}
+        figure = pick_figure(structured(result).get("figures"), label)
         if figure is None:
             return {"ok": False, "error": NO_FIGURE}
         url = figure["imageUrl"]
@@ -239,24 +240,3 @@ def pick_figure(figures: Any, label: str = "") -> dict[str, Any] | None:
         if named:
             return named
     return shown[0] if shown else None
-
-
-def mcp_structured(result: Any) -> dict[str, Any]:
-    """An MCP tool result as a dict: its structured content, or its text as JSON."""
-    if not isinstance(result, dict):
-        return {}
-    if isinstance(result.get("structuredContent"), dict):
-        return result["structuredContent"]
-    for block in result.get("content") or []:
-        try:
-            value = json.loads(block.get("text", ""))
-        except (AttributeError, ValueError):
-            continue
-        if isinstance(value, dict):
-            return value
-    return {}
-
-
-def mcp_text(result: dict[str, Any]) -> str:
-    texts = [c.get("text", "") for c in result.get("content") or [] if isinstance(c, dict)]
-    return " ".join(t for t in texts if t) or "the tool failed"

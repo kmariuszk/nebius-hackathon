@@ -55,6 +55,7 @@ from pydantic import Field
 
 from harness.agents.master import candidates
 from harness.board.tools import BoardTools
+from harness.toolsets import error_text, failed, structured
 
 log = logging.getLogger(__name__)
 
@@ -118,7 +119,7 @@ class Calls:
             error = error_text(result)
             log.warning("background %s %s %s: %s", self.paper_id, self.tool_context.agent_name, name, error)
             raise ToolFailed(f"{name}: {error}")
-        return candidates.structured(result)
+        return structured(result)
 
 
 class Step(BaseAgent):
@@ -532,7 +533,7 @@ def recorded(
     error = "" if ok else error_text(tool_response)
     if not ok:
         log.warning("background %s %s %s: %s", job.paper_id, tool_context.agent_name, tool.name, error)
-    written = candidates.structured(tool_response).get("written") if ok and tool.name == "set_card" else None
+    written = structured(tool_response).get("written") if ok and tool.name == "set_card" else None
     tried.append({"tool": tool.name, "ok": ok, "error": error, "written": written or []})
 
 
@@ -549,20 +550,6 @@ def retry_note(tried: list[dict[str, Any]]) -> str:
         f"\n\nYour last attempt didn't save. Errors: {errors}. Call set_card with paperId and oneLine first, "
         "then claims and glance in a second call."
     )
-
-
-def failed(result: Any) -> bool:
-    return not isinstance(result, dict) or bool(result.get("isError")) or "error" in result
-
-
-def error_text(result: Any) -> str:
-    if isinstance(result, dict):
-        if "error" in result:
-            return str(result["error"])
-        texts = [c.get("text", "") for c in result.get("content") or [] if isinstance(c, dict)]
-        if any(texts):
-            return " ".join(texts)
-    return json.dumps(result, default=str)[:300]
 
 
 def short(error: object) -> str:
