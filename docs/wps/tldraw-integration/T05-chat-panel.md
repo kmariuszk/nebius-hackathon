@@ -8,7 +8,7 @@
 | Unblocks | T06, T07, T12; since Oct 20 also [T16](T16-start-and-home-pages.md), the T10 and T13 refreshes (all through `chatBus`) |
 | Milestone | M1 (built); the Oct 20 refresh is W1 Nothing broken |
 | Priority | P1 (refresh) |
-| Status | Built and merged ([PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13), Oct 18): the panel, the ACP connection, thoughts, plan, tool cards with model, time and cost, permission prompt, reconnect banner, paper links. Refresh (Oct 20) not started: see What's left |
+| Status | Built on branch `w1/chat-start` (Oct 20): the refresh (chat bus, resources on send, Find more through the bus, no blank bubbles), on top of the panel merged in [PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13) (Oct 18). Left: refresh criterion 1 checked by hand in a browser; `chat/fixtures/masterTurn.json` is modelled on what `mapping.py` and `trace.py` send, to swap for a live capture |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -48,10 +48,10 @@ export const chatBus = {
 
 **Tasks:**
 
-- [ ] `client/client/chat/chatBus.ts`; `ChatPanel.tsx` subscribes and sends with resources.
-- [ ] `client/client/widgets/parts.tsx`: Find more through `chatBus`.
-- [ ] `client/client/chat/chatState.ts`: whitespace-only chunks.
-- [ ] Tests: `chat/chatBus.test.ts` (queued before a subscriber, sent once); `chatState.test.ts` with chunks recorded from a live master turn (narration, `"\n\n"` between tool cards).
+- [x] `client/client/chat/chatBus.ts`; `ChatPanel.tsx` subscribes and sends with resources.
+- [x] `client/client/widgets/parts.tsx`: Find more through `chatBus`.
+- [x] `client/client/chat/chatState.ts`: whitespace-only chunks.
+- [x] Tests: `chat/chatBus.test.ts` (queued before a subscriber, sent once); `chatState.test.ts` with chunks recorded from a live master turn (narration, `"\n\n"` between tool cards).
 
 **Acceptance criteria (refresh):**
 

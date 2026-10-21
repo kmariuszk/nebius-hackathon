@@ -150,12 +150,14 @@ function applyUpdate(state: ChatState, update: SessionUpdate): ChatState {
 			const text = blockText(update.content)
 			if (!text) return state
 			const messageId = update.messageId ?? null
+			const turn = state.turns[state.turns.length - 1]
+			const last = turn?.epoch === state.epoch ? turn.items[turn.items.length - 1] : undefined
+			const current = last?.kind === kind && !(kind === 'thought' && last.done) && last.messageId === messageId ? last : null
+			// whitespace (the "\n\n" between tool cards) joins the text before it, never starts a bubble
+			if (!text.trim() && !current) return state
 			return editTurnOrStart(state, (t, nextKey) => {
 				const items = kind === 'message' ? settleItems(t.items) : t.items
-				const last = items[items.length - 1]
-				if (last?.kind === kind && !(kind === 'thought' && last.done) && last.messageId === messageId) {
-					return { ...t, items: [...items.slice(0, -1), { ...last, text: last.text + text }] }
-				}
+				if (current) return { ...t, items: [...items.slice(0, -1), { ...current, text: current.text + text }] }
 				const item: TextItem = { kind, key: `i${nextKey()}`, messageId, text, done: false }
 				return { ...t, items: [...settleItems(items), item] }
 			})
