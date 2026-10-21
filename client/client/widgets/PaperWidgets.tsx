@@ -14,8 +14,9 @@ import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
 import { nodeLabel, shortAuthors } from '../../shared/display.ts'
 import { paperShapeId } from '../../shared/ids.ts'
 import type { PaperCardShape } from '../../shared/shapes.ts'
-import { currentGoal, litPaperIds, openPaperId, paperMoreOpen } from '../viewerState.ts'
+import { currentGoal, litPaperIds, openPaperId, paperMoreOpen, tour } from '../viewerState.ts'
 import { WidgetsContext, type LinkedPaper, type Toast, type WidgetsApi } from './context.ts'
+import { emptyState } from './emptyStates.ts'
 import { fadeCss, relatedSet, type Related } from './fade.ts'
 import { noteAuthor, plainText } from './notes.ts'
 import {
@@ -30,6 +31,8 @@ import {
 	type NoteItem,
 } from './parts.tsx'
 import { COL, GAP, focusCamera, focusZoom, layoutWidgets, type Column, type Item, type Layout } from './placement.ts'
+import { runTour, tourPaperId } from './tour.ts'
+import type { Vote } from './votes.ts'
 import './widgets.css'
 
 // The v5 widgets around an opened paper (T10): siblings of <Tldraw> over `.Board-canvas`, so
@@ -45,6 +48,18 @@ const close = () => {
 	paperMoreOpen.set(false)
 }
 
+// after a saved vote the tour moves on; outside it, Discard closes the paper if it's still open
+const voted = (paperId: string, decision: Vote) => {
+	if (tour.get()) runTour({ type: 'voted', paperId, decision })
+	else if (decision === 'discard' && openPaperId.get() === paperId) close()
+}
+
+// a paper that left the board closes, or during the tour leaves it
+const gone = (paperId: string) => {
+	if (tour.get()?.steps.some((s) => s.paperId === paperId)) runTour({ type: 'gone', paperId })
+	else close()
+}
+
 const isTyping = (target: EventTarget | null) =>
 	target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
 
@@ -55,12 +70,16 @@ export function PaperWidgets({ editor, boardId, memberId }: { editor: Editor; bo
 	const shown = useRef<string | null>(null)
 	const camera = useRef<{ x: number; y: number; z: number } | null>(null)
 
-	// opening remembers the camera and closing flies back to it; another paper starts with More closed
+	// opening remembers the camera and closing flies back to it, so a tour flies back to where it
+	// started; another paper starts with More closed
 	useEffect(() => {
 		const was = shown.current
 		if (paperId === was) return
 		shown.current = paperId
 		paperMoreOpen.set(false)
+		// opening a paper the tour isn't on, or closing (×, Escape, the canvas), ends the tour
+		const t = tour.get()
+		if (t && tourPaperId(t) !== paperId) tour.set(null)
 		if (paperId && !was) {
 			const { x, y, z } = editor.getCamera()
 			camera.current = { x, y, z }
@@ -102,8 +121,8 @@ function OpenPaper({ paperId, ...props }: OpenProps & { paperId: string }) {
 	const seen = useRef(false)
 	useEffect(() => {
 		if (shape && !hidden) seen.current = true
-		else if (seen.current) close()
-	}, [shape, hidden])
+		else if (seen.current) gone(paperId)
+	}, [shape, hidden, paperId])
 
 	if (!shape || hidden) return null
 	return <Opened {...props} shape={shape} />
@@ -123,12 +142,19 @@ function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { sha
 	const [noteDraft, setNoteDraft] = useState(false)
 	const [figureOpen, setFigureOpen] = useState(false)
 	const [scroll, setScroll] = useState({ left: 0, right: 0 })
+	const running = useValue(tour)
+	const touring = tourPaperId(running) === p.paperId ? running : null
 
-	// which widgets show (v5): the left column only what has data or is on its way
+	// which widgets show (v5): the left column only what has data, is on its way or says why it never
+	// came (emptyStates.ts); a seed's Why says it's a seed, over the suggestions linked to it
 	const isSeed = p.kind === 'seed'
-	const first = !isSeed && (p.oneLine || p.working || p.scores[goal]) ? 'why' : 'linked'
-	const leftKeys = [...(p.glance.length || p.working ? ['glance'] : []), ...(p.figure || p.working ? ['figure'] : [])]
-	const rightKeys = [first, ...(notes.length || (more && !isSeed) || noteDraft ? ['notes'] : []), ...(more && !isSeed ? ['evidence'] : [])]
+	const leftKeys = (['glance', 'figure'] as const).filter((k) => emptyState(p, k).kind !== 'hidden')
+	const rightKeys = [
+		'why',
+		...(isSeed ? ['linked'] : []),
+		...(notes.length || (more && !isSeed) || noteDraft ? ['notes'] : []),
+		...(more && !isSeed ? ['evidence'] : []),
+	]
 	const keys = ['title', 'actions', ...leftKeys, ...rightKeys]
 
 	const leftSig = leftKeys.join()
@@ -212,13 +238,20 @@ function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { sha
 	}, [peek])
 	useEffect(() => () => clearTimeout(hideTimer.current), [])
 
-	// Escape closes (the figure first), unless you're typing or tldraw needs it
+	// Escape closes (the figure first), unless you're typing or tldraw needs it; during the tour the
+	// arrow keys step too
 	useEffect(() => {
 		const onKey = (e: KeyboardEvent) => {
-			if (e.key !== 'Escape') return
-			if (figureOpen) return setFigureOpen(false)
+			const step = e.key === 'ArrowRight' ? 'next' : e.key === 'ArrowLeft' ? 'prev' : null
+			if (e.key !== 'Escape' && !step) return
+			if (figureOpen) {
+				if (e.key === 'Escape') setFigureOpen(false)
+				return
+			}
 			if (isTyping(e.target) || editor.getEditingShapeId() || editor.menus.hasAnyOpenMenus()) return
-			close()
+			if (!step) return close()
+			// with a modifier, or a shape selected, the arrows are tldraw's
+			if (tour.get() && !e.metaKey && !e.ctrlKey && !e.altKey && !editor.getSelectedShapeIds().length) runTour({ type: step })
 		}
 		window.addEventListener('keydown', onKey)
 		return () => window.removeEventListener('keydown', onKey)
@@ -353,7 +386,7 @@ function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { sha
 				}}
 			>
 				{slot('title', <TitleWidget />)}
-				{slot('actions', <ActionsWidget />)}
+				{slot('actions', <ActionsWidget tour={touring} onVoted={(decision) => voted(p.paperId, decision)} />)}
 				{column('left', layout.columns.left)}
 				{column('right', layout.columns.right)}
 			</Anchored>

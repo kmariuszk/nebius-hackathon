@@ -8,7 +8,7 @@
 | Unblocks | T09 (row click reuses focus), T12, the catch-me-up tour (harness owner) |
 | Milestone | M3; the Oct 20 refresh (the tour) is W2 One clean run |
 | Priority | P1 (refresh) |
-| Status | Harness half done: the four tools send `_canvas/*`. Browser: `focus`, `highlight` and `open_paper` are handled; `_canvas/tour` arrives but only logs (no tour yet). Refresh (Oct 20) not started: see What's left |
+| Status | Refresh built on branch `w2/tour` (Oct 21): Catch me up is a local tour (`widgets/tour.ts`, tested) started by the top bar, `?tour=1` and `_canvas/tour`, with the tour bar in the actions widget and `/seen` when it ends; left: refresh criteria 1–4 by hand in a browser (two browsers for 4). Harness half done: the four tools send `_canvas/*`; `focus`, `highlight` and `open_paper` handled in the browser. Deferred: the busy-user queue and "Follow the agent" (criteria 4 and 5) |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -52,12 +52,12 @@ The spec is the v6 demo board (`client/public/landing/demo-board.html`, "Catch m
 
 **Tasks:**
 
-- [ ] `client/client/viewerState.ts`: `tour`; `client/client/widgets/tour.ts`: the reducer and `stepsFromBoard(derived, goal)`.
-- [ ] `client/client/pinboard/TopBar.tsx`: `CatchMeUp` starts the tour.
-- [ ] `client/client/pages/Room.tsx`: `?tour=1`.
-- [ ] `client/client/chat/viewerActions.ts`: `_canvas/tour` starts the tour.
-- [ ] `client/client/widgets/parts.tsx`: the tour bar in `ActionsWidget`; Keep and Discard call `voted` (through the T10 refresh's `onVoted`).
-- [ ] `client/client/widgets/tour.test.ts`.
+- [x] `client/client/viewerState.ts`: `tour`; `client/client/widgets/tour.ts`: the reducer and `stepsFromBoard(derived, goal)`.
+- [x] `client/client/pinboard/TopBar.tsx`: `CatchMeUp` starts the tour.
+- [x] `client/client/pages/Room.tsx`: `?tour=1`.
+- [x] `client/client/chat/viewerActions.ts`: `_canvas/tour` starts the tour.
+- [x] `client/client/widgets/parts.tsx`: the tour bar in `ActionsWidget`; Keep and Discard call `voted` (through the T10 refresh's `onVoted`).
+- [x] `client/client/widgets/tour.test.ts`.
 
 **Acceptance criteria (refresh, replacing 6 above for v6):**
 

@@ -1,7 +1,7 @@
 import { useSync } from '@tldraw/sync'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { defaultBindingUtils, defaultShapeUtils, Editor, Tldraw, type TLComponents } from 'tldraw'
+import { defaultBindingUtils, defaultShapeUtils, Editor, react, Tldraw, type TLComponents } from 'tldraw'
 import { boardApi } from '../api'
 import { chatBus } from '../chat/chatBus'
 import { ChatPanel } from '../chat/ChatPanel'
@@ -15,7 +15,9 @@ import { TopBar, type Wall } from '../pinboard/TopBar'
 import '../pinboard/pinboard.css'
 import { customBindingUtils, customShapeUtils, getShapeVisibility } from '../shapes'
 import { registerBoardSideEffects } from '../sideEffects'
+import { tour } from '../viewerState'
 import { PaperWidgets } from '../widgets/PaperWidgets'
+import { startCatchUp } from '../widgets/tour'
 
 const shapeUtils = [...defaultShapeUtils, ...customShapeUtils]
 const bindingUtils = [...defaultBindingUtils, ...customBindingUtils]
@@ -81,17 +83,39 @@ export function Room() {
 			.then((board) => chatBus.ask({ text: onboardingPrompt(board ? board.question || board.title : '') }))
 	}, [roomId, memberId])
 
-	// Home's "Catch me up" count starts over once the researcher has been here a while
+	// Home's "Catch me up" count starts over once the researcher has been here a while, and again
+	// when a Catch me up tour ends
 	useEffect(() => {
 		const api = boardApi(roomId, memberId)
-		const timer = setTimeout(() => {
+		const markSeen = () =>
 			api
 				.get()
 				.then((board) => api.seen(board.lastSeq))
 				.catch((e) => console.warn(`Couldn't mark board ${roomId} as seen:`, e))
-		}, SEEN_AFTER_MS)
-		return () => clearTimeout(timer)
+		const timer = setTimeout(markSeen, SEEN_AFTER_MS)
+		let touring = tour.get() !== null
+		const stop = react('tour end marks the board seen', () => {
+			const now = tour.get() !== null
+			if (touring && !now) markSeen()
+			touring = now
+		})
+		return () => {
+			clearTimeout(timer)
+			stop()
+		}
 	}, [roomId, memberId])
+
+	// Home's "Catch me up" opens the board with ?tour=1: the tour starts once the board has synced
+	// (the editor only mounts then), if anything is new
+	useEffect(() => {
+		if (!editor) return
+		const url = new URL(window.location.href)
+		if (!url.searchParams.has('tour')) return
+		// gone from the URL first, so a reload doesn't start it again
+		url.searchParams.delete('tour')
+		window.history.replaceState(window.history.state, '', url)
+		startCatchUp(editor)
+	}, [editor])
 
 	// Create a store connected to multiplayer.
 	const store = useSync({
