@@ -7,19 +7,41 @@ reader agents need.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Annotated, Any
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import AfterValidator, BeforeValidator
 
 from discovery.fulltext import DEFAULT_MAX_CHARS
 from discovery.service import (
+    DATE,
+    PLACEHOLDERS,
     SEARCH_SOURCES,
     SEED_STRATEGIES,
+    SINCE_FORMAT,
     Discovery,
     RerankBackend,
     SearchSource,
     Strategy,
 )
+from discovery.sources import Skipped
+
+
+def _unset(value: Any) -> Any:
+    """A placeholder such as "None" for an optional argument means it was left out."""
+    return None if isinstance(value, str) and value.strip() in PLACEHOLDERS else value
+
+
+def _date(value: str | None) -> str | None:
+    if value is not None and not DATE.match(value):
+        raise ValueError(SINCE_FORMAT)
+    return value
+
+
+Since = Annotated[str | None, BeforeValidator(_unset), AfterValidator(_date)]
+OptionalIds = Annotated[list[str] | None, BeforeValidator(_unset)]
+OptionalText = Annotated[str | None, BeforeValidator(_unset)]
 
 INSTRUCTIONS = """\
 Tools for finding biomedical and computational research papers. Papers are identified by prefixed IDs \
@@ -37,8 +59,8 @@ def build_server(discovery: Discovery) -> MCPServer:
     async def search(
         query: str,
         limit: int = 20,
-        sources: list[SearchSource] | None = None,
-        since: str | None = None,
+        sources: Annotated[list[SearchSource] | None, BeforeValidator(_unset)] = None,
+        since: Since = None,
     ) -> dict[str, Any]:
         """Search for papers matching a query.
 
@@ -47,8 +69,9 @@ def build_server(discovery: Discovery) -> MCPServer:
             limit: Most papers to return.
             sources: Any of pubmed (keyword search), openalex (keyword search across
                 fields) and web (Tavily search of PubMed, PMC, bioRxiv, medRxiv, arXiv).
-                Defaults to all three.
-            since: Only papers published on or after this date, YYYY-MM-DD.
+                Defaults to all three; leave out when not needed.
+            since: Only papers published on or after this date: YYYY, YYYY-MM or
+                YYYY-MM-DD. Leave out when not needed.
 
         Returns papers (ID, title, year, venue, authors, link, abstract excerpt,
         foundBy), the hit count per source, and the sources that were skipped and why.
@@ -58,24 +81,27 @@ def build_server(discovery: Discovery) -> MCPServer:
     @server.tool()
     async def find_candidates(
         seed_ids: list[str],
-        exclude_ids: list[str] | None = None,
-        strategies: list[Strategy] | None = None,
-        since: str | None = None,
+        exclude_ids: OptionalIds = None,
+        strategies: Annotated[list[Strategy] | None, BeforeValidator(_unset)] = None,
+        since: Since = None,
         limit: int = 100,
-        query: str | None = None,
+        query: OptionalText = None,
     ) -> dict[str, Any]:
         """Find candidate papers related to the seed papers.
 
         Args:
             seed_ids: Paper IDs of the researcher's seed papers.
-            exclude_ids: Paper IDs never to return, such as discarded papers.
+            exclude_ids: Paper IDs never to return, such as discarded papers. Leave out
+                when not needed.
             strategies: Any of pubmed_links (PubMed similar, citing and reference
                 links), citing (OpenAlex papers citing the seeds), recommend (Semantic
                 Scholar recommendations), keyword and web (both need `query`).
-                Defaults to pubmed_links, citing and recommend.
-            since: Only papers published on or after this date, YYYY-MM-DD.
+                Defaults to pubmed_links, citing and recommend; leave out when not needed.
+            since: Only papers published on or after this date: YYYY, YYYY-MM or
+                YYYY-MM-DD. Leave out when not needed.
             limit: Most candidate IDs to return.
-            query: The sub-query, for the keyword and web strategies.
+            query: The sub-query, for the keyword and web strategies. Leave out when
+                not needed.
 
         Returns candidate paper IDs (papers found by several strategies first), the
         count per strategy, and what was skipped and why. Seeds and excluded papers
@@ -89,10 +115,10 @@ def build_server(discovery: Discovery) -> MCPServer:
     async def rerank(
         goal: str,
         paper_ids: list[str],
-        seed_ids: list[str] | None = None,
-        exclude_ids: list[str] | None = None,
+        seed_ids: OptionalIds = None,
+        exclude_ids: OptionalIds = None,
         k: int = 20,
-        backend: RerankBackend | None = None,
+        backend: Annotated[RerankBackend | None, BeforeValidator(_unset)] = None,
     ) -> dict[str, Any]:
         """Rank candidate papers for the researcher's goal, best first, with a reason for each.
 
@@ -122,7 +148,7 @@ def build_server(discovery: Discovery) -> MCPServer:
     async def score_candidates(
         question: str,
         candidate_ids: list[str],
-        seed_ids: list[str] | None = None,
+        seed_ids: OptionalIds = None,
         limit: int = 20,
     ) -> dict[str, Any]:
         """Rank candidate papers by how close their title and abstract are in meaning to
@@ -136,14 +162,18 @@ def build_server(discovery: Discovery) -> MCPServer:
 
         Returns the top papers (ID, title, year, score from 0 to 1, similarity to the
         question and to the closest seed, which seed that is), how many candidates
-        were scored, and the IDs that could not be found and why. Seeds are never
-        returned as candidates.
+        were scored, and the IDs that could not be found or embedded and why. Seeds
+        are never returned as candidates.
         """
-        return await discovery.score_candidates(question, candidate_ids, seed_ids, limit)
+        try:
+            return await discovery.score_candidates(question, candidate_ids, seed_ids, limit)
+        except (ValueError, Skipped) as error:
+            # A ToolError keeps its text; anything else reaches the model as "Error executing tool".
+            raise ToolError(str(error)) from error
 
     @server.tool()
     async def resolve_seed(
-        doi: str | None = None, pmid: str | None = None, title: str | None = None
+        doi: OptionalText = None, pmid: OptionalText = None, title: OptionalText = None
     ) -> dict[str, Any]:
         """Look up a seed paper by DOI, PMID or exact title, and return its full record."""
         return (await discovery.resolve_seed(doi, pmid, title)).to_record()

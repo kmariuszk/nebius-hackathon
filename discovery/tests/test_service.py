@@ -347,3 +347,10 @@ async def test_fulltext_falls_back_to_the_abstract(discovery):
 
     no_copy = await discovery.get_fulltext("pmid:200")
     assert no_copy["source"] == "abstract" and no_copy["skipped"] == ["no PMC, arXiv or publisher copy is known"]
+
+
+async def test_recommend_without_a_seed_is_skipped_rather_than_sent(discovery):
+    # Semantic Scholar answers 400 "No positive paper examples given" to an empty list.
+    result = await discovery.find_candidates([], strategies=["recommend"])
+    assert result["candidateIds"] == []
+    assert result["skipped"] == ["recommend: no seed Semantic Scholar can look up"]

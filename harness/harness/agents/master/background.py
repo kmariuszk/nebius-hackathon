@@ -2,16 +2,19 @@
 
 The master places papers, calls `process_papers` and carries on; the cards
 fill in while it ranks and answers (docs/Concept.md, Agent design,
-`read_then_relate`). Per paper, each step has its own runner:
+`read_then_relate`). First a model-free step links each paper to the paper it
+was placed near (kind `similar`). Then, per paper, each step has its own runner:
 
 1. the reader agent reads the paper on its own and answers with its artifacts as JSON;
 2. a model-free step writes them to the card: each quote and highlight that is
    word for word in the abstract with `add_quote`, the summary and what
    couldn't be checked with `set_card`;
 3. the context agent relates the paper to the board: "why it matters", the
-   glance steps and links to the closest papers;
-4. the "Agent is reading…" badge goes off, also when a step failed, which
-   then says why in the card's `gaps`.
+   glance steps and links to the closest papers; when it saved no "why", it
+   tries once more with the errors it got;
+4. the "Agent is reading…" badge goes off, also when a step failed or the
+   context agent left "why it matters" or the glance out, which the card's
+   `gaps` then says. Every failed tool call is logged at WARNING.
 
 At most `PAPERS_AT_ONCE` papers are read at a time, and the background
 agents make at most `CALLS_PER_MINUTE` model calls a minute, since Token
@@ -29,6 +32,7 @@ import time
 from collections import deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from functools import partial
 from typing import Any
 
 from google.adk.agents import BaseAgent, LlmAgent
@@ -84,18 +88,25 @@ class ToolFailed(RuntimeError):
 
 
 class Calls:
-    """MCP tools called from Python inside an agent's run, so they carry that run's headers."""
+    """MCP tools called from Python inside an agent's run, so they carry that run's headers.
 
-    def __init__(self, tools: dict[str, BaseTool], tool_context: ToolContext) -> None:
+    A call that fails is logged with the paper it was for and raises `ToolFailed`.
+    """
+
+    def __init__(self, tools: dict[str, BaseTool], tool_context: ToolContext, paper_id: str = "") -> None:
         self.tools = tools
         self.tool_context = tool_context
+        self.paper_id = paper_id
 
     async def __call__(self, name: str, **args: Any) -> dict[str, Any]:
-        if name not in self.tools:
-            raise ToolFailed(f"{name}: not offered by the MCP server")
-        result = await self.tools[name].run_async(args=args, tool_context=self.tool_context)
-        if not isinstance(result, dict) or result.get("isError") or "error" in result:
-            raise ToolFailed(f"{name}: {error_text(result)}")
+        if name in self.tools:
+            result = await self.tools[name].run_async(args=args, tool_context=self.tool_context)
+        else:
+            result = {"error": "not offered by the MCP server"}
+        if failed(result):
+            error = error_text(result)
+            log.warning("background %s %s %s: %s", self.paper_id, self.tool_context.agent_name, name, error)
+            raise ToolFailed(f"{name}: {error}")
         return candidates.structured(result)
 
 
@@ -104,12 +115,13 @@ class Step(BaseAgent):
 
     tools: list[BaseToolset] = Field(default_factory=list)
     action: Callable[[Calls], Awaitable[None]]
+    paper_id: str = ""  # for the log
 
     async def _run_async_impl(self, ctx: InvocationContext):  # type: ignore[override]
         found: dict[str, BaseTool] = {}
         for toolset in self.tools:
             found.update({tool.name: tool for tool in await toolset.get_tools(ReadonlyContext(ctx))})
-        await self.action(Calls(found, ToolContext(ctx)))
+        await self.action(Calls(found, ToolContext(ctx), self.paper_id))
         return
         yield  # an async generator that yields no events
 
@@ -151,10 +163,11 @@ class ProcessPapers(BaseToolset):
     async def process_papers(self, paper_ids: list[str], tool_context: ToolContext) -> dict[str, Any]:
         """Read placed papers in the background and fill in their cards; returns at once.
 
-        For each paper the reader agent reads its full text (or abstract), its summary and
-        quotes go onto the card, and the context agent writes why it matters for the board's
-        question, the paper at a glance, and links to the closest papers. The "Agent is
-        reading…" badge stays on until the card is filled in. Don't wait for it.
+        Each paper is first linked to the paper you placed it near. Then the reader agent reads
+        its full text (or abstract), its summary and quotes go onto the card, and the context
+        agent writes why it matters for the board's question, the paper at a glance, and links
+        to the closest papers. The "Agent is reading…" badge stays on until the card is filled
+        in. Don't wait for it.
 
         Args:
             paper_ids: Papers you placed with add_papers in this chat, or [] for every one
@@ -168,7 +181,7 @@ class ProcessPapers(BaseToolset):
             "alreadyStarted": [p for p in wanted if p in self.started],
             "notPlaced": [p for p in wanted if p not in cards],
         }
-        self.start(result["started"], state.get("run_id"), state.get(candidates.QUESTION, ""))
+        self.start(result["started"], state)
         return result
 
     async def after_turn(self, callback_context: CallbackContext) -> None:
@@ -178,7 +191,7 @@ class ProcessPapers(BaseToolset):
         left = [p for p, kind in candidates.placed(state).items() if kind != "seed" and p not in self.started]
         if left:
             log.info("the master placed %d papers without reading them; reading them now", len(left))
-            self.start(left, state.get("run_id"), state.get(candidates.QUESTION, ""))
+            self.start(left, state)
         # New cards start with the badge on, and seeds aren't read: turn theirs off.
         seeds = [p for p, kind in candidates.placed(state).items() if kind == "seed" and p not in self.started]
         if seeds:
@@ -188,48 +201,79 @@ class ProcessPapers(BaseToolset):
                 "mark_working", paperIds=seeds, on=False)))
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
+        # 4. Clusters, once per board (D04), go here.
         return None
 
-    def start(self, paper_ids: list[str], run_id: str | None, question: str) -> None:
+    def start(self, paper_ids: list[str], state: dict[str, Any]) -> None:
+        """The after-placement steps for these papers, in the background. A paper starts once a chat,
+        so the link to the paper it was placed near is written once too."""
         if not paper_ids:
             return
         self.started.update(paper_ids)
-        task = asyncio.create_task(self.batch([Job(p, run_id, question) for p in paper_ids]))
+        near = candidates.near(state)
+        links = [{"from": p, "to": near[p], "kind": "similar"} for p in paper_ids if near.get(p, p) != p]
+        jobs = [Job(p, state.get("run_id"), state.get(candidates.QUESTION, "")) for p in paper_ids]
+        task = asyncio.create_task(self.batch(jobs, links))
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
 
-    async def batch(self, jobs: list[Job]) -> None:
-        # Badges on first (cards already on the board don't have one yet), then read.
-        try:
-            await self.step("process_papers", jobs[0], lambda call: call(
-                "mark_working", paperIds=[job.paper_id for job in jobs], on=True))
-        except Exception as error:
-            log.warning("could not turn the reading badges on: %s", error)
+    async def batch(self, jobs: list[Job], links: list[dict[str, str]]) -> None:
+        # The after-placement steps (docs/wps/agent-harness/README.md), each one even if the one
+        # before failed. Badges on first: cards already on the board don't have one yet.
+        await self.try_step("turn the reading badges on", jobs[0], lambda call: call(
+            "mark_working", paperIds=[job.paper_id for job in jobs], on=True))
+        # 1. Citation links among the board's papers (D03) go here.
+        # 2. Near links: each paper to the one it was placed near, without a model.
+        if links:
+            await self.try_step("link the papers to the ones they were placed near", jobs[0], lambda call: call(
+                "link_papers", links=links))
+        # 3. Reading.
         await asyncio.gather(*(self.read_then_relate(job) for job in jobs))
 
+    async def try_step(self, what: str, job: Job, action: Callable[[Calls], Awaitable[Any]]) -> None:
+        """A model-free step whose failure is only logged."""
+        try:
+            await self.step("process_papers", job, action)
+        except Exception as error:
+            log.warning("could not %s: %s", what, error)
+
     async def read_then_relate(self, job: Job) -> None:
-        gaps: list[str] = []
-        written: list[str] = []
+        gaps: list[str] = []  # the reader's, written to the card with its summary
+        new: list[str] = []  # found since the reader's write; `finish` adds them
         try:
             async with self.slots:
                 try:
                     reading = parse_reading(await self.ask(self.reader(), f"Paper ID: {job.paper_id}", job))
                     card = await self.write_reading(job, reading, gaps)
-                    written = list(gaps)
                 except Exception as error:
                     log.warning("reading %s failed: %s", job.paper_id, error)
-                    gaps.append(f"The agent couldn't read this paper: {short(error)}")
+                    new.append(f"The agent couldn't read this paper: {short(error)}")
                     return
-                try:
-                    await self.ask(self.context(self.board), relate_request(job, reading, card), job)
-                except Exception as error:
-                    log.warning("relating %s to the board failed: %s", job.paper_id, error)
-                    gaps.append(f"The agent couldn't relate this paper to the board: {short(error)}")
+                new += await self.relate(job, relate_request(job, reading, card))
         except asyncio.CancelledError:
-            gaps.append("The agent stopped reading this paper: the chat closed first.")
+            new.append("The agent stopped reading this paper: the chat closed first.")
             raise
         finally:
-            await self.finish(job, gaps if gaps != written else None)
+            await self.finish(job, gaps, new)
+
+    async def relate(self, job: Job, request: str) -> list[str]:
+        """Run the context agent, once more if it saved no `oneLine`; the gaps for what it still didn't write."""
+        tried: list[dict[str, Any]] = []
+        for retry in (False, True):
+            try:
+                await self.ask(self.context(self.board), request + (retry_note(tried) if retry else ""), job, tried)
+            except Exception as error:
+                log.warning("relating %s to the board failed: %s", job.paper_id, error)
+                tried.append({"tool": "", "ok": False, "error": short(error), "written": []})
+            if "oneLine" in saved(tried):
+                break
+        errors = [t["error"] for t in tried if not t["ok"]]
+        if "oneLine" not in saved(tried):
+            reason = short(errors[-1]) if errors else "it gave no answer"
+            return [f"The agent couldn't write why this paper matters: {reason}"]
+        if "glance" not in saved(tried):
+            return ["The agent couldn't draw the paper at a glance."]
+        return []
 
     async def write_reading(self, job: Job, reading: dict[str, Any], gaps: list[str]) -> dict[str, Any]:
         """The reader's artifacts onto the card; returns the paper's title, abstract and card quotes."""
@@ -260,11 +304,12 @@ class ProcessPapers(BaseToolset):
         await self.step("reader", job, write, papers=True)
         return card
 
-    async def finish(self, job: Job, gaps: list[str] | None) -> None:
+    async def finish(self, job: Job, gaps: list[str], new: list[str]) -> None:
+        """Badge off; first, when there are `new` gaps since the reader's write, the card's gaps become both."""
         async def done(call: Calls) -> None:
-            if gaps:
+            if new:
                 try:
-                    await call("set_card", paperId=job.paper_id, gaps=gaps[:8])
+                    await call("set_card", paperId=job.paper_id, gaps=[*gaps, *new][:8])
                 except ToolFailed as error:
                     log.warning("could not note what went wrong on %s: %s", job.paper_id, error)
             await call("mark_working", paperIds=[job.paper_id], on=False)
@@ -275,14 +320,15 @@ class ProcessPapers(BaseToolset):
             log.error("could not clear the reading badge on %s: %s", job.paper_id, error)
 
     async def step(self, name: str, job: Job, action: Callable[[Calls], Awaitable[None]], papers: bool = False) -> None:
-        tools = [self.board.canvas("get_board", "add_quote", "set_card", "mark_working")]
+        tools = [self.board.canvas("get_board", "add_quote", "set_card", "mark_working", "link_papers")]
         if papers:
             tools.append(self.board.papers("get_paper"))
-        await self.run(Step(name=name, tools=tools, action=action), "", job)
+        await self.run(Step(name=name, tools=tools, action=action, paper_id=job.paper_id), "", job)
 
-    async def ask(self, agent: LlmAgent, text: str, job: Job) -> str:
-        """Run a background agent on `text`; its final answer."""
+    async def ask(self, agent: LlmAgent, text: str, job: Job, tried: list[dict[str, Any]] | None = None) -> str:
+        """Run a background agent on `text`; its final answer. Its tool calls go into `tried`, failures to the log."""
         agent.before_model_callback = self.pace.before_model
+        agent.after_tool_callback = partial(recorded, job, [] if tried is None else tried)
         self.board.models.setdefault(agent.name, model_name(agent))
         return await self.run(agent, text, job)
 
@@ -354,6 +400,44 @@ def relate_request(job: Job, reading: dict[str, Any], card: dict[str, Any]) -> s
     )
 
 
+def recorded(
+    job: Job,
+    tried: list[dict[str, Any]],
+    *,
+    tool: BaseTool,
+    args: dict[str, Any],
+    tool_context: ToolContext,
+    tool_response: Any,
+) -> None:
+    """After a background agent's tool call: note it in `tried` with the card fields a
+    `set_card` wrote, and log it when it failed."""
+    ok = not failed(tool_response)
+    error = "" if ok else error_text(tool_response)
+    if not ok:
+        log.warning("background %s %s %s: %s", job.paper_id, tool_context.agent_name, tool.name, error)
+    written = candidates.structured(tool_response).get("written") if ok and tool.name == "set_card" else None
+    tried.append({"tool": tool.name, "ok": ok, "error": error, "written": written or []})
+
+
+def saved(tried: list[dict[str, Any]]) -> set[str]:
+    """The card fields the context agent's `set_card` calls wrote."""
+    return {field for t in tried for field in t["written"]}
+
+
+def retry_note(tried: list[dict[str, Any]]) -> str:
+    """What the context agent's second try adds to its request."""
+    errors = "; ".join([short(t["error"]) for t in tried if not t["ok"]][-3:])
+    errors = errors or ("none, but no set_card call wrote oneLine" if tried else "you called no tool")
+    return (
+        f"\n\nYour last attempt didn't save. Errors: {errors}. Call set_card with paperId and oneLine first, "
+        "then claims and glance in a second call."
+    )
+
+
+def failed(result: Any) -> bool:
+    return not isinstance(result, dict) or bool(result.get("isError")) or "error" in result
+
+
 def error_text(result: Any) -> str:
     if isinstance(result, dict):
         if "error" in result:
@@ -364,7 +448,7 @@ def error_text(result: Any) -> str:
     return json.dumps(result, default=str)[:300]
 
 
-def short(error: Exception) -> str:
+def short(error: object) -> str:
     text = " ".join(str(error).split()) or type(error).__name__
     return text if len(text) <= 160 else text[:159] + "…"
 

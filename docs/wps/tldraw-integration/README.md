@@ -1,6 +1,6 @@
 # tldraw integration: the board, the board service and the agent's way in
 
-Oct 18, 2026 · Work package group T · Branch `feat/board-build` (the plans came in with PR #6) · Status: T00 done and merged; shared contracts and hook points in place; T01 to T14 open
+Oct 18, 2026 · Work package group T · Branch `feat/board-build` (the plans came in with PR #6) · Status on Oct 20: T00 to T05 and T08 done and merged; T06, T09, T10 and T13 partly built; T07 and T14 not started; T11 and T12 deferred; T15 and T16 added by the [finish plan](../README.md#finish-plan-oct-20), which also refreshes T05, T06, T07, T09, T10, T13 and T14 (see [Where it stands on Oct 20](#where-it-stands-on-oct-20))
 
 This group builds everything between a researcher's browser and the agents: the tldraw board and its custom shapes, the board service that owns each shared room, the chat panel that talks ACP over a WebSocket, the canvas MCP that agents write through, the REST and SSE API, the v5 board UI (nodes, paper widgets, ranked list, filters, top and bottom bars, link and note editing), and the half of the harness that faces the board (the ACP adapter and the canvas and viewer tools). The agents' reasoning, their models and the discovery service belong to other owners; this group meets them at the contracts in [`interfaces.md`](interfaces.md).
 
@@ -33,6 +33,27 @@ The circled part of [architecture diagram 1](../../architecture.html#components)
 | ACP adapter, chat panel, canvas MCP, REST API, ranked list, paper widgets | Not built (stubs only where listed above) | — |
 | Visual design | v5 clickable mockup with real papers: the v4 board, but an opened paper splits into widgets around its node | `docs/mockups/flashcard-v5.html`, `flashcard-v4.html`, [mockups README](../../mockups/README.md) |
 
+## Where it stands on Oct 20
+
+`main` at `9ba8985`; `pnpm test` in `client/` passes (148 tests) and `tsc` is clean. The board is the v6 pinboard design (PR #21), and the static demo board (`client/public/landing/demo-board.html`, the v6 mockup) is now the visual spec for the browser ([frontend.md](../../frontend.md)). A live run on Oct 19 and a code read found the gaps the [finish plan](../README.md#finish-plan-oct-20) fixes; finding numbers are in its [traceability table](../README.md#traceability-findings-to-work-packages).
+
+| WP | State on Oct 20 | Left, and where |
+| --- | --- | --- |
+| T00, T01, T02 | Done and merged | T02's layout overlaps v6 cards (F6, F7, F9): [T15](T15-graph-layout-and-strings.md) |
+| T03, T04 | Done and merged (PR #13) | — |
+| T05 | Built and merged (PR #13) | Chat bus for other parts of the app, blank bubbles (F5, F18): refresh in [T05](T05-chat-panel.md) |
+| T06 | Harness tools and focus, highlight, open paper built | The tour (F14, F15): refresh in [T06](T06-viewer-actions.md) |
+| T07 | Prompt mapping in the harness only | Everything else (F22): refresh in [T07](T07-board-context.md) |
+| T08 | Built and merged (PR #19) | `/seen`, Home counts, PDF seeds: [T16](T16-start-and-home-pages.md); removed links from the browser: T14 refresh |
+| T09 | Ranked list and "Looking for" built (v6) | Filters (F21): refresh in [T09](T09-ranked-list.md) |
+| T10 | Widgets built (v6); Phase B not started | Empty states (F20), tour hook, Find more: refresh in [T10](T10-paper-card.md); Phase B out of the plan |
+| T11 | Not started | Deferred |
+| T12 | Not started | Live run: [H01](../agent-harness/H01-live-board-check.md); the rest deferred |
+| T13 | Top bar and toolbar built (v6) | Title (F23), agent presence, Update suggestions (F17), help: refresh in [T13](T13-board-chrome.md) |
+| T14 | Not started | Link editing, note pinning (F16), guards: refresh in [T14](T14-board-editing.md) |
+| T15 (new) | — | Graph layout and strings on v6 cards |
+| T16 (new) | — | Start and Home pages on the real board (F11, F12, F13) |
+
 ## The model: Nemotron 3.5 Super VL on Token Factory
 
 Every board-facing agent in this group, and every live agent test, runs on **Nemotron 3.5 Super VL** (`nvidia/Nemotron-3.5-Super-VL`) on Nebius Token Factory. There is no other provider. Super VL matters here because it can *see*: it reads the board from a picture as well as from `get_board`'s JSON, and it reads papers' figures, drawings and charts, not just their text.
@@ -55,23 +76,25 @@ Two things the probes showed that matter to the harness owner are in [I8](interf
 
 ## The work packages
 
-| WP | Title | Lane | Size | Depends on | Milestone |
-| --- | --- | --- | --- | --- | --- |
-| [T00](T00-sync-server-hardening.md) | Harden the sync server and agent permissions (PR #6 review) · **done**, merged with PR #6 | Board + repo config | S | — | Before M1 |
-| [T01](T01-shared-board-model.md) | Shared board model: custom shapes, IDs, attribution, human-touched flags | Board + Browser | M | — | M2 |
-| [T02](T02-canvas-mcp.md) | Canvas MCP and layout service | Board | M | T00, T01 | M2 |
-| [T03](T03-acp-pipe.md) | ACP pipe: WebSocket to harness stdio | Board | S | T00, T04 echo mode | M1 |
-| [T04](T04-acp-adapter.md) | ACP adapter: `python -m harness` | Harness (board half) | M | I1 | M1 |
-| [T05](T05-chat-panel.md) | Chat panel: browser ACP client | Browser | M | T03 | M1 |
-| [T06](T06-viewer-actions.md) | Per-viewer canvas actions: focus, highlight, open paper, catch-up tour | Harness + Browser | S | T04, T05 | M3 |
-| [T07](T07-board-context.md) | What the agent sees: selection, the board and papers as images | Browser + Harness | M | T04, T05 | M3 |
-| [T08](T08-rest-sse-api.md) | REST + SSE API and board DB | Board | M | T01 | M4 |
-| [T09](T09-ranked-list.md) | Ranked list, filters and "Looking for" (v4) | Browser | M | T01, T06, T08 | M4 |
-| [T10](T10-paper-card.md) | Paper widgets (v5) and PDF reading | Browser | L | T01, T08 | M4 |
-| [T11](T11-external-agents.md) | External agents on the canvas MCP | Board + Browser | S | T02, T08 | M5 |
-| [T12](T12-integration-demo.md) | Integration check and demo run | All | M | T02 to T07 | M5 |
-| [T13](T13-board-chrome.md) | Board chrome (v4): top bar, bottom bar, help | Browser | M | T01, T05, T08 | M4 |
-| [T14](T14-board-editing.md) | Editing the board (v4): links and pinned notes | Browser | M | T01, T08 | M4 |
+| WP | Title | Lane | Size | Depends on | Milestone | Status (Oct 20) | Finish plan |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| [T00](T00-sync-server-hardening.md) | Harden the sync server and agent permissions (PR #6 review) · **done**, merged with PR #6 | Board + repo config | S | — | Before M1 | Done | — |
+| [T01](T01-shared-board-model.md) | Shared board model: custom shapes, IDs, attribution, human-touched flags | Board + Browser | M | — | M2 | Done | — |
+| [T02](T02-canvas-mcp.md) | Canvas MCP and layout service | Board | M | T00, T01 | M2 | Done | Layout fixed in T15 |
+| [T03](T03-acp-pipe.md) | ACP pipe: WebSocket to harness stdio | Board | S | T00, T04 echo mode | M1 | Done | — |
+| [T04](T04-acp-adapter.md) | ACP adapter: `python -m harness` | Harness (board half) | M | I1 | M1 | Done | — |
+| [T05](T05-chat-panel.md) | Chat panel: browser ACP client | Browser | M | T03 | M1 | Built | Refresh · P1 · W1 |
+| [T06](T06-viewer-actions.md) | Per-viewer canvas actions: focus, highlight, open paper, catch-up tour | Harness + Browser | S | T04, T05 | M3 | Partly built | Refresh · P1 · W2 |
+| [T07](T07-board-context.md) | What the agent sees: selection, the board and papers as images | Browser + Harness | M | T04, T05 | M3 | Not started | Refresh · P2 · W3 |
+| [T08](T08-rest-sse-api.md) | REST + SSE API and board DB | Board | M | T01 | M4 | Built | Rest in T16, T14 |
+| [T09](T09-ranked-list.md) | Ranked list, filters and "Looking for" (v4) | Browser | M | T01, T06, T08 | M4 | Partly built | Refresh · P2 · W3 |
+| [T10](T10-paper-card.md) | Paper widgets (v5) and PDF reading | Browser | L | T01, T08 | M4 | Phase A built | Refresh · P1 · W2 |
+| [T11](T11-external-agents.md) | External agents on the canvas MCP | Board + Browser | S | T02, T08 | M5 | Not started | Deferred |
+| [T12](T12-integration-demo.md) | Integration check and demo run | All | M | T02 to T07 | M5 | Not started | Live run in H01; rest deferred |
+| [T13](T13-board-chrome.md) | Board chrome (v4): top bar, bottom bar, help | Browser | M | T01, T05, T08 | M4 | Partly built | Refresh · P1 · W3 |
+| [T14](T14-board-editing.md) | Editing the board (v4): links and pinned notes | Browser | M | T01, T08 | M4 | Not started | Refresh · P1 · W3 |
+| [T15](T15-graph-layout-and-strings.md) | Graph layout and strings on the v6 board | Board + Browser + Harness | M | — | W1 | Not started | New · P0 · W1 |
+| [T16](T16-start-and-home-pages.md) | Start and Home pages on the real board | Browser + Board | M | T05 refresh | W1 | Not started | New · P0 · W1 |
 
 ```mermaid
 flowchart LR
@@ -102,7 +125,13 @@ flowchart LR
   T08 --> T14
   T13 --> T12
   T14 --> T12
+  T02 --> T15["T15 Graph layout and strings"]
+  T15 --> T14
+  T05 --> T16["T16 Start and Home pages"]
+  T08 --> T16
 ```
+
+The finish plan's order across all three groups (waves W1 to W3) is in the [top-level README](../README.md#finish-plan-oct-20).
 
 **Suggested order for one person:** T00 is done (merged with PR #6), and the shared contracts and hook points are in place, so each lane lands in its own files. Then T04 echo mode, T03, T05 (M1: chat works), then T01, T02 (M2: the agent writes to the board), then T06, T07 (M3), then T08, T13, T10, T09, T14 (M4: the v5 board), then T11, T12 (M5). With a second person, the Board lane (T01, T02, T08) and the Browser lane (T05, T13, T10, T09, T14) run in parallel from the start, meeting at the contracts below.
 
@@ -338,6 +367,10 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 | D20 | Creates and updates are separate writes: `putShapes` only inserts, `patchShapes` merges and keeps position, stacking and `meta` | PR #6 review, finding 6: replacing a record on update would wipe a person's layout, the exact thing the human-touched rules prevent |
 | D21 | Prompt context tags are defined once, in T04 | PR #6 review, finding 5: T04, T07 and I4 had drifted apart |
 | D22 | v5 widgets replace the v4 card; `glance[]` replaces `facets` | Oct 18. The v4 card was still overwhelming: you didn't know where to look. Each widget answers one question in a fixed place (title on top, why it matters on the right, the paper at a glance and the figure on the left, actions under the node). The glance diagram replaces v4's "Compared with your seeds" strip and its three-line summary; the agent extracts it from the abstract and the app draws it, so no image model is involved |
+| D23 | Every paper is a fixed 172 × 70 card (`CARD_SIZE` in `client/shared/shapes.ts`), and the layout keeps a card's footprint clear; nodes no longer grow with their links | Oct 20 ([T15](T15-graph-layout-and-strings.md)). v6 draws a fixed card on the node, so the server's 48 px layout overlapped cards (17 of 153 pairs on Oct 19) and growth by links was invisible |
+| D24 | Catch me up is a local tour built from the cards; the agent can still start one with `_canvas/tour` | Oct 20 ([T06](T06-viewer-actions.md) refresh). Works with the chat closed and costs no model call; the agent's lines are already on the cards. Replaces T13's "sends the prompt Catch me up" |
+| D25 | The agent looks at a paper's figure through its image URL (`look_at_figure`), not a PDF page snapshot | Oct 20 ([T07](T07-board-context.md) refresh). There is no PDF reader; Token Factory takes images by URL, so no browser round trip is needed |
+| D26 | After placing papers, citation links, near links and clusters are written by code in the harness, not by the model | Oct 20 ([agent harness](../agent-harness/README.md#shared-contracts)). Same strings and frames, no model tokens, no retyped IDs; the model keeps the judgement calls (what to search, what to place, the answer) |
 
 ## Risks
 

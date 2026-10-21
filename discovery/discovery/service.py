@@ -10,7 +10,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import xml.etree.ElementTree as ET
+from collections import Counter
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import asdict
 from typing import Any, Literal
@@ -21,7 +23,7 @@ import numpy as np
 from discovery import fulltext
 from discovery import rerank as listwise
 from discovery import rerank_vl
-from discovery.embeddings import Embedder
+from discovery.embeddings import EmbedError, Embedder
 from discovery.fulltext import FullText
 from discovery.papers import Paper, default_url, format_id, ids_from_url, parse_id
 from discovery.sources import Skipped, arxiv, openalex, pubmed, semantic_scholar, tavily
@@ -40,12 +42,19 @@ RERANK_BACKENDS: tuple[RerankBackend, ...] = ("super_vl", "rerank_vl")
 # PubMed similar articles taken per seed; the list is ranked, so the top is enough.
 SIMILAR_PER_SEED = 20
 
+# Strings a model sends for an optional argument it means to leave out.
+PLACEHOLDERS = frozenset({"None", "none", "null", "NULL", "undefined", ""})
+DATE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
+SINCE_FORMAT = "since must be YYYY, YYYY-MM or YYYY-MM-DD"
+
 
 class Discovery:
     def __init__(self, client: httpx.AsyncClient, store: Store, vectors: VectorStore) -> None:
         self.client = client
         self.store = store
         self.vectors = vectors
+        self._warm_tasks: set[asyncio.Task[None]] = set()
+        self._warming: set[str] = set()
 
     async def search(
         self,
@@ -54,15 +63,17 @@ class Discovery:
         sources: Iterable[SearchSource] = SEARCH_SOURCES,
         since: str | None = None,
     ) -> dict[str, Any]:
+        since = _since(since)
         jobs = {
             "pubmed": lambda: self._pubmed_search(query, limit, since),
             "openalex": lambda: openalex.search(self.client, query, limit, since),
             "web": lambda: self._web_search(query, limit, since),
         }
         found, skipped = await _run({name: jobs[name]() for name in dict.fromkeys(sources)})
-        papers = self._save_all(_round_robin(found))
+        papers = list(self._save_all(_round_robin(found)).values())[:limit]
+        self._warm([paper for paper, _ in papers])
         return {
-            "papers": [paper.to_summary(by) for paper, by in list(papers.values())[:limit]],
+            "papers": [paper.to_summary(by) for paper, by in papers],
             "countsBySource": {name: len(hits) for name, hits in found.items()},
             "skipped": skipped,
         }
@@ -76,6 +87,7 @@ class Discovery:
         limit: int = 100,
         query: str | None = None,
     ) -> dict[str, Any]:
+        since = _since(since)
         seeds, skipped = await self._papers(seed_ids, "seed")
         excluded = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
 
@@ -103,6 +115,7 @@ class Discovery:
         ]
         # Papers that several strategies found come first.
         candidates.sort(key=lambda entry: -len(entry[1]))
+        self._warm(seeds + [paper for paper, _ in candidates[:limit]])
         return {
             "candidateIds": [paper.paper_id for paper, _ in candidates[:limit]],
             "countsByStrategy": {name: len(hits) for name, hits in found.items()},
@@ -174,7 +187,9 @@ class Discovery:
 
         The score is the mean of the two cosine similarities, or the question's alone
         without seeds. It is the first part of the scoring step in docs/Concept.md;
-        citation overlap, recency and Lightning verdicts come later.
+        citation overlap, recency and Lightning verdicts come later. Candidates that
+        can't be embedded are left out and noted in `skipped`; raises `ValueError` when
+        the question or every candidate can't be.
         """
         embedder = Embedder.from_env(self.client)
         seeds, skipped = await self._papers(seed_ids or [], "seed")
@@ -191,8 +206,18 @@ class Discovery:
         if not candidates:
             return {"top": [], "scored": 0, "skipped": skipped}
 
-        vectors = await self._paper_vectors(embedder, seeds + candidates)
-        question_vector = _unit(np.asarray(await embedder.query(question), dtype=np.float32))
+        vectors, failures = await self._paper_vectors(embedder, seeds + candidates)
+        for role, papers, what in (("candidates", candidates, "scored"), ("seeds", seeds, "used")):
+            reasons = Counter(failures[paper.paper_id] for paper in papers if paper.paper_id in failures)
+            skipped += [f"{n} {role} weren't {what}: {reason}" for reason, n in reasons.items()]
+        if all(paper.paper_id in failures for paper in candidates):
+            raise ValueError(f"No candidate could be embedded: {failures[candidates[0].paper_id]}")
+        candidates = [paper for paper in candidates if paper.paper_id in vectors]
+        seeds = [seed for seed in seeds if seed.paper_id in vectors]
+        try:
+            question_vector = _unit(np.asarray(await embedder.query(question), dtype=np.float32))
+        except EmbedError as error:
+            raise ValueError(f"The question couldn't be embedded: {error}") from error
         matrix = np.stack([vectors[paper.paper_id] for paper in candidates])
         question_similarity = matrix @ question_vector
         if seeds:
@@ -416,7 +441,7 @@ class Discovery:
         score = {pmid: s for pmid, s in score.items() if pmid not in seed_pmids}
         top = sorted(score, key=lambda pmid: (-score[pmid], -int(pmid)))[:limit]
         papers = _in_order(await pubmed.efetch(self.client, top), "pmid", top)
-        if since:
+        if since := _since(since):
             papers = [p for p in papers if p.year is None or p.year >= int(since[:4])]
         return papers
 
@@ -432,19 +457,52 @@ class Discovery:
             raise Skipped("no seed found in OpenAlex")
         return await openalex.citing(self.client, work_ids, limit, since)
 
-    async def _paper_vectors(self, embedder: Embedder, papers: list[Paper]) -> dict[str, np.ndarray]:
-        """Unit vectors for the papers, embedding only those not stored for their current text."""
+    async def _paper_vectors(
+        self, embedder: Embedder, papers: list[Paper]
+    ) -> tuple[dict[str, np.ndarray], dict[str, str]]:
+        """Unit vectors for the papers, embedding only those not stored for their current
+        text, and why each paper that couldn't be embedded wasn't."""
         texts = {paper.paper_id: paper.embedding_text() for paper in papers}
         vectors = self.vectors.get(embedder.model, texts)
         missing = [paper_id for paper_id in texts if paper_id not in vectors]
+        failures: dict[str, str] = {}
         if missing:
-            embedded = await embedder.documents([texts[paper_id] for paper_id in missing])
-            self.vectors.put(
-                embedder.model,
-                {paper_id: (texts[paper_id], vector) for paper_id, vector in zip(missing, embedded)},
-            )
-            vectors |= {paper_id: np.asarray(v, dtype=np.float32) for paper_id, v in zip(missing, embedded)}
-        return {paper_id: _unit(vector) for paper_id, vector in vectors.items()}
+            result = await embedder.documents([texts[paper_id] for paper_id in missing])
+            embedded = {paper_id: v for paper_id, v in zip(missing, result.vectors) if v is not None}
+            failures = {missing[i]: reason for i, reason in result.failures.items()}
+            self.vectors.put(embedder.model, {paper_id: (texts[paper_id], v) for paper_id, v in embedded.items()})
+            vectors |= {paper_id: np.asarray(v, dtype=np.float32) for paper_id, v in embedded.items()}
+        return {paper_id: _unit(vector) for paper_id, vector in vectors.items()}, failures
+
+    def _warm(self, papers: list[Paper]) -> None:
+        """Embed the papers in the background, so scoring them later reads stored vectors.
+
+        One warm-up per paper at a time; its errors are logged and never reach a tool.
+        """
+        fresh = [paper for paper in papers if paper.paper_id not in self._warming]
+        if not fresh:
+            return
+        try:
+            embedder = Embedder.from_env(self.client)
+        except Skipped:
+            return  # No key: score_candidates says which to set when it's called.
+        ids = {paper.paper_id for paper in fresh}
+        self._warming |= ids
+
+        async def warm() -> None:
+            try:
+                _, failures = await self._paper_vectors(embedder, fresh)
+                if failures:
+                    reasons = "; ".join(sorted(set(failures.values())))
+                    log.warning("Warm-up left %d papers unembedded: %s", len(failures), reasons)
+            except Exception:
+                log.warning("Embedding warm-up failed", exc_info=True)
+            finally:
+                self._warming -= ids
+
+        task = asyncio.create_task(warm())
+        self._warm_tasks.add(task)
+        task.add_done_callback(self._warm_tasks.discard)
 
     def _save_all(self, found: Iterable[tuple[str, Paper]]) -> dict[str, tuple[Paper, list[str]]]:
         """Save each paper; returns paper ID → (stored paper, sources that found it)."""
@@ -479,6 +537,16 @@ def _round_robin(found: dict[str, list[Paper]]) -> list[tuple[str, Paper]]:
     for rank in range(max((len(papers) for papers in found.values()), default=0)):
         merged += [(name, papers[rank]) for name, papers in found.items() if rank < len(papers)]
     return merged
+
+
+def _since(since: str | None) -> str | None:
+    """`since` as a full YYYY-MM-DD date, which every source accepts, or None for a
+    placeholder; raises `ValueError` for anything else."""
+    if since is None or since.strip() in PLACEHOLDERS:
+        return None
+    if not DATE.match(since):
+        raise ValueError(SINCE_FORMAT)
+    return since + "-01" * (2 - since.count("-"))
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:

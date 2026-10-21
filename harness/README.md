@@ -53,7 +53,7 @@ uv run pytest                    # offline tests
 
 | Agent | Model | Tools | Status |
 | --- | --- | --- | --- |
-| `master` | Super VL | `search` agent (as a tool, a fresh one per call), `reader` agent (as a tool), papers `resolve_seed`, `get_paper`, `rerank`; on a board also papers `score_candidates`, canvas `get_board`, `add_papers`, `set_scores`, `link_papers`, `add_note`, `process_papers`, the viewer tools and `update_plan` | Built; the default chat agent. On a board it runs the discovery onto the board (below). Without one (`adk web`) it runs about three sub-queries in parallel, reranks every candidate they found and answers in the chat. Candidate IDs go from the tool results to the papers MCP without a model retyping them (`agents/master/candidates.py`). Calls `reader` when asked to summarise a paper |
+| `master` | Super VL | `search` and `reader` agents (as tools, each built fresh per call by `candidates.FreshAgentTool`, so parallel calls don't cut each other's MCP session), papers `resolve_seed`, `get_paper`, `rerank`; on a board also papers `score_candidates`, canvas `get_board`, `add_papers`, `set_scores`, `link_papers`, `add_note`, `process_papers`, the viewer tools and `update_plan` | Built; the default chat agent. On a board it runs the discovery onto the board (below). Without one (`adk web`) it runs about three sub-queries in parallel, reranks every candidate they found and answers in the chat. Candidate IDs go from the tool results to the papers MCP without a model retyping them (`agents/master/candidates.py`). Calls `reader` when asked to summarise a paper |
 | `search` | Lightning | papers `search`, `find_candidates` | Built; runs one sub-query and answers with its picks as JSON; the IDs its tools return go to the master's candidate pool |
 | `reader` | Super VL | papers `get_fulltext`, `check_quotes` | Built; reads one paper and answers with its artifacts as JSON: TL;DR, summary, plain-language abstract, categorised highlights, quotes with highlight links, and key figures by caption. Every highlight and quote is checked word for word against the text. About 25 to 35 s a paper |
 | `context` | Lightning | canvas `get_board`, `add_quote`, `set_card`, `link_papers` | Built; relates one read paper to the board: writes "why it matters" (`oneLine` and its claims) and "the paper at a glance" on its card, and links it to the closest papers with kind `similar`. `process_papers` runs it after the reader |
@@ -70,7 +70,7 @@ Under ACP the master gets the chat's board (`build(board)`, interfaces I1) and f
 6. `rerank` on the top of the scoring (the harness fills in `paper_ids`), then `set_scores` per placed paper and board goal.
 7. The answer in the chat, with papers as `[Title](paper:<id>)` links. Papers it placed but didn't hand to `process_papers` are read anyway once the turn ends.
 
-`process_papers` (`agents/master/background.py`) reads each placed paper in the background, with its own runners: the `reader`; a model-free step that writes the reader's quotes (`add_quote`, which keeps only sentences from the abstract for now), its summary and what it couldn't check (`set_card` `summary`, `gaps`); then the `context` agent; then `mark_working` off. A failed step still clears the badge and says why in `gaps`. At most 3 papers are read at a time and the background agents make at most 30 model calls a minute, since Token Factory's limit is shared. Background writes carry the run ID of the turn that placed the paper and the researcher's member ID, like the turn's own writes. Closing the chat stops the passes still running, and each clears its badge.
+`process_papers` (`agents/master/background.py`) first links the papers to the ones they were placed near, in one model-free `link_papers` call (kind `similar`), so each card's string shows as soon as reading starts. Then it reads each placed paper in the background, with its own runners: the `reader`; a model-free step that writes the reader's quotes (`add_quote`, which keeps only sentences from the abstract for now), its summary and what it couldn't check (`set_card` `summary`, `gaps`); then the `context` agent; then `mark_working` off. If no `set_card` from the context agent wrote `oneLine`, it runs once more with the errors it got; if it still didn't, the card's `gaps` say "The agent couldn't write why this paper matters: <reason>", and a card with `oneLine` but no glance says "The agent couldn't draw the paper at a glance." Any other failed step still clears the badge and says why in `gaps`. Every failed tool call in a background pass is logged at WARNING as `background <paperId> <agent> <tool>: <error>`, so the log says why a card has a gap. At most 3 papers are read at a time and the background agents make at most 30 model calls a minute, since Token Factory's limit is shared. Background writes carry the run ID of the turn that placed the paper and the researcher's member ID, like the turn's own writes. Closing the chat stops the passes still running, and each clears its badge.
 
 ### The reader's artifacts
 
@@ -120,6 +120,29 @@ def build(board: BoardTools | None = None) -> LlmAgent:
 To try it in an ACP client such as Zed, add a [custom agent](https://zed.dev/docs/ai/external-agents#custom-agents) with `"command": "uv", "args": ["run", "--project", "<repo>/harness", "python", "-m", "harness"]`. Plain clients send no canvas MCP, so the agent simply has no canvas tools.
 
 Tests: `uv run pytest` runs the adapter as a real subprocess against scripted models and stand-in canvas and papers MCPs (`tests/test_acp_*.py`), no keys needed. `uv run pytest -m live` runs `board_assistant` on Super VL through the same subprocess (`tests/live/`); it skips unless the harness finds `TF_API_KEY`. `tests/fixtures/echo-session.jsonl` is a recorded echo session for the chat panel's tests.
+
+## Live board check
+
+One command runs the real stack on a fresh board and checks what the master leaves on it ([H01](../docs/wps/agent-harness/H01-live-board-check.md)): the papers MCP and the board service start on free ports with their data in a temp dir (`tests/live/board_stack.py`), the board gets the demo question and the five seeds from `docs/demo.md`, and `master` runs on Nemotron through the real ACP adapter with the Start page's first message. Once the turn ends and every card's reading badge is off, the check reads the room's SQLite file (`tests/live/room.py`), the activity feed and the tool cards.
+
+```zsh
+uv run pytest -m live -k master_board -s
+NODE=~/.nvm/versions/node/v22.18.0/bin/node uv run pytest -m live -k master_board -s   # Node 22.18+ not first on PATH
+```
+
+You need `uv`, Node 22.18 or later (on `PATH`, or `NODE=/path/to/node`) and `TF_API_KEY` and `TAVILY_API_KEY` in the repo's `.env`; `OPENALEX_API_KEY` and `NCBI_API_KEY` make the searches fuller. Without them the test skips and says what's missing.
+
+It fails on: a turn that doesn't end with `end_turn`; fewer than 4 suggestions; any two cards whose drawn boxes (172 × 70, centred on the node) overlap, seeds included; a reading badge left on; a suggestion with neither "Why it matters" nor a gap; a placeholder value (`"None"`, `"null"`, `""`, …) that reached a papers tool (the tool cards show the model's own arguments, so the ones the harness dropped are subtracted, from its "dropped … placeholder" log lines); a source skipped with HTTP 400. When the tools exist, it also wants a `cites` link (`citation_links`), 2 to 6 cluster frames (`apply_clusters`) and a figure on some card (`get_figures`). The failure names the cards and calls at fault.
+
+| Variable | Effect |
+| --- | --- |
+| `LIVE_WARM=1` | Discovery uses its cache in `discovery/data` instead of an empty one (the gate runs cold) |
+| `LIVE_TIMING=strict` | Also fail when the first card takes over 90 s, the answer over 120 s or the last badge over 300 s; otherwise the timings are only reported |
+| `LIVE_MODEL=cheap` | Nemotron 3.5 Lightning stands in for Super VL in the harness and in the papers MCP's rerank, at about a fifth of the price (USD 0.06 / 0.24 per million tokens against 0.30 / 0.90); any other value is used as the model ID. For development runs: the timing targets aren't asserted, and a pass or a failure says less about the demo, since Lightning is the model that wrote the placeholder arguments |
+
+Each run writes `tests/live/reports/<UTC time>.json` (gitignored; format in the [group README](../docs/wps/agent-harness/README.md#shared-contracts)) and prints the three timings with the counts. `modelCalls` counts every LiteLLM call the harness made, background passes included; `costUsd` is the chat turn's cost from the last usage update, so the background reading isn't in it. If a check fails, the processes' last 50 log lines are printed and the temp dir is kept.
+
+A run takes about 10 minutes on today's pipeline and makes a few dozen Token Factory calls (the master, three search agents, the reader and context agent per card), plus the papers MCP's own scoring and rerank calls. Run one at a time, never in CI; use `LIVE_MODEL=cheap` while iterating and the default models for the gate.
 
 ## Not built yet
 

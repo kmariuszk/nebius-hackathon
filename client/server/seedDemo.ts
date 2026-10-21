@@ -7,15 +7,8 @@ import type { PaperCardProps } from '../shared/paperCard.ts'
 // Fills a board with the v5 mockup's real papers (docs/mockups/flashcard-v5.html): 5 seeds, 4
 // suggestions, 1 kept paper, their citation links and a pinned note. Re-running updates them.
 // Usage: node server/seedDemo.ts <board> [--url http://localhost:5858]
+// (seedDemo.test.ts imports the shapes and bindings without sending them)
 
-const args = process.argv.slice(2)
-const board = args.find((a) => !a.startsWith('--'))
-const urlAt = args.indexOf('--url')
-const base = urlAt >= 0 ? args[urlAt + 1] : 'http://localhost:5858'
-if (!board) {
-	console.error('Usage: node server/seedDemo.ts <board> [--url http://localhost:5858]')
-	process.exit(1)
-}
 const meta = (paperId?: string) => ({ createdBy: 'agent', onBehalfOf: 'm_demo000000', runId: null, ...(paperId ? { paperId } : {}) })
 
 const P = {
@@ -542,8 +535,8 @@ const pubmed = (pmid: string, text: string) => {
 }
 const degree = (k: string) => EDGES.filter(([a, b]) => a === k || b === k).length
 
-const shapes: Record<string, unknown>[] = []
-const bindings: Record<string, unknown>[] = []
+export const shapes: Record<string, unknown>[] = []
+export const bindings: Record<string, unknown>[] = []
 const box: Record<string, { x: number; y: number; w: number }> = {}
 
 // v6: positions spread out for 172×70 cards (docs/mockups/flashcard-v6.html)
@@ -650,26 +643,38 @@ shapes.push({
 })
 bindings.push({ id: 'binding:note-pin-demo00000001', typeName: 'binding', type: 'note-pin', fromId: noteId, toId: paperShapeId(pid('n1')), props: note, meta: {} })
 
-// insert-only creates; a shape that exists is patched instead, a binding that exists is left as is
-async function send(method: 'POST' | 'PATCH', items: unknown[]) {
-	const res = await fetch(`${base}/api/rooms/${encodeURIComponent(board!)}/shapes`, {
-		method,
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify(items),
-	})
-	return { status: res.status, text: await res.text() }
-}
-let created = 0
-let updated = 0
-for (const item of [...shapes, ...bindings] as { id: string; typeName?: string }[]) {
-	let res = await send('POST', [item])
-	if (res.status === 409 && item.typeName !== 'binding') {
-		res = await send('PATCH', [item])
-		if (res.status === 200) updated++
-	} else if (res.status === 200) created++
-	if (res.status !== 200 && res.status !== 409) {
-		console.error(`${item.id}: ${res.status} ${res.text}`)
-		process.exitCode = 1
+async function main() {
+	const args = process.argv.slice(2)
+	const board = args.find((a) => !a.startsWith('--'))
+	const urlAt = args.indexOf('--url')
+	const base = urlAt >= 0 ? args[urlAt + 1] : 'http://localhost:5858'
+	if (!board) {
+		console.error('Usage: node server/seedDemo.ts <board> [--url http://localhost:5858]')
+		process.exit(1)
 	}
+	// insert-only creates; a shape that exists is patched instead, a binding that exists is left as is
+	async function send(method: 'POST' | 'PATCH', items: unknown[]) {
+		const res = await fetch(`${base}/api/rooms/${encodeURIComponent(board!)}/shapes`, {
+			method,
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify(items),
+		})
+		return { status: res.status, text: await res.text() }
+	}
+	let created = 0
+	let updated = 0
+	for (const item of [...shapes, ...bindings] as { id: string; typeName?: string }[]) {
+		let res = await send('POST', [item])
+		if (res.status === 409 && item.typeName !== 'binding') {
+			res = await send('PATCH', [item])
+			if (res.status === 200) updated++
+		} else if (res.status === 200) created++
+		if (res.status !== 200 && res.status !== 409) {
+			console.error(`${item.id}: ${res.status} ${res.text}`)
+			process.exitCode = 1
+		}
+	}
+	console.log(`${board}: ${created} created, ${updated} updated (${shapes.length} shapes, ${bindings.length} bindings)`)
 }
-console.log(`${board}: ${created} created, ${updated} updated (${shapes.length} shapes, ${bindings.length} bindings)`)
+
+if (import.meta.main) await main()

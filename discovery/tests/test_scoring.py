@@ -1,16 +1,20 @@
 """Embedding scores against a fake embeddings endpoint (no network).
 
 The fake embeds a text as counts of a few topic words, so cosine similarity
-behaves like meaning would and the expected order is easy to read.
+behaves like meaning would and the expected order is easy to read. It can be
+scripted to fail: the next requests time out or answer an error status, or
+every request with a given text times out.
 """
 
+import asyncio
 import json
 
 import httpx
 import pytest
 from mcp import Client
+from test_service import fake_apis
 
-from discovery.embeddings import QUERY_INSTRUCTION
+from discovery.embeddings import QUERY_INSTRUCTION, _retry_after
 from discovery.papers import Paper
 from discovery.server import build_server
 from discovery.service import Discovery
@@ -28,13 +32,24 @@ def topic_vector(text: str) -> list[float]:
 
 class FakeEmbeddings:
     def __init__(self) -> None:
-        self.texts: list[str] = []
+        self.texts: list[str] = []  # Texts embedded, in request order.
+        self.requests = 0
+        self.script: list[str | int] = []  # How the next requests fail: "timeout" or a status.
+        self.failing: str | None = None  # Requests with a text containing this always time out.
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         if not request.url.path.endswith("/embeddings"):
             return httpx.Response(404)
         assert request.headers["Authorization"] == "Bearer test-key"
         body = json.loads(request.content)
+        self.requests += 1
+        failure = self.script.pop(0) if self.script else None
+        if failure is None and self.failing is not None and any(self.failing in t for t in body["input"]):
+            failure = "timeout"
+        if failure == "timeout":
+            raise httpx.ReadTimeout("timed out", request=request)
+        if failure:
+            return httpx.Response(failure, headers={"Retry-After": "0"} if failure == 429 else {})
         self.texts += body["input"]
         data = [
             {"index": i, "embedding": topic_vector(text)} for i, text in enumerate(body["input"])
@@ -49,8 +64,9 @@ def paper(pmid: str, title: str, abstract: str | None = None) -> Paper:
 @pytest.fixture
 def embeddings(monkeypatch):
     monkeypatch.setenv("TF_API_KEY", "test-key")
-    for name in ("EMBED_API_KEY", "EMBED_BASE_URL", "EMBED_MODEL"):
+    for name in ("EMBED_API_KEY", "EMBED_BASE_URL", "EMBED_MODEL", "EMBED_CONCURRENCY"):
         monkeypatch.delenv(name, raising=False)
+    monkeypatch.setattr("discovery.embeddings.RETRY_WAITS", (0, 0))
     return FakeEmbeddings()
 
 
@@ -147,3 +163,122 @@ async def test_score_candidates_over_mcp(discovery):
         )
         assert not result.is_error
         assert result.structured_content["top"][0]["paperId"] == "pmid:2"
+
+
+@pytest.mark.parametrize("script", [["timeout"], [429, 500]])
+async def test_a_slow_or_busy_endpoint_is_retried_within_one_call(discovery, embeddings, script):
+    embeddings.script = list(script)
+
+    result = await discovery.score_candidates(
+        "melanoma immunotherapy", ["pmid:3", "pmid:4", "pmid:2"], seed_ids=["pmid:1"]
+    )
+
+    assert [p["paperId"] for p in result["top"]] == ["pmid:2", "pmid:4", "pmid:3"]
+    assert result["scored"] == 3 and result["skipped"] == []
+    # The papers' batch until it answers, then the question.
+    assert embeddings.requests == len(script) + 2
+
+
+async def test_a_batch_that_always_fails_leaves_the_rest_scored(discovery, embeddings, monkeypatch):
+    monkeypatch.setattr("discovery.embeddings.BATCH", 1)
+    embeddings.failing = "Heart failure"
+
+    result = await discovery.score_candidates(
+        "melanoma immunotherapy", ["pmid:3", "pmid:4", "pmid:2"], seed_ids=["pmid:1"]
+    )
+
+    assert [p["paperId"] for p in result["top"]] == ["pmid:2", "pmid:4"]
+    assert result["scored"] == 2
+    assert result["skipped"] == ["1 candidates weren't scored: embeddings timed out after 3 tries"]
+
+    # What was embedded is stored, so the next call embeds only the paper that failed.
+    embeddings.failing = None
+    embeddings.texts.clear()
+    result = await discovery.score_candidates(
+        "melanoma immunotherapy", ["pmid:3", "pmid:4", "pmid:2"], seed_ids=["pmid:1"]
+    )
+    assert result["scored"] == 3 and result["skipped"] == []
+    assert embeddings.texts == [
+        "Heart failure outcomes\n\nheart failure in older adults",
+        QUERY_INSTRUCTION + "melanoma immunotherapy",
+    ]
+
+
+async def test_a_seed_that_cannot_be_embedded_is_left_out(discovery, embeddings, monkeypatch):
+    monkeypatch.setattr("discovery.embeddings.BATCH", 1)
+    embeddings.failing = "PD-1 blockade"
+
+    result = await discovery.score_candidates("melanoma", ["pmid:2", "pmid:3"], seed_ids=["pmid:1"])
+
+    assert result["scored"] == 2 and result["top"][0]["closestSeed"] is None
+    assert result["skipped"] == ["1 seeds weren't used: embeddings timed out after 3 tries"]
+
+
+async def test_an_endpoint_that_always_fails_gives_a_readable_tool_error(discovery, embeddings):
+    arguments = {"question": "melanoma", "candidate_ids": ["pmid:2", "pmid:3"]}
+    async with Client(build_server(discovery)) as client:
+        embeddings.failing = ""
+        result = await client.call_tool("score_candidates", arguments)
+        assert result.is_error
+        assert "No candidate could be embedded: embeddings timed out after 3 tries" in result.content[0].text
+
+        # Only the question fails: the papers are embedded (and stored), the call is not.
+        embeddings.failing = "Instruct:"
+        result = await client.call_tool("score_candidates", arguments)
+        assert result.is_error
+        assert "The question couldn't be embedded: embeddings timed out after 3 tries" in result.content[0].text
+
+        # A refusal such as a bad key is not retried.
+        embeddings.failing, embeddings.requests = None, 0
+        embeddings.script = [401]
+        result = await client.call_tool("score_candidates", {**arguments, "question": "heart"})
+        assert result.is_error and "embeddings answered HTTP 401" in result.content[0].text
+        assert embeddings.requests == 1
+
+
+async def test_search_warms_the_vectors_scoring_reads(discovery, embeddings, monkeypatch):
+    monkeypatch.setattr("discovery.sources.pubmed._throttle.interval", 0)
+    discovery.client = httpx.AsyncClient(
+        transport=httpx.MockTransport(
+            lambda r: embeddings(r) if r.url.path.endswith("/embeddings") else fake_apis(r)
+        )
+    )
+
+    found = await discovery.search("melanoma", sources=["pubmed"])
+    # A second search of the same papers doesn't embed them again while the first warm-up runs.
+    await discovery.search("melanoma", sources=["pubmed"])
+    await asyncio.gather(*discovery._warm_tasks)
+    paper_ids = [paper["paperId"] for paper in found["papers"]]
+    assert len(paper_ids) == 2 and len(embeddings.texts) == 2
+
+    embeddings.texts.clear()
+    result = await discovery.score_candidates("melanoma", paper_ids)
+    assert result["scored"] == 2
+    assert embeddings.texts == [QUERY_INSTRUCTION + "melanoma"]
+
+
+async def test_embedding_requests_share_a_few_slots(discovery, embeddings, monkeypatch):
+    monkeypatch.setenv("EMBED_CONCURRENCY", "2")
+    monkeypatch.setattr("discovery.embeddings._slots", None)
+    monkeypatch.setattr("discovery.embeddings.BATCH", 1)
+    in_flight = peak = 0
+
+    async def slow(request: httpx.Request) -> httpx.Response:
+        nonlocal in_flight, peak
+        in_flight += 1
+        peak = max(peak, in_flight)
+        await asyncio.sleep(0.01)
+        in_flight -= 1
+        return embeddings(request)
+
+    discovery.client = httpx.AsyncClient(transport=httpx.MockTransport(slow))
+    result = await discovery.score_candidates("melanoma", ["pmid:2", "pmid:3", "pmid:4"], seed_ids=["pmid:1"])
+    assert result["scored"] == 3 and peak == 2
+
+
+def test_retry_after_is_honoured_up_to_a_minute():
+    def wait(headers: dict[str, str]) -> float:
+        return _retry_after(httpx.Response(429, headers=headers), 2)
+
+    assert [wait({"Retry-After": "7"}), wait({"Retry-After": "600"}), wait({})] == [7, 60, 2]
+    assert wait({"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}) == 2

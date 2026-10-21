@@ -5,8 +5,9 @@
 //   Start page, on submit:
 //     POST /boards                     {title, question, context}           -> Board
 //     POST /boards/{id}/seeds          {doi} | {pmid} | multipart "file"    -> Paper   (once per paper)
+//     then the browser opens ML_CONFIG.boardUrl(board.id) + "?start=1": the board opens its
+//     chat and sends the agent its first prompt. With sample data only:
 //     POST /boards/{id}/runs           {kind: "onboarding"}                 -> Run
-//     then the browser opens ML_CONFIG.boardUrl(board.id)
 //   Home page:
 //     GET  /boards                                                          -> [Board]
 //
@@ -16,6 +17,8 @@
 //
 // Notes for the backend:
 //   - {pmid} is an addition to the contract: researchers paste PubMed links as often as DOIs.
+//   - A PDF is looked up by the first DOI on its first two pages, else by its title; one it can't
+//     place is a 422 whose message the page shows, and the other papers still become seeds.
 //   - question may be empty (papers only): the agent drafts a question from the seeds.
 //   - No seeds (question only): the board starts from search hits (Concept.md flow 2).
 //   - Login is faked: the display name is kept in localStorage and sent as X-Display-Name.
@@ -75,7 +78,6 @@
       if (seed.file) { const f = new FormData(); f.append('file', seed.file, seed.file.name); return call('POST', path, f); }
       return call('POST', path, seed.doi ? { doi: seed.doi } : { pmid: seed.pmid });
     },
-    startRun: (boardId, kind = 'onboarding') => call('POST', `/boards/${encodeURIComponent(boardId)}/runs`, { kind }),
     listBoards: () => call('GET', '/boards'),
   };
 

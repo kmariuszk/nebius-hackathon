@@ -5,10 +5,59 @@
 | Lane | Browser |
 | Size | M |
 | Depends on | T03 (and T04 echo mode to test against) |
-| Unblocks | T06, T07, T12 |
-| Milestone | M1 |
-| Status | Not started |
+| Unblocks | T06, T07, T12; since Oct 20 also [T16](T16-start-and-home-pages.md), the T10 and T13 refreshes (all through `chatBus`) |
+| Milestone | M1 (built); the Oct 20 refresh is W1 Nothing broken |
+| Priority | P1 (refresh) |
+| Status | Built on branch `w1/chat-start` (Oct 20): the refresh (chat bus, resources on send, Find more through the bus, no blank bubbles), on top of the panel merged in [PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13) (Oct 18). Left: refresh criterion 1 checked by hand in a browser; `chat/fixtures/masterTurn.json` is modelled on what `mapping.py` and `trace.py` send, to swap for a live capture |
 | Owner | TBD |
+
+## Where it stands (Oct 20)
+
+| Part | State | Where |
+| --- | --- | --- |
+| Panel beside the canvas, rail when closed, opened from the top bar | Built | `client/client/chat/ChatPanel.tsx`, `chat.css` |
+| ACP over the WebSocket, one harness per chat, Stop, Reconnect | Built | `chat/connection.ts`, `client/server/acpPipe.ts` |
+| Thoughts, plan, tool cards (model, time, cost), permission prompt | Built | `chat/chatState.ts`, `ThoughtBlock.tsx`, `PlanList.tsx`, `ToolCard.tsx`, `PermissionPrompt.tsx` |
+| Paper links (`paper:` URLs) focus the board | Built | `chat/AgentMessage.tsx`, `chat/viewerActions.ts` |
+| Sending a prompt from elsewhere in the app | Missing: "Find more like this" dispatches `pdc:ask` and nobody listens (F18); the Start page has no way to send the first prompt (F11) | `client/client/widgets/parts.tsx` |
+| Whitespace between tool cards | Each whitespace-only message chunk after a tool card starts a new message item, so blank bubbles appear (F5) | `chat/chatState.ts`, `applyUpdate` (`if (!text) return state` lets `"\n"` through) |
+| "Follow the agent", "Include my view" | Not built; they belong to [T06](T06-viewer-actions.md) and [T07](T07-board-context.md) | — |
+
+## What's left (v6)
+
+**A chat bus** (`client/client/chat/chatBus.ts`), the one way the rest of the app talks to the agent:
+
+```ts
+export interface AskRequest {
+	text: string
+	/** Extra ACP `resource` blocks after the text, e.g. T13's tldraw://<boardId>/changes. */
+	resources?: { uri: string; mimeType: string; text: string }[]
+}
+export const chatBus = {
+	ask(request: AskRequest): void,           // queued until a ChatPanel takes it
+	onAsk(handler: (r: AskRequest) => void): () => void,
+}
+```
+
+- `ChatPanel` subscribes with `onAsk`: it opens itself (`onOpenChange(true)`), connects if it hasn't, and sends the request once its status is `ready` and no turn is running (a running turn queues it). One request is sent once, even if the panel re-renders.
+- `send` takes the resources and appends them as `{type: "resource", resource: {uri, mimeType, text}}` blocks after the text block; `harness/acp/mapping.py` already turns `tldraw://…/changes` into `<board-changes>`.
+- `parts.tsx`' "Find more like this" calls `chatBus.ask({text})` instead of dispatching `pdc:ask` (the event and its fallback toast go).
+- Users: [T16](T16-start-and-home-pages.md) (the onboarding prompt), the [T10 refresh](T10-paper-card.md) (Find more), the [T13 refresh](T13-board-chrome.md) (Update suggestions).
+
+**No blank bubbles:** in `applyUpdate`, a whitespace-only chunk is appended to the current message item if there is one, and dropped if it would start a new one.
+
+**Tasks:**
+
+- [x] `client/client/chat/chatBus.ts`; `ChatPanel.tsx` subscribes and sends with resources.
+- [x] `client/client/widgets/parts.tsx`: Find more through `chatBus`.
+- [x] `client/client/chat/chatState.ts`: whitespace-only chunks.
+- [x] Tests: `chat/chatBus.test.ts` (queued before a subscriber, sent once); `chatState.test.ts` with chunks recorded from a live master turn (narration, `"\n\n"` between tool cards).
+
+**Acceptance criteria (refresh):**
+
+1. On an open paper, "Find more like this" opens the chat (connecting if needed) and sends "Find more papers like <label>: “<title>”"; the agent's turn starts.
+2. A request made before the panel ever opened is sent exactly once when the connection is ready.
+3. A recorded live turn with whitespace-only chunks between tool cards renders no empty message bubbles.
 
 ## Goal
 

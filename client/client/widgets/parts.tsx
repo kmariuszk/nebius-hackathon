@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
 import { nodeLabel, sentenceCase, shortAuthors } from '../../shared/display.ts'
 import type { Fit, GlanceStep, PaperQuote } from '../../shared/paperCard.ts'
+import { chatBus } from '../chat/chatBus.ts'
 import { openPaperId, paperMoreOpen } from '../viewerState.ts'
 import { addPinnedNote } from './boardWrites.ts'
 import { sourceLabel, splitClaims, type ClaimEvidence } from './claims.ts'
@@ -449,12 +450,8 @@ export function ActionsWidget() {
 		} else api.toast({ text: `${label} is back on the board.`, undo })
 	}
 
-	// for the chat panel to pick up (it calls preventDefault); until it does, say where to ask
-	const findMore = () => {
-		const text = `Find more papers like ${label}: “${sentenceCase(p.title)}”`
-		const handled = !window.dispatchEvent(new CustomEvent('pdc:ask', { detail: { text, paperId: p.paperId }, cancelable: true }))
-		if (!handled) api.toast({ text: `Ask the agent in the chat to find more like ${label}.` })
-	}
+	// the chat opens (connecting if it has to) and sends it
+	const findMore = () => chatBus.ask({ text: `Find more papers like ${label}: “${sentenceCase(p.title)}”` })
 
 	let actions: ReactNode
 	if (collection) {

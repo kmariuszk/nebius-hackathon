@@ -7,7 +7,7 @@
 | Depends on | [I1](interfaces.md#i1-agent-factory-takes-the-boards-tools) agreed with the harness owner (the adapter works with today's `search` agent and our `board_assistant` without it) |
 | Unblocks | T03 (echo mode), T05, T06, T07, T12 |
 | Milestone | M1 |
-| Status | Not started |
+| Status | Done and merged ([PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13), Oct 18): `harness/harness/acp/` (adapter, worker, mapping, trace, scripted models, prices) and `python -m harness`, with `harness/tests/test_acp_*.py`; `master` is the default agent since PR #22. Checked Oct 20; the agents' own fixes are in the [agent harness group](../agent-harness/README.md) |
 | Owner | TBD |
 
 ## Goal

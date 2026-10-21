@@ -6,9 +6,66 @@
 | Size | M |
 | Depends on | T01, T05 (chat), T08 (board, counts, agent presence) |
 | Unblocks | T09 (the "Looking for" control), T12 |
-| Milestone | M4 |
-| Status | Not started |
+| Milestone | M4; the Oct 20 refresh is W3 The team edits |
+| Priority | P1 (refresh) |
+| Status | Top bar and toolbar built in the v6 look and merged (PR #21, Oct 18); changes counter, Update suggestions, help, the board's title and agent presence not built. Refresh (Oct 20) not started: see What's left; depends on the [T05 refresh](T05-chat-panel.md) |
 | Owner | TBD |
+
+## Where it stands (Oct 20)
+
+| Part | State | Where |
+| --- | --- | --- |
+| tldraw's own UI hidden | Built | `client/client/pages/Room.tsx` (`components`) |
+| Top bar: ‹ Boards, logo, board, Looking for, Pinboard switch, avatars, Catch me up, Chat | Built (files under `pinboard/`, not `chrome/` as planned); the board's name shows the room ID (`b_…`), not its title or question (F23) | `client/client/pinboard/TopBar.tsx` |
+| The agent in the face pile | Always shown, whether a harness is running or not | `TopBar.tsx` (`Avatars`) |
+| Catch me up | Cycles through new papers; the tour is the [T06 refresh](T06-viewer-actions.md) | `TopBar.tsx` (`CatchMeUp`) |
+| Bottom toolbar | **Note** only (click the board to place it; v6 adds **Filter**, the [T09 refresh](T09-ranked-list.md)) | `client/client/pinboard/Toolbar.tsx` |
+| "N changes · the agent is waiting · Update suggestions", the change list, "See what it did" | Not built: only on the static demo board (F17) | `client/public/landing/demo-board.html` |
+| Help / the key | Not built | — |
+
+## What's left (v6)
+
+The spec is the v6 demo board's toolbar and its "Update suggestions" flow (`client/public/landing/demo-board.html`), [`shots-v5/23-changes-list.png`](../../mockups/shots-v5/23-changes-list.png), [`shots-v5/24-update-log.png`](../../mockups/shots-v5/24-update-log.png) and [`shots-v6/8-help-key.png`](../../mockups/shots-v6/8-help-key.png).
+
+**The board's title** (F23): `TopBar` reads `GET /api/v1/boards/:id` (`boardApi.get`, added by [T16](T16-start-and-home-pages.md)) and shows the title, with the question as its tooltip; the room ID only while it loads.
+
+**The agent in the face pile** only while `agentActive` is true: read from `GET /boards/:id` on load and on window focus, and kept current from the board's SSE stream (`/api/v1/boards/:id/events`, the `agent.active` and `agent.idle` events T08 records).
+
+**Changes** (`client/client/pinboard/changes.ts`): this viewer's own edits since their last Update suggestions, kept per board in `sessionStorage`:
+
+| Change | Recorded when | Entry |
+| --- | --- | --- |
+| `moved` | A person moves a paper card (the store side effect that sets `pinnedByHuman`, source `user`) | `{type, paperId}` |
+| `link_added`, `link_renamed`, `link_hidden`, `link_removed` | The [T14 refresh](T14-board-editing.md)'s link editor | `{type, from, to, kind, label?}` |
+| `note_added`, `note_pinned` | A person creates a note, or pins one to a paper | `{type, text, paperId?}` |
+| `voted` | `castVote` succeeds (`client/client/widgets/votes.ts`) | `{type, paperId, decision}` |
+| `cluster_renamed` | A person renames a cluster frame | `{type, clusterId, label}` |
+
+Repeated changes to the same thing collapse (moving a paper three times is one `moved`). The JSON sent to the agent is `{since: <ISO time>, changes: [{…, at}]}`, the `<board-changes>` contract (`harness/harness/acp/mapping.py` already maps the `tldraw://<boardId>/changes` resource).
+
+**The toolbar** (`Toolbar.tsx`): with changes, "N changes · the agent is waiting · **Update suggestions**"; clicking "N changes" opens a list of them in plain words ("You moved Daugherty-Lopès 2024", "You pinned a note to Ibáñez-Molero 2026").
+
+**Update suggestions** calls `chatBus.ask({ text: "Update suggestions", resources: [{ uri: "tldraw://<boardId>/changes", mimeType: "application/json", text: <the JSON> }] })` (T05 refresh) and clears the changes. When that turn ends with `end_turn`, a toast says "Done. The agent caught up with your changes." with **See what it did**, which opens the chat scrolled to that turn.
+
+**What the master does with it** is already in its instruction ("<board-changes>: call `get_board` first…"); with [H04](../agent-harness/H04-first-run-in-90-seconds.md) the re-rank is `rank_papers`. A scripted harness test pins it down: an Update suggestions prompt with a `moved` and a `voted` change leads to `get_board`, then `rank_papers`, and no `add_papers` for the moved paper.
+
+**Help** (`client/client/pinboard/Help.tsx`, a **?** at the bottom right): the v6 key, explaining the cards (In your collection, Suggested · fit, the red rank number), the corner badges (New, Split vote, Reading…, ✓ Kept, Discarded), the three kinds of string (red cites, dotted similar, blue yours), notes and clusters.
+
+**Tasks:**
+
+- [ ] `TopBar.tsx`: title and question; agent avatar from `agentActive`.
+- [ ] `client/client/pinboard/changes.ts` and `changes.test.ts` (recording, collapsing, the JSON); hooks in `sideEffects.ts` and `votes.ts`.
+- [ ] `Toolbar.tsx`: the changes counter, list and Update suggestions; the "See what it did" toast (`ChatPanel` exposes "scroll to turn").
+- [ ] `client/client/pinboard/Help.tsx`.
+- [ ] `harness/tests/test_master_board.py`: the Update suggestions case.
+
+**Acceptance criteria (refresh, replacing 1 to 5 above for v6):**
+
+1. The top bar shows the board's title, not its ID.
+2. With a teammate and an active chat, the face pile shows both people and the agent; the agent's avatar goes within a minute of its harness ending.
+3. Moving a paper and pinning a note shows "2 changes · the agent is waiting"; the list names both; Update suggestions sends one prompt carrying both changes and resets the counter.
+4. When that turn ends, "Done. The agent caught up with your changes." appears, and See what it did opens the chat at that turn (demo-script step 7).
+5. Help explains every card, badge and string style on the board.
 
 ## Goal
 
