@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [H04](../agent-harness/H04-first-run-in-90-seconds.md) |
 | Milestone | W1 Nothing broken |
-| Status | Built on branch `w1/discovery` (Oct 20); criterion 5 (one successful `score_candidates` in H01's cold run) still needs a live run |
+| Status | Built (Oct 20, `w1/discovery`). Criterion 5 holds: in the Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`), the master called `score_candidates` once and it succeeded |
 | Owner | TBD |
 
 ## Goal

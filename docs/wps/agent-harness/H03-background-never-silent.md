@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [T10 refresh](../tldraw-integration/T10-paper-card.md) (the widgets show these gaps) |
 | Milestone | W1 Nothing broken |
-| Status | Built on branch `w1/harness-bg` (Oct 20); the DH3 decision gate waits on the H01 live check |
+| Status | Built (Oct 20, `w1/harness-bg`). DH3, first of two runs: in the Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`), 0 of 21 suggestions needed the "couldn't write why" gap, so the context agent stays on Lightning; one more run to confirm |
 | Owner | TBD |
 
 ## Goal

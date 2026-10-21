@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [H04](../agent-harness/H04-first-run-in-90-seconds.md) |
 | Milestone | W1 Nothing broken |
-| Status | Built on branch `w1/discovery` (Oct 20); criterion 4 (the manual MCP call against the running server) still needs a live run |
+| Status | Built (Oct 20, `w1/discovery`). In the Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`), no source was skipped with HTTP 400; criterion 4's manual MCP call is still to do |
 | Owner | TBD |
 
 ## Goal

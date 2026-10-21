@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | The acceptance of H02, H03, H04, D01, D02, D03, D04, D05 and T15 |
 | Milestone | W1 Nothing broken |
-| Status | Built on branch `w1/live-check` (Oct 20). A first run on unfixed `main` failed as intended on 4 overlapping seed cards and 2 placeholder arguments, and also on the master never answering within 600 s and a Semantic Scholar HTTP 400 for a recommendation with no seeds (fixed with D01's branch); the gate run on Wave 1 is pending |
+| Status | Built (Oct 20, `w1/live-check`). On unfixed `main` it failed as intended (4 overlapping seed cards, 2 placeholder arguments, an HTTP 400, no answer within 600 s). The Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`) passed: 21 suggestions, 0 overlaps, every suggestion with "Why it matters", 0 placeholder arguments, 0 HTTP 400 skips, no failed tool call. Timings (reported, not yet targets): first card 55.5 s, answer 130.6 s, every card read 880.9 s. `LIVE_MODEL=cheap` added for development runs |
 | Owner | TBD |
 
 ## Goal

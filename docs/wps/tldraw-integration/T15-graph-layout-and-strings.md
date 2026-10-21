@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (frames that fit cards), the [T14 refresh](T14-board-editing.md) (link editing on the strings), [H01](../agent-harness/H01-live-board-check.md)'s overlap check |
 | Milestone | W1 Nothing broken |
-| Status | Built (Oct 20): board and browser parts on `w1/board`, the harness near-links step on `w1/harness-bg` (criterion 6: `test_placed_papers_are_linked_to_their_neighbours_without_the_model`), both merged into `w1/integration`; H01's live overlap check pending |
+| Status | Built (Oct 20): board and browser parts on `w1/board`, the harness near-links step on `w1/harness-bg` (criterion 6: `test_placed_papers_are_linked_to_their_neighbours_without_the_model`). Criterion 8 holds: in the Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`), 0 of the 26 cards overlap. Old boards keep their layout; re-seed the demo board |
 | Owner | TBD |
 
 ## Goal

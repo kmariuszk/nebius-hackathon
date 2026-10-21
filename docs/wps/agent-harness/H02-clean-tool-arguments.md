@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | H04 |
 | Milestone | W1 Nothing broken |
-| Status | Built on branch `w1/harness-args` (Oct 20); acceptance criterion 3 waits for the H01 live check |
+| Status | Built (Oct 20, `w1/harness-args`). In the Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`): 0 placeholder arguments reached the papers MCP and each search agent made 3 calls before `done`; Super VL wrote none that run, so the cleaning itself is proven by the scripted tests |
 | Owner | TBD |
 
 ## Goal
