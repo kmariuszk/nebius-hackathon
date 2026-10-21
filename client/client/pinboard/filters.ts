@@ -60,6 +60,21 @@ export function passes(card: FilterCard, f: BoardFilters, goal: string): boolean
 	return true
 }
 
+/** Whether a card fades for this viewer: it fails their filters and isn't the paper they have open. */
+export function fadedByFilters(card: FilterCard & Pick<PaperCardProps, 'paperId'>, f: BoardFilters, goal: string, openId: string | null): boolean {
+	return card.paperId !== openId && !passes(card, f, goal)
+}
+
+/** Whether a string between two cards fades for this viewer: it does with either of them. */
+export function stringFadedByFilters(
+	ends: readonly (FilterCard & Pick<PaperCardProps, 'paperId'>)[],
+	f: BoardFilters,
+	goal: string,
+	openId: string | null
+): boolean {
+	return ends.some((card) => fadedByFilters(card, f, goal, openId))
+}
+
 /** How many filters are on, for the Filter button; showing discarded papers counts as one. */
 export function activeCount(f: BoardFilters): number {
 	return [

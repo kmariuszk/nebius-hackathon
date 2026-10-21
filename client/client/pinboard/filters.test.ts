@@ -7,7 +7,7 @@ import { defaultPaperCardProps } from '../../shared/shapes.ts'
 import { boardDerived } from '../shapes/card.ts'
 import { currentGoal, filters, type BoardFilters } from '../viewerState.ts'
 import { boardSteps } from '../widgets/tour.ts'
-import { activeCount, DEFAULT_FILTERS, filterOptions, passes, sinceYears, toggled } from './filters.ts'
+import { activeCount, DEFAULT_FILTERS, fadedByFilters, filterOptions, passes, sinceYears, stringFadedByFilters, toggled } from './filters.ts'
 
 afterEach(() => {
 	filters.set(DEFAULT_FILTERS)
@@ -276,4 +276,22 @@ test('the seed note goes to the top new card that passes; showing discarded pape
 	assert.equal(shown.total, 5)
 	// a discarded paper is never new, so Catch me up doesn't change
 	assert.deepEqual(shown.fresh, ['oliveira', 'preprint', 'liu'])
+})
+
+test('a card the filters leave out fades unless it is open, and its strings fade with it', () => {
+	const f = only({ minCitedBy: 50 })
+	const oliveira = props('oliveira', { citedBy: 24 })
+	const liu = props('liu', { citedBy: 122 })
+	const seed = props('seed', { kind: 'seed', status: 'kept', citedBy: 0 })
+	assert.equal(fadedByFilters(oliveira, f, GOAL, null), true)
+	assert.equal(fadedByFilters(oliveira, f, GOAL, 'oliveira'), false)
+	assert.equal(fadedByFilters(liu, f, GOAL, null), false)
+	assert.equal(fadedByFilters(seed, f, GOAL, null), false)
+
+	// a string fades when either end does, whichever end that is
+	assert.equal(stringFadedByFilters([oliveira, seed], f, GOAL, null), true)
+	assert.equal(stringFadedByFilters([seed, oliveira], f, GOAL, null), true)
+	assert.equal(stringFadedByFilters([liu, seed], f, GOAL, null), false)
+	assert.equal(stringFadedByFilters([oliveira, seed], f, GOAL, 'oliveira'), false)
+	assert.equal(stringFadedByFilters([oliveira, seed], DEFAULT_FILTERS, GOAL, null), false)
 })

@@ -15,7 +15,7 @@ import {
 	paperCardProps,
 	type PaperCardShape,
 } from '../../shared/shapes'
-import { passes } from '../pinboard/filters'
+import { fadedByFilters } from '../pinboard/filters'
 import { currentGoal, filters, litPaperIds, openPaperId, paperMoreOpen } from '../viewerState'
 import { arrivalDelay } from './arrivals'
 import { boardDerived, CARD_H, CARD_W, cardOffset, FIT_LABEL, isSaved, loopPath, seedOf, tilt } from './card'
@@ -115,7 +115,11 @@ function PaperCard({ shape }: { shape: PaperCardShape }) {
 	const rank = useValue('paper rank', () => boardDerived(editor).ranks.get(paperId) ?? null, [editor, paperId])
 	const note = useValue('paper note', () => boardDerived(editor).notes.get(paperId) ?? null, [editor, paperId])
 	// a suggestion this viewer's filters leave out fades, never hides (T09)
-	const filteredOut = useValue('paper filtered out', () => !passes(shape.props, filters.get(), currentGoal.get()), [shape.props])
+	const filteredOut = useValue(
+		'paper filtered out',
+		() => fadedByFilters(shape.props, filters.get(), currentGoal.get(), openPaperId.get()),
+		[shape.props]
+	)
 	const [delay, setDelay] = useState(() => arrivalDelay(shape.id))
 
 	const saved = isSaved(shape)
@@ -135,7 +139,7 @@ function PaperCard({ shape }: { shape: PaperCardShape }) {
 			onAnimationEnd={(e) => e.target === e.currentTarget && setDelay(null)}
 		>
 			<div
-				className={`pb-wrap${discarded ? ' gone' : ''}${filteredOut && !open ? ' faded' : ''}`}
+				className={`pb-wrap${discarded ? ' gone' : ''}${filteredOut ? ' faded' : ''}`}
 				style={{ left: o.x, top: o.y, width: CARD_W, height: CARD_H }}
 			>
 				<div className="pb-tilt" style={{ transform: `rotate(${angle.toFixed(2)}deg)` }}>
