@@ -228,9 +228,12 @@ async def test_master_places_scored_papers_reads_them_in_the_background_and_rank
         # The reader's artifacts are written under its model, the context agent's under its own.
         assert summary["model"] == "nvidia/Nemotron-3.5-Super-VL"
         assert card["args"]["glance"] == GLANCE and card["model"] == "nvidia/Nemotron-3_5-Lightning"
-        assert [link["args"]["links"] for link in of(canvas_mcp, "link_papers")
-                if link["args"]["links"][0]["from"] == paper_id] == [[{"from": paper_id, "to": "pmid:9",
-                                                                      "kind": "similar"}]]
+        assert [link["args"]["links"] for link in of(canvas_mcp, "link_papers") if link["model"] == card["model"]
+                and link["args"]["links"][0]["from"] == paper_id] == [[{"from": paper_id, "to": "pmid:9",
+                                                                        "kind": "similar"}]]
+    # Before that, the harness linked each paper to the one it was placed near.
+    assert of(canvas_mcp, "link_papers")[0]["args"]["links"] == [
+        {"from": "pmid:3", "to": "pmid:9", "kind": "similar"}, {"from": "pmid:1", "to": "pmid:9", "kind": "similar"}]
 
     # The context agent sees the card's quote IDs, the abstract and the reader's findings.
     contexts = [a for a in passes.built if a.name == "context"]
@@ -365,6 +368,52 @@ async def test_process_papers_reads_only_papers_placed_in_this_chat(canvas_mcp, 
     assert first == {"started": ["pmid:1"], "alreadyStarted": [], "notPlaced": ["pmid:9"]}
     assert again == {"started": [], "alreadyStarted": ["pmid:1"], "notPlaced": []}
     assert [c["args"]["on"] for c in of(canvas_mcp, "mark_working", "pmid:1")] == [True, False]
+
+
+def place_near(*papers: tuple[str, str | None]) -> list[types.Content]:
+    """The master's turns: look the papers up, place each near its neighbour, answer; no process_papers."""
+    return [
+        calls(*[("get_paper", {"paper_id": paper_id}) for paper_id, _ in papers]),
+        call("add_papers", papers=[{"paperId": p, "title": "A", **({"near": n} if n else {})} for p, n in papers]),
+        say("I placed them."),
+    ]
+
+
+async def test_placed_papers_are_linked_to_their_neighbours_without_the_model(canvas_mcp, papers_mcp):
+    canvas_mcp.abstract = ABSTRACT
+    papers = [("pmid:1", "pmid:9"), ("pmid:3", "pmid:9"), ("pmid:4", "pmid:1"), ("pmid:5", None)]
+    passes = Scripted(readers={p: [say("Sorry, I couldn't read it.")] for p, _ in papers}, contexts={})
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = ScriptedLlm(turns=place_near(*papers))
+
+    events = await turn(agent, "Place these four papers")
+
+    # One call, three links: pmid:5 was placed near nothing.
+    [near] = of(canvas_mcp, "link_papers")
+    assert near["args"]["links"] == [{"from": "pmid:1", "to": "pmid:9", "kind": "similar"},
+                                     {"from": "pmid:3", "to": "pmid:9", "kind": "similar"},
+                                     {"from": "pmid:4", "to": "pmid:1", "kind": "similar"}]
+    assert (near["runId"], near["auth"], near["model"]) == (RUN_ID, "Bearer m_ana", None)
+    assert not [c for e in events for c in e.get_function_calls() if c.name == "link_papers"]
+    # After the badges go on, before the reading's own writes.
+    tools = canvas_mcp.tools_called()
+    assert tools.index("mark_working") < tools.index("link_papers") < tools.index("set_card")
+
+
+async def test_a_failed_near_link_step_is_logged_and_the_reading_still_runs(canvas_mcp, papers_mcp, caplog):
+    canvas_mcp.abstract = ABSTRACT
+    canvas_mcp.server.remove_tool("link_papers")
+    passes = Scripted(readers={"pmid:1": reader_turns("pmid:1")}, contexts={"pmid:1": [say("Nothing to add.")]})
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = ScriptedLlm(turns=place_near(("pmid:1", "pmid:9")))
+
+    await turn(agent, "Place pmid:1")
+
+    assert "could not link the papers to the ones they were placed near: link_papers: not offered by the MCP server" in [
+        r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    summary, *_ = of(canvas_mcp, "set_card", "pmid:1")
+    assert summary["args"]["summary"]
+    assert of(canvas_mcp, "mark_working", "pmid:1")[-1]["args"]["on"] is False
 
 
 async def test_parallel_reader_calls_each_get_their_own_mcp_session(canvas_mcp, papers_mcp):

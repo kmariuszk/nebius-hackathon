@@ -7,8 +7,8 @@ ID a model copied wrong (say `doi:1136/…` for `doi:10.1136/…`) never reaches
 the ranking, and later turns rank old and new candidates together.
 
 On a board the master also notes what its own tools return (`note`): paper
-details, the board's papers and discarded papers, the scored order and what
-it placed. `fill` then gives `score_candidates` the pool without the
+details, the board's papers and discarded papers, the scored order, what it
+placed and near which paper. `fill` then gives `score_candidates` the pool without the
 discarded papers, gives `rerank` the top of the latest scoring, and swaps the
 titles and links in `add_papers` for the ones the tools returned.
 """
@@ -32,8 +32,9 @@ log = logging.getLogger(__name__)
 # keys keep parallel search runs from overwriting each other's results.
 PREFIX = "candidates:"
 # The same, for paper details (`papers:`), get_board (`board:`), the order
-# score_candidates gave (`scored:`) and the cards add_papers wrote (`placed:`).
-PAPERS, BOARD, SCORED, PLACED = "papers:", "board:", "scored:", "placed:"
+# score_candidates gave (`scored:`), the cards add_papers wrote (`placed:`) and
+# the paper each was placed near (`near:`).
+PAPERS, BOARD, SCORED, PLACED, NEAR = "papers:", "board:", "scored:", "placed:", "near:"
 QUESTION = "question"
 # What add_papers takes from the tools' paper records; the model gives paperId, near and kind.
 CARD_FIELDS = ("title", "authors", "year", "venue", "url", "type", "foundBy")
@@ -230,6 +231,15 @@ def placed(state: dict[str, Any]) -> dict[str, str]:
     return cards
 
 
+def near(state: dict[str, Any]) -> dict[str, str]:
+    """The paper each card add_papers wrote in this conversation was placed near, when it named one."""
+    papers: dict[str, str] = {}
+    for key, value in state.items():
+        if key.startswith(NEAR):
+            papers.update(value)
+    return papers
+
+
 def scored(state: dict[str, Any]) -> list[str]:
     """The order the latest `score_candidates` returned."""
     lists = [ids for key, ids in state.items() if key.startswith(SCORED)]
@@ -252,8 +262,10 @@ def note(*, tool: BaseTool, args: dict[str, Any], tool_context: ToolContext, too
         state[BOARD + key] = {"papers": papers, "discarded": result.get("discardedIds") or []}
     elif tool.name == "add_papers":
         kinds = {paper.get("paperId"): paper.get("kind") or "suggestion" for paper in args.get("papers", [])}
+        nears = {paper.get("paperId"): paper["near"] for paper in args.get("papers", []) if paper.get("near")}
         written = [*result.get("added", []), *result.get("updated", [])]
         state[PLACED + key] = {paper_id: kinds.get(paper_id, "suggestion") for paper_id in written}
+        state[NEAR + key] = {paper_id: nears[paper_id] for paper_id in written if paper_id in nears}
 
 
 def fill(*, tool: BaseTool, args: dict[str, Any], tool_context: ToolContext) -> dict[str, Any] | None:

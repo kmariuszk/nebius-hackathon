@@ -2,7 +2,8 @@
 
 The master places papers, calls `process_papers` and carries on; the cards
 fill in while it ranks and answers (docs/Concept.md, Agent design,
-`read_then_relate`). Per paper, each step has its own runner:
+`read_then_relate`). First a model-free step links each paper to the paper it
+was placed near (kind `similar`). Then, per paper, each step has its own runner:
 
 1. the reader agent reads the paper on its own and answers with its artifacts as JSON;
 2. a model-free step writes them to the card: each quote and highlight that is
@@ -162,10 +163,11 @@ class ProcessPapers(BaseToolset):
     async def process_papers(self, paper_ids: list[str], tool_context: ToolContext) -> dict[str, Any]:
         """Read placed papers in the background and fill in their cards; returns at once.
 
-        For each paper the reader agent reads its full text (or abstract), its summary and
-        quotes go onto the card, and the context agent writes why it matters for the board's
-        question, the paper at a glance, and links to the closest papers. The "Agent is
-        reading…" badge stays on until the card is filled in. Don't wait for it.
+        Each paper is first linked to the paper you placed it near. Then the reader agent reads
+        its full text (or abstract), its summary and quotes go onto the card, and the context
+        agent writes why it matters for the board's question, the paper at a glance, and links
+        to the closest papers. The "Agent is reading…" badge stays on until the card is filled
+        in. Don't wait for it.
 
         Args:
             paper_ids: Papers you placed with add_papers in this chat, or [] for every one
@@ -179,7 +181,7 @@ class ProcessPapers(BaseToolset):
             "alreadyStarted": [p for p in wanted if p in self.started],
             "notPlaced": [p for p in wanted if p not in cards],
         }
-        self.start(result["started"], state.get("run_id"), state.get(candidates.QUESTION, ""))
+        self.start(result["started"], state)
         return result
 
     async def after_turn(self, callback_context: CallbackContext) -> None:
@@ -189,7 +191,7 @@ class ProcessPapers(BaseToolset):
         left = [p for p, kind in candidates.placed(state).items() if kind != "seed" and p not in self.started]
         if left:
             log.info("the master placed %d papers without reading them; reading them now", len(left))
-            self.start(left, state.get("run_id"), state.get(candidates.QUESTION, ""))
+            self.start(left, state)
         # New cards start with the badge on, and seeds aren't read: turn theirs off.
         seeds = [p for p, kind in candidates.placed(state).items() if kind == "seed" and p not in self.started]
         if seeds:
@@ -199,24 +201,41 @@ class ProcessPapers(BaseToolset):
                 "mark_working", paperIds=seeds, on=False)))
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
+        # 4. Clusters, once per board (D04), go here.
         return None
 
-    def start(self, paper_ids: list[str], run_id: str | None, question: str) -> None:
+    def start(self, paper_ids: list[str], state: dict[str, Any]) -> None:
+        """The after-placement steps for these papers, in the background. A paper starts once a chat,
+        so the link to the paper it was placed near is written once too."""
         if not paper_ids:
             return
         self.started.update(paper_ids)
-        task = asyncio.create_task(self.batch([Job(p, run_id, question) for p in paper_ids]))
+        near = candidates.near(state)
+        links = [{"from": p, "to": near[p], "kind": "similar"} for p in paper_ids if near.get(p, p) != p]
+        jobs = [Job(p, state.get("run_id"), state.get(candidates.QUESTION, "")) for p in paper_ids]
+        task = asyncio.create_task(self.batch(jobs, links))
         self.tasks.add(task)
         task.add_done_callback(self.tasks.discard)
 
-    async def batch(self, jobs: list[Job]) -> None:
-        # Badges on first (cards already on the board don't have one yet), then read.
-        try:
-            await self.step("process_papers", jobs[0], lambda call: call(
-                "mark_working", paperIds=[job.paper_id for job in jobs], on=True))
-        except Exception as error:
-            log.warning("could not turn the reading badges on: %s", error)
+    async def batch(self, jobs: list[Job], links: list[dict[str, str]]) -> None:
+        # The after-placement steps (docs/wps/agent-harness/README.md), each one even if the one
+        # before failed. Badges on first: cards already on the board don't have one yet.
+        await self.try_step("turn the reading badges on", jobs[0], lambda call: call(
+            "mark_working", paperIds=[job.paper_id for job in jobs], on=True))
+        # 1. Citation links among the board's papers (D03) go here.
+        # 2. Near links: each paper to the one it was placed near, without a model.
+        if links:
+            await self.try_step("link the papers to the ones they were placed near", jobs[0], lambda call: call(
+                "link_papers", links=links))
+        # 3. Reading.
         await asyncio.gather(*(self.read_then_relate(job) for job in jobs))
+
+    async def try_step(self, what: str, job: Job, action: Callable[[Calls], Awaitable[Any]]) -> None:
+        """A model-free step whose failure is only logged."""
+        try:
+            await self.step("process_papers", job, action)
+        except Exception as error:
+            log.warning("could not %s: %s", what, error)
 
     async def read_then_relate(self, job: Job) -> None:
         gaps: list[str] = []  # the reader's, written to the card with its summary
@@ -301,7 +320,7 @@ class ProcessPapers(BaseToolset):
             log.error("could not clear the reading badge on %s: %s", job.paper_id, error)
 
     async def step(self, name: str, job: Job, action: Callable[[Calls], Awaitable[None]], papers: bool = False) -> None:
-        tools = [self.board.canvas("get_board", "add_quote", "set_card", "mark_working")]
+        tools = [self.board.canvas("get_board", "add_quote", "set_card", "mark_working", "link_papers")]
         if papers:
             tools.append(self.board.papers("get_paper"))
         await self.run(Step(name=name, tools=tools, action=action, paper_id=job.paper_id), "", job)
