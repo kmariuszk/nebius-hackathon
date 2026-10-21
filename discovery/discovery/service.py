@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Awaitable, Callable, Iterable
@@ -51,6 +52,8 @@ SINCE_FORMAT = "since must be YYYY, YYYY-MM or YYYY-MM-DD"
 # A deliberate cap below an embedding batch's worst case (sum(embeddings.TIMEOUTS)): after it, scoring sends the texts itself rather than wait.
 WARM_WAIT = 60.0
 
+PAGE_RETRY_SECONDS = 600.0
+
 
 class Discovery:
     def __init__(self, client: httpx.AsyncClient, store: Store, vectors: VectorStore) -> None:
@@ -59,6 +62,7 @@ class Discovery:
         self.vectors = vectors
         self._warm_tasks: set[asyncio.Task[None]] = set()
         self._warming: dict[str, asyncio.Task[None]] = {}
+        self._page_failed: dict[str, tuple[float, str]] = {}
 
     async def search(
         self,
@@ -339,7 +343,7 @@ class Discovery:
         if cached := self.store.get_fulltext(paper.paper_id):
             images = None
             if figures.lacks_image_urls(cached):  # saved before figures had image URLs, or PMC's page failed
-                images = await figures.add_image_urls(self.client, cached)
+                images = await self._add_image_urls(cached)
                 self.store.save_fulltext(paper.paper_id, cached)
             return cached, [], images
         if "pmcid" not in paper.ids and "pmid" in paper.ids:
@@ -364,13 +368,23 @@ class Discovery:
         for name, attempt in attempts:
             try:
                 if found := await attempt():
-                    images = await figures.add_image_urls(self.client, found)
+                    images = await self._add_image_urls(found)
                     self.store.save_fulltext(paper.paper_id, found)
                     return found, skipped, images
                 skipped.append(f"{name}: no full text there")
             except (Skipped, httpx.HTTPError, ET.ParseError) as error:
                 skipped.append(f"{name}: {error}")
         return fulltext.from_abstract(paper.abstract, url), skipped, None
+
+    async def _add_image_urls(self, text: FullText) -> str | None:
+        """`figures.add_image_urls`, remembering a failed PMC article page in this process: one
+        that failed less than `PAGE_RETRY_SECONDS` ago isn't fetched again, and gives the same reason."""
+        pmcid = ids_from_url(text.url or "").get("pmcid", "")
+        if (failed := self._page_failed.get(pmcid)) and time.monotonic() - failed[0] < PAGE_RETRY_SECONDS:
+            return failed[1]
+        if reason := await figures.add_image_urls(self.client, text):
+            self._page_failed[pmcid] = (time.monotonic(), reason)
+        return reason
 
     async def _pmc(self, pmcid: str, url: str, abstract: str | None) -> FullText | None:
         return fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
