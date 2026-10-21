@@ -8,7 +8,7 @@
 | Unblocks | T12 |
 | Milestone | M4; the Oct 20 refresh (filters) is W3 The team edits |
 | Priority | P2 (refresh) |
-| Status | Ranked list and "Looking for" built in the v6 look (merged with PR #21, Oct 18); filters not built. Refresh (Oct 20) not started: see What's left |
+| Status | Refresh built on branch `w3/filters` (Oct 21): per-viewer filters (`pinboard/filters.ts`, tested) narrow the ranked list, the red rank numbers and Catch me up together, from the Filter button in the bottom toolbar (`pinboard/FilterPanel.tsx`), and fade the rest on the board; discovery emits `citedBy` (OpenAlex, Semantic Scholar) and `add_papers` fills it. On top of the ranked list and "Looking for" merged with PR #21 (Oct 18). Left: criteria 1 to 6 checked by hand in a browser; the strings of filtered-out papers still draw at full strength (`pinboard/Strings.tsx`; the demo board fades them too) |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -34,11 +34,11 @@ The spec is the v6 demo board's **Filter** button in the bottom toolbar, next to
 
 **Tasks:**
 
-- [ ] `client/client/pinboard/filters.ts` and `filters.test.ts`.
-- [ ] `client/client/shapes/card.ts`: filters in `derive`.
-- [ ] `client/client/pinboard/FilterPanel.tsx`; the button in `Toolbar.tsx`; fade in `PaperCardShapeUtil.tsx` and `paperCard.css`.
-- [ ] `client/client/pinboard/RankedList.tsx`: "Showing N of M · Clear".
-- [ ] `discovery/discovery/papers.py`, `sources/openalex.py`, `sources/semantic_scholar.py`: `cited_by`; `harness/harness/agents/master/candidates.py`: `citedBy` in `CARD_FIELDS`.
+- [x] `client/client/pinboard/filters.ts` and `filters.test.ts`.
+- [x] `client/client/shapes/card.ts`: filters in `derive`.
+- [x] `client/client/pinboard/FilterPanel.tsx`; the button in `Toolbar.tsx`; fade in `PaperCardShapeUtil.tsx` and `paperCard.css`.
+- [x] `client/client/pinboard/RankedList.tsx`: "Showing N of M · Clear".
+- [x] `discovery/discovery/papers.py`, `sources/openalex.py`, `sources/semantic_scholar.py`: `cited_by`; `harness/harness/agents/master/candidates.py`: `citedBy` in `CARD_FIELDS`.
 
 **Acceptance criteria (refresh):** criteria 1 to 6 below hold on the v6 board, with the Filter button in the bottom toolbar; and the red rank numbers on the cards always match the ranked list's order under the current filters.
 

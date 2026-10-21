@@ -38,7 +38,7 @@ PREFIX = "candidates:"
 PAPERS, BOARD, SCORED, PLACED, NEAR = "papers:", "board:", "scored:", "placed:", "near:"
 QUESTION = "question"
 # What add_papers takes from the tools' paper records; the model gives paperId, near and kind.
-CARD_FIELDS = ("title", "authors", "year", "venue", "url", "type", "foundBy")
+CARD_FIELDS = ("title", "authors", "year", "venue", "url", "type", "citedBy", "foundBy")
 FROM_SEEDS = "expanded from the seeds"
 # Most papers `rank_papers` reranks per goal: the placed suggestions, then the next scored.
 class FreshAgentTool(AgentTool):

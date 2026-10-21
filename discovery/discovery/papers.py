@@ -57,10 +57,16 @@ class Paper:
     url: str | None = None
     open_access_pdf: str | None = None
     type: str | None = None
+    cited_by: int | None = None  # How many works cite it, where the source counts them.
     paper_id: str | None = None  # Set by the store.
 
     def __post_init__(self) -> None:
         self.ids = {kind: normalise(kind, value) for kind, value in self.ids.items() if value}
+
+    @property
+    def peer_reviewed(self) -> bool | None:
+        """No source says, so it follows the type: a preprint isn't peer reviewed, else unknown."""
+        return False if self.type == "preprint" else None
 
     def aliases(self) -> list[str]:
         return [format_id(kind, self.ids[kind]) for kind in ID_KINDS if kind in self.ids]
@@ -77,6 +83,9 @@ class Paper:
         for f in fields(self):
             if f.name == "ids":
                 merged["ids"] = {**other.ids, **self.ids}
+            elif f.name == "cited_by":  # 0 is a count, not a gap
+                if merged["cited_by"] is None:
+                    merged["cited_by"] = other.cited_by
             elif not merged[f.name]:
                 merged[f.name] = getattr(other, f.name)
         return Paper(**merged)
@@ -98,6 +107,8 @@ class Paper:
             "abstract": self.abstract,
             "openAccessPdf": self.open_access_pdf,
             "type": self.type,
+            "peerReviewed": self.peer_reviewed,
+            "citedBy": self.cited_by,
         }
 
     def to_summary(self, found_by: list[str]) -> dict[str, Any]:
@@ -114,6 +125,9 @@ class Paper:
             "authors": authors,
             "url": self.url or default_url(self.ids),
             "abstract": abstract or None,
+            "type": self.type,
+            "peerReviewed": self.peer_reviewed,
+            "citedBy": self.cited_by,
             "foundBy": found_by,
         }
 
@@ -129,6 +143,7 @@ class Paper:
             url=record.get("url"),
             open_access_pdf=record.get("openAccessPdf"),
             type=record.get("type"),
+            cited_by=record.get("citedBy"),
             paper_id=record.get("paperId"),
         )
 
