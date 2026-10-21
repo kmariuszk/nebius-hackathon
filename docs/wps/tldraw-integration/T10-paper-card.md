@@ -8,7 +8,7 @@
 | Unblocks | T12 |
 | Milestone | M4; the Oct 20 refresh is W2 One clean run |
 | Priority | P1 (refresh) |
-| Status | Refresh built on branch `w2/tour` (Oct 21): empty states that end (`widgets/emptyStates.ts`, tested), `onVoted` on the actions widget, Find more through `chatBus`; left: refresh criteria 1–3 by hand in a browser, and criterion 4 with the T06 refresh. Phase A (the widgets) on `main` since Oct 18, in the v6 look since PR #21; Phase B (PDF reading) not started and out of the plan |
+| Status | Refresh built on branch `w2/tour` (Oct 21): empty states that end (`widgets/emptyStates.ts`, tested), `onVoted` and the T06 tour bar in the actions widget, Find more through `chatBus`; left: refresh criteria 1–4 by hand in a browser. Phase A (the widgets) on `main` since Oct 18, in the v6 look since PR #21; Phase B (PDF reading) not started and out of the plan |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -43,7 +43,7 @@
 **Tasks:**
 
 - [x] `client/client/widgets/parts.tsx`: the empty states; `onVoted`; Find more through `chatBus`.
-- [ ] `client/client/widgets/PaperWidgets.tsx`: pass `onVoted` and the tour state.
+- [x] `client/client/widgets/PaperWidgets.tsx`: pass `onVoted` and the tour state.
 - [x] Tests: a pure `emptyState(card, widget)` helper in `widgets/emptyStates.ts` with `emptyStates.test.ts` (working, failed with a gap, seed, figure present).
 
 **Acceptance criteria (refresh):**

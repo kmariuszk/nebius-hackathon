@@ -2,12 +2,13 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import { nodeLabel, sentenceCase, shortAuthors } from '../../shared/display.ts'
 import type { Fit, GlanceStep, PaperQuote } from '../../shared/paperCard.ts'
 import { chatBus } from '../chat/chatBus.ts'
-import { openPaperId, paperMoreOpen } from '../viewerState.ts'
+import { openPaperId, paperMoreOpen, type Tour } from '../viewerState.ts'
 import { addPinnedNote } from './boardWrites.ts'
 import { sourceLabel, splitClaims, type ClaimEvidence } from './claims.ts'
 import { useWidgets, type LinkedPaper, type WidgetsApi } from './context.ts'
 import { emptyState } from './emptyStates.ts'
 import { glanceIcon, RELATION_LABEL, type GlanceIcon } from './glance.ts'
+import { runTour } from './tour.ts'
 import { castVote, myVote, type Vote } from './votes.ts'
 
 // The widgets around an open paper (v5, docs/mockups/flashcard-v5.html), each answering one
@@ -441,8 +442,8 @@ export function FigureWidget() {
 
 /* ---------- actions, under the node ---------- */
 
-/** `onVoted` runs once a vote is saved: PaperWidgets decides what opens next. */
-export function ActionsWidget({ onVoted }: { onVoted(decision: Vote): void }) {
+/** `onVoted` runs once a vote is saved: PaperWidgets decides what opens next. `tour` is set while Catch me up is on this paper. */
+export function ActionsWidget({ tour, onVoted }: { tour: Tour | null; onVoted(decision: Vote): void }) {
 	const api = useWidgets()
 	const { shape, boardId, memberId, more } = api
 	const p = shape.props
@@ -454,6 +455,8 @@ export function ActionsWidget({ onVoted }: { onVoted(decision: Vote): void }) {
 	// the card changes when the board service's write reaches this browser through sync
 	const vote = async (v: Vote) => {
 		let before: Vote
+		// a vote on the tour's last paper ends it
+		const caughtUp = tour !== null && v !== null && tour.i === tour.steps.length - 1 ? ' You’re caught up.' : ''
 		setSending(true)
 		try {
 			before = await castVote(boardId, p, memberId, v)
@@ -468,8 +471,8 @@ export function ActionsWidget({ onVoted }: { onVoted(decision: Vote): void }) {
 				() => v === 'discard' && openPaperId.set(p.paperId),
 				(e: Error) => api.toast({ text: `Undo wasn’t saved: ${e.message}` })
 			)
-		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.`, undo })
-		else if (v === 'discard') api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.`, undo })
+		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.${caughtUp}`, undo })
+		else if (v === 'discard') api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.${caughtUp}`, undo })
 		else api.toast({ text: `${label} is back on the board.`, undo })
 		onVoted(v)
 	}
@@ -505,25 +508,70 @@ export function ActionsWidget({ onVoted }: { onVoted(decision: Vote): void }) {
 
 	return (
 		<Widget k="actions" className="dock">
-			{p.status === 'contested' && (
-				<div className="votes">
-					<span className="split">Split vote:</span>
-					{voteSummary(p.keepBy, p.discardBy, memberId)}
-				</div>
-			)}
-			<div className="drow">
-				<button className="more" onClick={api.close} title="Close (Esc)">
-					× Close
-				</button>
-				{p.kind !== 'seed' && (
-					<button className={`more${more ? ' open' : ''}`} onClick={() => paperMoreOpen.set(!more)}>
-						{more ? 'Less' : 'More'} <span className="chev">⌄</span>
-					</button>
+			{tour && <TourBar tour={tour} />}
+			<div className="dbody">
+				{p.status === 'contested' && (
+					<div className="votes">
+						<span className="split">Split vote:</span>
+						{voteSummary(p.keepBy, p.discardBy, memberId)}
+					</div>
 				)}
-				<span className="grow" />
-				{actions}
+				<div className="drow">
+					{!tour && (
+						<button className="more" onClick={api.close} title="Close (Esc)">
+							× Close
+						</button>
+					)}
+					{p.kind !== 'seed' && (
+						<button className={`more${more ? ' open' : ''}`} onClick={() => paperMoreOpen.set(!more)}>
+							{more ? 'Less' : 'More'} <span className="chev">⌄</span>
+						</button>
+					)}
+					<span className="grow" />
+					{actions}
+				</div>
 			</div>
 		</Widget>
+	)
+}
+
+/** Catch me up's strip on top of the actions (v6 demo board): where you are, the paper's line, and the way on. */
+function TourBar({ tour }: { tour: Tour }) {
+	const api = useWidgets()
+	const last = tour.i === tour.steps.length - 1
+	const done = () => {
+		runTour({ type: 'end' })
+		api.toast({ text: 'You’re caught up.' })
+	}
+	return (
+		<div className="tour">
+			<div className="r1">
+				<span className="av">
+					<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+						<rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" strokeWidth="1.5" />
+						<circle cx="6" cy="9" r="1.2" fill="#fff" />
+						<circle cx="10" cy="9" r="1.2" fill="#fff" />
+						<path d="M8 4.5V2" stroke="#fff" strokeWidth="1.5" />
+					</svg>
+				</span>
+				{tour.title.toUpperCase()} · {tour.i + 1} OF {tour.steps.length}
+				<span className="dots">
+					{tour.steps.map((s, k) => (
+						<i key={s.paperId} className={k === tour.i ? 'on' : undefined} />
+					))}
+				</span>
+				<span className="nav">
+					<button onClick={() => runTour({ type: 'prev' })} disabled={tour.i === 0} title="Previous">
+						‹
+					</button>
+					<button onClick={last ? done : () => runTour({ type: 'next' })}>{last ? 'Done' : 'Next ›'}</button>
+					<button onClick={() => runTour({ type: 'end' })} title="End the catch-up">
+						×
+					</button>
+				</span>
+			</div>
+			<div className="say">{tour.steps[tour.i].line}</div>
+		</div>
 	)
 }
 

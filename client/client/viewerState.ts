@@ -32,3 +32,19 @@ export const paperMoreOpen = atom<boolean>('paperMoreOpen', false)
 
 /** Papers lit up on this screen only: hovering "three of your seeds", or `_canvas/highlight` (T06). */
 export const litPaperIds = atom<string[]>('litPaperIds', [])
+
+export interface TourStep {
+	paperId: string
+	/** Shown in the tour bar under the paper's node. */
+	line: string
+}
+
+export interface Tour {
+	title: string
+	steps: TourStep[]
+	/** The step whose paper is open. */
+	i: number
+}
+
+/** The Catch-me-up tour running in this browser (T06, decision D24), or null; widgets/tour.ts moves it. */
+export const tour = atom<Tour | null>('tour', null)

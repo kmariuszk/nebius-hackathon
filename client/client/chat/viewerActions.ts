@@ -1,12 +1,13 @@
 import { Box, type Editor, type TLShape, type TLShapeId } from 'tldraw'
 import { paperShapeId } from '../../shared/ids.ts'
 import { PAPER_CARD_TYPE } from '../../shared/paperCard.ts'
-import { litPaperIds, openPaperId } from '../viewerState'
+import { currentGoal, litPaperIds, openPaperId } from '../viewerState'
+import { runTour, stepsOnBoard, visibleCard } from '../widgets/tour.ts'
 import { viewerBus } from './viewerBus.ts'
 
-// The browser half of T06's simplest actions: carry out viewerBus events on this viewer's canvas
-// only. The camera, lit papers and the open paper are local state, never written to the room.
-// T06 adds the busy-user queue, "Follow the agent" and the tour.
+// The browser half of T06's actions: carry out viewerBus events on this viewer's canvas only. The
+// camera, lit papers, the open paper and the tour are local state, never written to the room.
+// The busy-user queue and "Follow the agent" are still to come.
 
 const DEFAULT_HIGHLIGHT_MS = 4000
 
@@ -49,7 +50,12 @@ export function registerViewerActions(editor: Editor) {
 			}, params.durationMs ?? DEFAULT_HIGHLIGHT_MS)
 		}),
 		viewerBus.on('open_paper', ({ paperId }) => openPaperId.set(paperId)),
-		viewerBus.on('tour', (params) => console.info('[chat] _canvas/tour arrived; the tour is not built yet (T06, T10)', params)),
+		// the agent's Catch me up runs like the top bar's, with its own lines; papers not on the board are left out
+		viewerBus.on('tour', ({ title, steps }) => {
+			const onBoard = stepsOnBoard(steps, currentGoal.get(), (paperId) => visibleCard(editor, paperId))
+			if (!onBoard.length) return viewerBus.emit('notice', { text: "Those papers aren't on the board yet." })
+			runTour({ type: 'start', steps: onBoard, title })
+		}),
 	]
 
 	return () => {
