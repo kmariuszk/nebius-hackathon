@@ -6,9 +6,11 @@ import './chat.css'
 import { chatBus, promptBlocks, type AskRequest } from './chatBus'
 import { chatReducer, initialChatState, type Turn } from './chatState'
 import { openAgentConnection, type AgentConnection } from './connection'
+import { addBoardContext } from './context'
 import { formatCost, formatTokens, stopReasonText } from './format'
 import { PermissionPrompt } from './PermissionPrompt'
 import { PlanList } from './PlanList'
+import { registerSnapshots } from './snapshot'
 import { ThoughtBlock } from './ThoughtBlock'
 import { ToolCard } from './ToolCard'
 import { registerViewerActions } from './viewerActions'
@@ -43,6 +45,9 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 	const running = !!lastTurn?.running
 
 	useEffect(() => (editor ? registerViewerActions(editor) : undefined), [editor])
+	useEffect(() => (editor ? registerSnapshots(editor) : undefined), [editor])
+	// "Include my view": a picture of what the researcher sees goes with each message they send (T07)
+	const [includeView, setIncludeView] = useState(true)
 
 	useEffect(() => {
 		let timer: ReturnType<typeof setTimeout> | undefined
@@ -129,9 +134,18 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 		[boardId, memberId, disconnect]
 	)
 
-	const sendPrompt = (c: AgentConnection, request: AskRequest) => {
+	const sendPrompt = (c: AgentConnection, request: AskRequest, withContext = false) => {
 		dispatch({ type: 'send', text: request.text })
-		c.prompt(promptBlocks(request)).then(
+		const blocks = promptBlocks(request)
+		// what they typed goes with what they're looking at: the selection, the view and its picture
+		const prompt =
+			withContext && editor
+				? addBoardContext(editor, boardId, blocks, { includeView }).catch((e) => {
+						console.warn('[chat] sent without the board context:', e)
+						return blocks
+					})
+				: Promise.resolve(blocks)
+		prompt.then((p) => c.prompt(p)).then(
 			(res) => dispatch({ type: 'stop', stopReason: res.stopReason, usage: res.usage }),
 			(e) => {
 				// a dropped connection is reported by onClose
@@ -145,7 +159,7 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 		const c = conn.current
 		if (!text || !c || running) return
 		setDraft('')
-		sendPrompt(c, { text })
+		sendPrompt(c, { text }, true)
 	}
 
 	// requests from elsewhere in the app (chatBus): open the panel, which connects, then send each
@@ -224,6 +238,17 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 						<div>
 							<div className="ChatPanel-title">Agent</div>
 							<small>Only you see this chat. What the agent adds to the board, everyone sees.</small>
+							<small>
+								<label title="Send a picture of what you see on the board with each message">
+									<input
+										type="checkbox"
+										role="switch"
+										checked={includeView}
+										onChange={(e) => setIncludeView(e.target.checked)}
+									/>{' '}
+									Include my view
+								</label>
+							</small>
 						</div>
 						<button type="button" className="ChatPanel-x" aria-expanded={true} onClick={() => setOpen(false)} title="Hide the chat">
 							×

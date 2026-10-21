@@ -8,7 +8,7 @@
 | Unblocks | T12 |
 | Milestone | M3 (board), M4 (paper pages); the Oct 20 refresh is W3 The team edits |
 | Priority | P2 (refresh) |
-| Status | Not started, apart from the prompt mapping in the harness. Refresh (Oct 20): see What's left; depends on the [T05 refresh](T05-chat-panel.md) and, for `look_at_figure`, [D05](../discovery/D05-real-figures.md) |
+| Status | Refresh built on branch `w3/looks` (Oct 21); what remains: the live Super VL criteria 1–4, a look in the browser (the export with strings, the "Include my view" switch, a hidden tab), the chips under the user's message, and the live tests |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -16,10 +16,10 @@
 | Part | State | Where |
 | --- | --- | --- |
 | Context tags in the user's message (`<selected-shape>`, `<viewport>`, `<board-changes>`, `<board-context>`, images) | Built on the harness side | `harness/harness/acp/mapping.py`, `harness/harness/board/prompts.py` (`BOARD_CONTEXT`) |
-| The chat panel sending selected shapes, the viewport and its image | Not built: the panel sends text only | `client/client/chat/ChatPanel.tsx` |
-| `_canvas/snapshot` | The browser answers with a "not supported yet" error (F22) | `client/client/chat/connection.ts`, `connection.test.ts` ("_canvas/snapshot gets a \"not supported yet\" error") |
-| `look_at_board`, `look_at_paper` and the image plugin | Not built | — |
-| PDF reader (for `paper_page`) | Not built and out of scope (T10's Phase B) | — |
+| The chat panel sending selected shapes, the viewport and its image | Built on `w3/looks` (Oct 21): Send adds the selection (up to 20), the open paper, the view summary and, with "Include my view" on, the view's picture | `client/client/chat/context.ts`, `ChatPanel.tsx` |
+| `_canvas/snapshot` | Built on `w3/looks`: `viewport`, `board` and `shapes`, at most 1,600 px, link arrows shown while it draws, an error at once for a hidden tab and after 10 s otherwise | `client/client/chat/snapshot.ts`, `connection.ts`, `client/client/shapes/index.ts` |
+| `look_at_board`, `look_at_figure` and the image plugin | Built on `w3/looks` | `harness/harness/board/viewer.py`, `harness/harness/acp/images.py` (registered in `worker.py`), `harness/tests/test_look_tools.py` |
+| PDF reader (for `paper_page`) | Not built and out of scope (T10's Phase B); `paper_page` is dropped (D25) | — |
 
 ## What's left (v6)
 
@@ -33,9 +33,11 @@ Everything in the Design below still stands, with these changes for v6 and for w
 
 **Tasks** (the original Tasks below, minus `paper_page`, plus):
 
-- [ ] `look_at_figure` in `viewer.py`, through the same image plugin.
-- [ ] Arrows visible during export.
-- [ ] `connection.test.ts`: the snapshot test answers with a PNG instead of an error.
+- [x] `look_at_figure` in `viewer.py`, through the same image plugin. `get_board` doesn't carry the card's figure, so it reads `get_figures`: the figure named by an optional `label` (the selection's `figure` gives the card's), else the first one with a picture.
+- [x] Arrows visible during export: `exportingSnapshot` in `chat/snapshot.ts`, read by `getShapeVisibility`, is on while a snapshot draws (the screen shows the arrows for that moment too).
+- [x] `connection.test.ts`: the snapshot test answers with a PNG instead of an error.
+
+**Built on `w3/looks` beyond the plan:** `ImagesPlugin` also leaves earlier prompts' pictures out of later turns (a note in their place), and drops a picture left over from a cancelled turn. Keyless tests: `client/client/chat/snapshot.test.ts`, `context.test.ts`, `connection.test.ts`, `harness/tests/test_look_tools.py` (criteria 5's error path, 6 and 7).
 
 **Acceptance criteria (refresh):** criteria 1, 2, 3, 5, 6 and 7 below stand; criterion 4 becomes: "With a paper open that has a figure, 'what does this figure show?' makes the agent call `look_at_figure` (a tool card shows it) and describe the figure's panels, axes or drawing, not just its caption."
 
@@ -110,14 +112,14 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 
 ## Tasks
 
-- [ ] `client/client/canvas/snapshot.ts`: the four targets, size cap, captions, errors.
-- [ ] `client/client/chat/context.ts`: prompt blocks, chips, "Include my view".
-- [ ] `client/shared/acpExt.ts`: `zod` schema for `_canvas/snapshot` params and result; `.onRequest` in T05's connection.
-- [ ] `harness/harness/board/viewer.py`: `look_at_board`, `look_at_paper`, the pending-images list.
-- [ ] `harness/harness/acp/images.py`: the `before_model_callback` plugin; register it in T04's runner.
-- [ ] `harness/harness/acp/mapping.py`: image blocks with captions.
-- [ ] Instruction paragraph (a constant in `harness/harness/board/`) telling agents what the context tags and the look tools are, used by `board_assistant` and offered to `master` through [I1](interfaces.md#i1-agent-factory-takes-the-boards-tools).
-- [ ] Tests (below).
+- [x] `client/client/canvas/snapshot.ts`: the four targets, size cap, captions, errors. (In `chat/snapshot.ts`, three targets: no `paper_page`.)
+- [ ] `client/client/chat/context.ts`: prompt blocks, chips, "Include my view". (Built apart from the chips under the user's message and the open paper's × chip: they need the chat state's turn to carry what was attached.)
+- [x] `client/shared/acpExt.ts`: `zod` schema for `_canvas/snapshot` params and result; `.onRequest` in T05's connection.
+- [x] `harness/harness/board/viewer.py`: `look_at_board`, `look_at_paper`, the pending-images list. (`look_at_figure` instead of `look_at_paper`; the list is `BoardTools.images`.)
+- [x] `harness/harness/acp/images.py`: the `before_model_callback` plugin; register it in T04's runner.
+- [x] `harness/harness/acp/mapping.py`: image blocks with captions. (Already in place: the caption is the text block before the image.)
+- [x] Instruction paragraph (a constant in `harness/harness/board/`) telling agents what the context tags and the look tools are, used by `board_assistant` and offered to `master` through [I1](interfaces.md#i1-agent-factory-takes-the-boards-tools). (`BOARD_CONTEXT`, which both use.)
+- [ ] Tests (below). (Keyless and browser tests done, the keyless one as `harness/tests/test_look_tools.py`; the live tests are still to write.)
 
 ## Acceptance criteria
 

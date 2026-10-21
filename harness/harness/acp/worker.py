@@ -24,6 +24,7 @@ from google.adk.runners import Runner
 from google.adk.sessions import InMemorySessionService
 
 from harness.acp import prices
+from harness.acp.images import ImagesPlugin
 from harness.acp.mapping import EventMapper, accepts_images, to_genai_content
 from harness.acp.trace import AcpTracePlugin
 from harness.board.ids import new_run_id
@@ -55,6 +56,7 @@ class SessionWorker:
         self.board = board
         self.model = board.models.get(agent.name, "")
         self.trace = AcpTracePlugin(send, board.models)
+        self.images = ImagesPlugin(board.images, board.models)
         self.jobs: asyncio.Queue[Job | None] = asyncio.Queue()
         self.open: set[Job] = set()
         self.task = asyncio.create_task(self.run(), name=f"session-worker-{board.session_id}")
@@ -81,7 +83,8 @@ class SessionWorker:
         await self.task
 
     async def run(self) -> None:
-        runner = Runner(app=App(name=APP, root_agent=self.agent, plugins=[self.trace]), session_service=InMemorySessionService())
+        plugins = [self.trace, self.images]
+        runner = Runner(app=App(name=APP, root_agent=self.agent, plugins=plugins), session_service=InMemorySessionService())
         try:
             session = await runner.session_service.create_session(
                 app_name=APP, user_id=self.board.member_id or "local", state={"board_id": self.board.board_id}

@@ -37,7 +37,8 @@ def tools(conn: Conn, session_id: str) -> dict:
 async def test_each_tool_sends_its_notification_with_the_browsers_params():
     conn = Conn()
     viewer = tools(conn, "s_ana")
-    assert set(viewer) == VIEWER_TOOLS  # the names the trace plugin hides
+    # the names the trace plugin hides; the look tools (T07) get cards
+    assert set(viewer) == VIEWER_TOOLS | {"look_at_board", "look_at_figure"}
 
     assert await viewer["focus"](paper_ids=["pmid:1"], shape_ids=["shape:note-1"]) == {"ok": True}
     assert await viewer["highlight"](paper_ids=["pmid:1", "pmid:2"], seconds=3) == {"ok": True}

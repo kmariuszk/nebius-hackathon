@@ -25,7 +25,7 @@ from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnecti
 from pydantic import BaseModel
 
 from harness import settings, toolsets
-from harness.board.viewer import viewer_tools
+from harness.board.viewer import PendingImage, look_tools, viewer_tools
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +82,8 @@ class BoardTools:
         self.session_id = session_id
         # Agent name to model ID, filled in once the agent tree is built, for X-Model.
         self.models: dict[str, str] = {}
+        # Pictures the look tools took, for the asking agent's next model call (T07).
+        self.images: list[PendingImage] = []
 
     @classmethod
     def for_session(
@@ -129,14 +131,15 @@ class BoardTools:
         return toolsets.http_toolset(self.papers_url, tool_names, auth)
 
     def viewer(self) -> list[BaseTool]:
-        """Focus, highlight, open paper and tour on this chat's researcher's screen (T06).
+        """Focus, highlight, open paper and tour on this chat's researcher's screen (T06), and
+        look at the board or a paper's figure (T07).
 
         Only a chat has a screen to point at, so there are none without an ACP
-        session (`adk web`, `from_env()`). T07 adds look at the board or a paper.
+        session (`adk web`, `from_env()`).
         """
         if self.conn is None or self.session_id is None:
             return []
-        return viewer_tools(self.conn, self.session_id)
+        return [*viewer_tools(self.conn, self.session_id), *look_tools(self)]
 
     def plan(self) -> BaseTool:
         """`update_plan`: the chat shows it as a checklist (I3); it gets no tool card."""
