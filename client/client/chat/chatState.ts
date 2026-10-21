@@ -9,6 +9,7 @@ import type {
 	ToolKind,
 	Usage,
 } from '@agentclientprotocol/sdk'
+import type { ViewerAction } from './viewerBus.ts'
 
 // The chat panel's state as a pure reducer over ACP updates (T05), so it can be tested without a DOM.
 // One turn per prompt; inside it, items in the order they arrived: thoughts, message text, tool
@@ -49,7 +50,19 @@ export interface PermissionItem {
 	answer: string | null
 }
 
-export type TurnItem = TextItem | ToolItem | PermissionItem
+/**
+ * A button the viewer offers when the agent wanted a camera move but Follow the agent is off
+ * (T06): "Show the paper", "Open <title>", "Start the tour (N papers)". Clicking runs `action`
+ * as a local action. The item is plain data so turns can hold it.
+ */
+export interface ShowItem {
+	kind: 'show'
+	key: string
+	label: string
+	action: ViewerAction
+}
+
+export type TurnItem = TextItem | ToolItem | PermissionItem | ShowItem
 
 export interface Turn {
 	key: string
@@ -81,6 +94,7 @@ export type ChatAction =
 	| { type: 'error'; message: string }
 	| { type: 'permission'; requestId: string; title: string; options: PermissionOption[] }
 	| { type: 'permission_answered'; requestId: string; answer: string }
+	| { type: 'show'; label: string; action: ViewerAction }
 	| { type: 'disconnected' }
 	| { type: 'reset' }
 
@@ -135,6 +149,24 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
 						}
 					: t
 			)
+		case 'show': {
+			// a chip lands in the turn that's running; with none running it gets its own prompt-less turn
+			const last = state.turns[state.turns.length - 1]
+			if (last?.epoch === state.epoch && last.running)
+				return pushItem(state, (key) => ({ kind: 'show', key, label: action.label, action: action.action }))
+			const turn: Turn = {
+				key: `t${state.nextKey}`,
+				epoch: state.epoch,
+				prompt: null,
+				items: [{ kind: 'show', key: `i${state.nextKey + 1}`, label: action.label, action: action.action }],
+				plan: null,
+				running: false,
+				stopReason: null,
+				error: null,
+				usage: null,
+			}
+			return { ...state, turns: [...state.turns, turn], nextKey: state.nextKey + 2 }
+		}
 		case 'disconnected':
 			return finishRunning(state, 'The connection closed before the agent finished.')
 		case 'reset':

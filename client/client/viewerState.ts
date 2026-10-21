@@ -1,4 +1,5 @@
 import { atom } from 'tldraw'
+import { getLocalStorageItem } from './localStorage.ts'
 
 // Per-viewer state (decision D19): tldraw atoms that live in this browser only and are never
 // written to the room, so two people can look at the same board differently.
@@ -48,3 +49,9 @@ export interface Tour {
 
 /** The Catch-me-up tour running in this browser (T06, decision D24), or null; widgets/tour.ts moves it. */
 export const tour = atom<Tour | null>('tour', null)
+
+/**
+ * The chat's "Follow the agent" switch (T06): whether the agent may move this viewer's camera.
+ * Persisted per viewer; on unless they turned it off.
+ */
+export const followAgent = atom<boolean>('followAgent', getLocalStorageItem('paper-canvas:follow-agent') !== 'off')

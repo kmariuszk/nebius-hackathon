@@ -125,7 +125,9 @@ test('whitespace-only chunks between tool cards join the message before them and
 	])
 	const items = state.turns[0].items
 	assert.deepEqual(
-		items.map((i) => (i.kind === 'tool' ? i.title : `${i.kind}:${i.kind === 'permission' ? '' : i.text}`)),
+		items.map((i) =>
+			i.kind === 'tool' ? i.title : `${i.kind}:${i.kind === 'message' || i.kind === 'thought' ? i.text : ''}`
+		),
 		[
 			'message:Let me look at the board first.\n\n',
 			'master: get_board',
@@ -233,4 +235,24 @@ test('board targets come from added papers and shape IDs, never from skipped ent
 	})
 	assert.deepEqual(findBoardTargets({ content: [{ type: 'text', text: 'not json' }] }), { paperIds: [], shapeIds: [] })
 	assert.deepEqual(findBoardTargets(undefined), { paperIds: [], shapeIds: [] })
+})
+
+test('a show chip lands in the running turn, or in its own prompt-less turn', () => {
+	const chip = { type: 'show' as const, label: 'Show the paper', action: { type: 'focus' as const, params: { paperIds: ['pmid:1'] } } }
+	// while a turn runs the chip is appended to it
+	let state = reduce([{ type: 'send', text: 'q' }, chip])
+	assert.equal(state.turns.length, 1)
+	const item = state.turns[0].items[0]
+	assert.equal(item.kind, 'show')
+	assert.equal(item.kind === 'show' && item.label, 'Show the paper')
+	// with no turn running it gets a prompt-less turn of its own
+	state = reduce([{ type: 'send', text: 'q' }, { type: 'stop', stopReason: 'end_turn' }, chip])
+	assert.equal(state.turns.length, 2)
+	assert.equal(state.turns[1].prompt, null)
+	assert.equal(state.turns[1].running, false)
+	assert.equal(state.turns[1].items[0].kind, 'show')
+	// and on an empty chat
+	state = reduce([chip])
+	assert.equal(state.turns.length, 1)
+	assert.equal(state.turns[0].prompt, null)
 })

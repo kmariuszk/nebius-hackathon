@@ -68,14 +68,18 @@ export async function openAgentConnection({
 		.onRequest(acp.methods.client.session.requestPermission, (ctx) => handlers.onPermission(ctx.params, ctx.signal))
 		.onNotification(acp.methods.client.session.update, (ctx) => handlers.onUpdate(ctx.params))
 		// per-viewer canvas actions (T06): they move only this browser's view
-		.onNotification(CANVAS_METHODS.focus, focusParams, ({ params: { sessionId: _, ...p } }) => viewerBus.emit('focus', p))
+		.onNotification(CANVAS_METHODS.focus, focusParams, ({ params: { sessionId: _, ...p } }) =>
+			viewerBus.emit('focus', { ...p, from: 'agent' })
+		)
 		.onNotification(CANVAS_METHODS.highlight, highlightParams, ({ params: { sessionId: _, ...p } }) =>
 			viewerBus.emit('highlight', p)
 		)
 		.onNotification(CANVAS_METHODS.openPaper, openPaperParams, ({ params }) =>
-			viewerBus.emit('open_paper', { paperId: params.paperId })
+			viewerBus.emit('open_paper', { paperId: params.paperId, from: 'agent' })
 		)
-		.onNotification(CANVAS_METHODS.tour, tourParams, ({ params: { sessionId: _, ...p } }) => viewerBus.emit('tour', p))
+		.onNotification(CANVAS_METHODS.tour, tourParams, ({ params: { sessionId: _, ...p } }) =>
+			viewerBus.emit('tour', { ...p, from: 'agent' })
+		)
 		// the agent looks at the board (T07): a PNG of this viewer's page, or an error it can explain
 		.onRequest(CANVAS_METHODS.snapshot, snapshotParams, async ({ params: { sessionId: _, ...request } }) => {
 			try {

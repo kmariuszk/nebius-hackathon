@@ -73,8 +73,8 @@ test('initialize, session/new with the canvas MCP, and a streamed prompt turn', 
 			headers: [{ name: 'Authorization', value: 'Bearer m_test000000' }],
 		},
 	])
-	// _canvas/focus reaches the viewer bus without its sessionId
-	assert.deepEqual(focus.seen, [{ paperIds: ['pmid:1'] }])
+	// _canvas/focus reaches the viewer bus without its sessionId, marked as the agent's
+	assert.deepEqual(focus.seen, [{ paperIds: ['pmid:1'], from: 'agent' }])
 
 	let state = chatReducer(initialChatState, { type: 'send', text: 'hello board' })
 	for (const n of updates) state = chatReducer(state, { type: 'update', update: n.update })
