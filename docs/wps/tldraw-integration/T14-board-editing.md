@@ -31,7 +31,7 @@ The design below stands, adapted to v6, where links are strings drawn over hidde
 - **The link editor** (`client/client/editing/LinkEditor.tsx`): the per-kind table below, unchanged; deleting a `similar` link also calls `PUT /removed-links` (`boardApi.removeLink`, new), so `get_board`'s `removedLinks` has it even after tldraw prunes the tombstone.
 - **Pinning notes on the canvas** (`client/client/editing/pinNotes.ts`, registered from `sideEffects.ts`): after a person creates a note or finishes dragging one (`source: 'user'`), if its centre lies inside a card's drawn box, create the `note-pin` binding (`dx`, `dy` from the note's and the card's top-left corners) and toast "Note pinned to <label>. It moves with the paper."; dragging a pinned note more than a card's width from its paper removes the binding, with a toast. The toolbar's **Note** can also be dragged onto the board (an HTML drag from the button that creates the note at the drop point, then the same rule).
 - **Guards** (`client/client/editing/guards.ts`): `editor.sideEffects.registerBeforeDeleteHandler('shape', …)` refuses a person deleting a `paper-card` (toast: "Use Discard to take a paper off the board") or a `cites` arrow (toast: "Citations can be hidden, not deleted").
-- **Changes for Update suggestions:** every edit above reports to the [T13 refresh](T13-board-chrome.md)'s `changes.ts` (`link_added`, `link_renamed`, `link_hidden`, `link_removed`, `note_pinned`).
+- **Changes for Update suggestions:** every edit above reports to the [T13 refresh](T13-board-chrome.md)'s `changes.ts` (`link_added`, `link_renamed`, `link_hidden`, `link_removed`, `note_pinned`, `note_unpinned`).
 
 **Tasks** (replacing the Tasks below for v6):
 

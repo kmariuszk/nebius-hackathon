@@ -14,6 +14,12 @@ from harness.acp.trace import kind_of, summary
 from harness.board.tools import BoardTools, NoTools
 
 SHAPE = '{"id":"shape:paper-pmid_1","type":"paper-card","paperId":"pmid:1"}'
+CHANGES = (
+    '{"since":"2026-10-21T09:00:00.000Z","changes":['
+    '{"type":"moved","paperId":"pmid:1","at":"2026-10-21T09:01:00.000Z"},'
+    '{"type":"note_unpinned","text":"Same patients?","paperId":"pmid:2","at":"2026-10-21T09:02:00.000Z"},'
+    '{"type":"note_removed","text":"Ask Igor","at":"2026-10-21T09:03:00.000Z"}]}'
+)
 PNG = base64.b64encode(b"\x89PNG fake").decode()
 
 
@@ -23,7 +29,7 @@ def test_prompt_blocks_become_tagged_parts():
             text_block("What links these?"),
             resource_block(embedded_text_resource("tldraw://b1/shape:paper-pmid_1", SHAPE, mime_type="application/vnd.tldraw.shape+json")),
             resource_block(embedded_text_resource("tldraw://b1/viewport", '{"x":0}', mime_type="application/json")),
-            resource_block(embedded_text_resource("tldraw://b1/changes", '[{"kind":"moved"}]')),
+            resource_block(embedded_text_resource("tldraw://b1/changes", CHANGES, mime_type="application/json")),
             resource_block(embedded_text_resource("https://example.org/notes", "some notes")),
             resource_block(embedded_blob_resource("tldraw://b1/blob", PNG, mime_type="image/png")),
             resource_link_block("paper", "https://pubmed.ncbi.nlm.nih.gov/1/"),
@@ -37,7 +43,7 @@ def test_prompt_blocks_become_tagged_parts():
         "What links these?",
         f'<selected-shape uri="tldraw://b1/shape:paper-pmid_1">{SHAPE}</selected-shape>',
         '<viewport>{"x":0}</viewport>',
-        '<board-changes>[{"kind":"moved"}]</board-changes>',
+        f"<board-changes>{CHANGES}</board-changes>",
         '<board-context uri="https://example.org/notes">some notes</board-context>',
         '<board-context uri="tldraw://b1/blob">[binary, image/png]</board-context>',
         "https://pubmed.ncbi.nlm.nih.gov/1/",

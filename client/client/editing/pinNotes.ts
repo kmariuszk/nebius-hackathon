@@ -188,7 +188,8 @@ function settle(editor: Editor, id: TLShapeId, why: Why) {
 	else if (paperId && pinnedTo?.id !== pin?.toId) recordEdit(editor, { type: 'note_pinned', noteId: note.id, text, paperId })
 	else if (!paperId && pin) {
 		const boardId = boardOf(editor)
-		if (boardId) changes.noteUnpinned(boardId, note.id)
+		const was = editor.getShape(pin.toId)
+		if (boardId && isPaperCard(was)) changes.noteUnpinned(boardId, note.id, text, was.props.paperId)
 	}
 }
 

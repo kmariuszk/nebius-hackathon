@@ -1,4 +1,6 @@
-import { react, type Editor } from 'tldraw'
+import { react, type Editor, type TLShapeId } from 'tldraw'
+import { NOTE_PIN_TYPE } from '../shared/bindings.ts'
+import { isPaperCard } from '../shared/paperCard.ts'
 import { createdMeta, nextMeta } from './boardRules.ts'
 import { isGuardReparent, registerGuards, userLinkMeta } from './editing/guards.ts'
 import { registerPinNotes } from './editing/pinNotes.ts'
@@ -16,6 +18,7 @@ export function registerBoardSideEffects(editor: Editor, memberId: string, board
 	const name = getDisplayName()
 	if (name && name !== editor.user.getName()) editor.user.updateUserPreferences({ name })
 
+	const pinsGoing = new Map<TLShapeId, TLShapeId>()
 	const cleanups = [
 		editor.sideEffects.registerBeforeCreateHandler('shape', (shape, source) => {
 			let meta = createdMeta(shape.meta, source, memberId)
@@ -49,9 +52,19 @@ export function registerBoardSideEffects(editor: Editor, memberId: string, board
 		editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
 			if (source === 'user' && shape.type === 'arrow') changes.linkShapeBack(boardId, shape.id)
 		}),
+		// a deleted note's pin goes before the note does, so the paper it was on is noted on the way
+		editor.sideEffects.registerBeforeDeleteHandler('binding', (binding) => {
+			if (binding.type === NOTE_PIN_TYPE) pinsGoing.set(binding.fromId, binding.toId)
+		}),
+		editor.sideEffects.registerOperationCompleteHandler(() => pinsGoing.clear()),
 		editor.sideEffects.registerAfterDeleteHandler('shape', (shape, source) => {
 			if (source !== 'user') return
-			if (shape.type === 'note') changes.noteDeleted(boardId, shape.id)
+			if (shape.type === 'note') {
+				const pin = pinsGoing.get(shape.id)
+				const card = pin ? editor.getShape(pin) : undefined
+				const paperId = isPaperCard(card) ? card.props.paperId : undefined
+				changes.noteDeleted(boardId, shape.id, plainText(shape.props.richText), paperId)
+			}
 			if (shape.type === 'arrow') changes.linkShapeGone(boardId, shape.id)
 		}),
 		// a name set in tldraw's people menu is kept for the next visit

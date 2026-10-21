@@ -68,7 +68,7 @@ Built when the user presses Send:
 3. **Viewport summary:** a `resource` block `tldraw://<boardId>/viewport` with `{visiblePaperIds, visibleNoteCount, zoom}`.
 4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the researcher's current view of the board:", then an `image` block from the shared renderer (section 3, target `viewport`).
 5. **From the PDF reader** (T10 Phase B): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
-6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last prompt, as JSON: `[{type: "moved" | "linked" | "link_named" | "link_hidden" | "link_deleted" | "note_added" | "note_pinned", paperIds, label?, text?}]`. The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
+6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last Update suggestions, as JSON: `{since, changes: [{type, …, at}]}`, where `type` is `moved`, `link_added`, `link_renamed`, `link_hidden`, `link_removed`, `note_added`, `note_pinned`, `note_unpinned`, `note_removed`, `voted` or `cluster_renamed` ([T13](T13-board-chrome.md) lists each one's fields). The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
 
 Chips under the user's message show what was attached ("3 cards", "your view", "page 5"); clicking one focuses it locally (T06).
 

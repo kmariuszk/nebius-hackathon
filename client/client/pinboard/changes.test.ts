@@ -99,13 +99,35 @@ test('a note you add and then pin is one change, which follows its text and its 
 	assert.equal((entries[0].change as { text: string }).text, 'Ask Igor about the cohort')
 	assert.equal(noteText(entries, 'shape:n1', 'Ask Igor about the cohort'), entries) // nothing new: the same list
 	assert.equal(noteText(entries, 'shape:other', 'x'), entries) // editing an older note isn't a change
-	entries = noteUnpinned(entries, 'shape:n1')
+	entries = noteUnpinned(entries, 'shape:n1', 'Ask Igor about the cohort', 'pmid:1', at(3))
 	assert.deepEqual(entries[0].change, { type: 'note_added', noteId: 'shape:n1', text: 'Ask Igor about the cohort' })
-	assert.deepEqual(noteDeleted(entries, 'shape:n1'), [])
+	assert.deepEqual(noteDeleted(entries, 'shape:n1', 'Ask Igor about the cohort', undefined, at(4)), [])
 
 	// an older note pinned now, then dragged off again: nothing
 	const pinned = run({ type: 'note_pinned', noteId: 'shape:old', text: 'Grant needs this', paperId: 'pmid:2' })
-	assert.deepEqual(noteUnpinned(pinned, 'shape:old'), [])
+	assert.deepEqual(noteUnpinned(pinned, 'shape:old', 'Grant needs this', 'pmid:2', at(2)), [])
+})
+
+test('a note from before this session, unpinned or deleted, is a change of its own', () => {
+	const moved = run({ type: 'moved', paperId: 'pmid:1' })
+	assert.deepEqual(noteUnpinned(moved, 'shape:old', 'Grant needs this', 'pmid:2', at(2)).slice(1), [
+		{ key: 'note shape:old', change: { type: 'note_unpinned', noteId: 'shape:old', text: 'Grant needs this', paperId: 'pmid:2' }, at: at(2) },
+	])
+	assert.deepEqual(noteDeleted(moved, 'shape:old', 'Same patients?', 'pmid:2', at(2)).slice(1), [
+		{ key: 'note shape:old', change: { type: 'note_removed', noteId: 'shape:old', text: 'Same patients?', paperId: 'pmid:2' }, at: at(2) },
+	])
+	// a free note deleted has no paper
+	assert.deepEqual(noteDeleted([], 'shape:free', 'Ask Igor', undefined, at(1))[0].change, {
+		type: 'note_removed',
+		noteId: 'shape:free',
+		text: 'Ask Igor',
+	})
+	// the agent gets them without the note's shape ID, as note_added
+	const entries = [...noteUnpinned([], 'shape:a', 'x', 'pmid:2', at(1)), ...noteDeleted([], 'shape:b', 'y', undefined, at(2))]
+	assert.deepEqual(JSON.parse(changesJson({ since: T0, entries })).changes, [
+		{ type: 'note_unpinned', text: 'x', paperId: 'pmid:2', at: at(1) },
+		{ type: 'note_removed', text: 'y', at: at(2) },
+	])
 })
 
 test('the JSON is {since, changes: [{…, at}]}, the <board-changes> contract', () => {
@@ -192,6 +214,25 @@ test('⌘Z and ⇧⌘Z on a link keep the changes list in step with the board', 
 	}
 })
 
+test('deleting a note from before this session tells the agent its text and the paper it was pinned to', () => {
+	const text = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Same patients?' }] }] }
+	const { editor, fake, bindings } = fakeEditor([
+		{ id: 'shape:paper-a', type: 'paper-card', props: { paperId: 'pmid:2' } },
+		{ id: 'shape:note-old', type: 'note', props: { richText: text } },
+	])
+	bindings.set('binding:pin', { id: 'binding:pin', type: 'note-pin', fromId: 'shape:note-old', toId: 'shape:paper-a', props: {}, meta: {} })
+	const off = registerBoardSideEffects(editor, 'm_me', 'b_note')
+	try {
+		fake.deleteShapes(['shape:note-old'])
+		assert.deepEqual(
+			changes.get('b_note').entries.map((e) => e.change),
+			[{ type: 'note_removed', noteId: 'shape:note-old', text: 'Same patients?', paperId: 'pmid:2' }]
+		)
+	} finally {
+		off()
+	}
+})
+
 test('each change in plain words', () => {
 	const labels: Record<string, string> = { 'pmid:1': 'Daugherty-Lopès 2024', 'pmid:2': 'Ibáñez-Molero 2026', 'pmid:3': 'Liu 2022' }
 	const say = (change: Change) => describeChange(change, (id) => labels[id] ?? id)
@@ -199,6 +240,8 @@ test('each change in plain words', () => {
 	assert.equal(say({ type: 'note_pinned', noteId: 'n', text: '', paperId: 'pmid:2' }), 'You pinned a note to Ibáñez-Molero 2026')
 	assert.equal(say({ type: 'note_added', noteId: 'n', text: '', paperId: 'pmid:3' }), 'You added a note on Liu 2022')
 	assert.equal(say({ type: 'note_added', noteId: 'n', text: '' }), 'You added a note')
+	assert.equal(say({ type: 'note_unpinned', noteId: 'n', text: '', paperId: 'pmid:2' }), 'You unpinned a note from Ibáñez-Molero 2026')
+	assert.equal(say({ type: 'note_removed', noteId: 'n', text: 'Same patients?' }), 'You deleted a note: “Same patients?”')
 	assert.equal(say({ type: 'link_added', ...mine }), 'You linked Ibáñez-Molero 2026 and Liu 2022')
 	assert.equal(say({ type: 'link_added', ...mine, label: 'same method' }), 'You linked Ibáñez-Molero 2026 and Liu 2022 as “same method”')
 	assert.equal(say({ type: 'link_renamed', ...mine, label: 'x' }), 'You named the link Ibáñez-Molero 2026 – Liu 2022 “x”')

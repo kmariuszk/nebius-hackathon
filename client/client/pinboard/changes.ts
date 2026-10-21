@@ -16,6 +16,8 @@ export type Change =
 	| ({ type: 'link_added' | 'link_renamed' | 'link_hidden' | 'link_removed' } & LinkChange)
 	| { type: 'note_added'; noteId: string; text: string; paperId?: string }
 	| { type: 'note_pinned'; noteId: string; text: string; paperId: string }
+	| { type: 'note_unpinned'; noteId: string; text: string; paperId: string }
+	| { type: 'note_removed'; noteId: string; text: string; paperId?: string }
 	| { type: 'voted'; paperId: string; decision: Decision }
 	| { type: 'cluster_renamed'; clusterId: string; label: string }
 
@@ -42,6 +44,8 @@ export function subjectOf(change: Change): string {
 			return `cluster ${change.clusterId}`
 		case 'note_added':
 		case 'note_pinned':
+		case 'note_unpinned':
+		case 'note_removed':
 			return `note ${change.noteId}`
 		default:
 			return `link ${change.kind} ${change.from} ${change.to}`
@@ -127,10 +131,10 @@ export function noteText(entries: readonly Entry[], noteId: string, text: string
 	return entries.map((e) => (e.key === key ? { ...e, change: { ...e.change, text } as Change } : e))
 }
 
-/** A note dragged off its paper: it's no longer pinned there. */
-export function noteUnpinned(entries: readonly Entry[], noteId: string): Entry[] {
+/** A note dragged off its paper (`paperId`): it's no longer pinned there; a note from before is `note_unpinned`. */
+export function noteUnpinned(entries: readonly Entry[], noteId: string, text: string, paperId: string, at: string): Entry[] {
 	const key = `note ${noteId}`
-	if (!entries.some((e) => e.key === key)) return entries as Entry[]
+	if (!entries.some((e) => e.key === key)) return [...entries, { key, change: { type: 'note_unpinned', noteId, text, paperId }, at }]
 	return entries.flatMap((e) => {
 		if (e.key !== key) return [e]
 		if (e.change.type === 'note_pinned') return []
@@ -140,10 +144,11 @@ export function noteUnpinned(entries: readonly Entry[], noteId: string): Entry[]
 	})
 }
 
-/** A note deleted: changes about it go too. */
-export function noteDeleted(entries: readonly Entry[], noteId: string): Entry[] {
+/** A note deleted: changes about it go too; a note from before is `note_removed`. */
+export function noteDeleted(entries: readonly Entry[], noteId: string, text: string, paperId: string | undefined, at: string): Entry[] {
 	const key = `note ${noteId}`
-	return entries.some((e) => e.key === key) ? entries.filter((e) => e.key !== key) : (entries as Entry[])
+	if (entries.some((e) => e.key === key)) return entries.filter((e) => e.key !== key)
+	return [...entries, { key, change: { type: 'note_removed', noteId, text, ...(paperId ? { paperId } : {}) }, at }]
 }
 
 /** The <board-changes> JSON: `{since, changes: [{type, …, at}]}`. */
@@ -170,6 +175,10 @@ export function describeChange(change: Change, labelOf: (paperId: string) => str
 			return change.paperId ? `You added a note on ${labelOf(change.paperId)}` : 'You added a note'
 		case 'note_pinned':
 			return `You pinned a note to ${labelOf(change.paperId)}`
+		case 'note_unpinned':
+			return `You unpinned a note from ${labelOf(change.paperId)}`
+		case 'note_removed':
+			return `You deleted a note: “${change.text}”`
 		case 'cluster_renamed':
 			return `You renamed a cluster “${change.label}”`
 	}
@@ -237,8 +246,10 @@ export function createChanges(storage: StorageLike | null, now = () => new Date(
 			return () => edit(boardId, (entries) => [...entries.filter((e) => e.key !== key), ...before])
 		},
 		noteText: (boardId: string, noteId: string, text: string) => edit(boardId, (e) => noteText(e, noteId, text)),
-		noteUnpinned: (boardId: string, noteId: string) => edit(boardId, (e) => noteUnpinned(e, noteId)),
-		noteDeleted: (boardId: string, noteId: string) => edit(boardId, (e) => noteDeleted(e, noteId)),
+		noteUnpinned: (boardId: string, noteId: string, text: string, paperId: string) =>
+			edit(boardId, (e) => noteUnpinned(e, noteId, text, paperId, now())),
+		noteDeleted: (boardId: string, noteId: string, text: string, paperId?: string) =>
+			edit(boardId, (e) => noteDeleted(e, noteId, text, paperId, now())),
 		linkShapeBack: (boardId: string, shapeId: string) => edit(boardId, (e) => linkShapeBack(e, shapeId)),
 		linkShapeGone: (boardId: string, shapeId: string) => edit(boardId, (e) => linkShapeGone(e, shapeId)),
 		/** The changes as <board-changes> JSON, and a fresh start for the next Update suggestions. */
