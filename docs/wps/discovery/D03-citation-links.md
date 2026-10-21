@@ -8,7 +8,7 @@
 | Depends on | — ([T15](../tldraw-integration/T15-graph-layout-and-strings.md) makes the card note count only these links) |
 | Unblocks | The red strings and "cites N of your seeds" on a real board; [D04](D04-clusters-from-data.md)'s optional citation blend |
 | Milestone | W2 One clean run |
-| Status | Built on branch `w2/citations` (Oct 21); criteria 4 and 5 wait for the live check |
+| Status | Built on `w2/citations` (Oct 21). Criterion 4 holds in part: in the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage), each board had 14 to 23 cites links with no model `link_papers` call; the PubMed spot check of three links is still to do. Criterion 5 needs a browser look |
 | Owner | TBD |
 
 ## Goal

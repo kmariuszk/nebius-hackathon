@@ -8,7 +8,7 @@
 | Depends on | H01 (the measurement), H02, [D01](../discovery/D01-validate-optional-arguments.md), [D02](../discovery/D02-scoring-without-timeouts.md) (the bugs that cost the most time) |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (clusters run after ranking), the demo recording |
 | Milestone | W2 One clean run |
-| Status | Built on branch `w2/rank` (Oct 21); the strict H01 timing runs wait for the Wave 2 integration |
+| Status | Built on `w2/rank`, plus on `w2/integration`: `rank_papers` ranks only the placed papers (ranking 20 took 34 to 52 s of Super VL reading for papers it never writes) and every model call times out after 120 s (`MODEL_TIMEOUT`). Strict timing not yet met twice in a row. In the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage): first card 50.5 / 73.4 / 91.0 / 76.7 / 103.9 s (target 90), answer 111.2 / 126.1 / 131.6 / 113.5 / 169.4 s (target 120), every card read 211 / 259 / 374 / 315 / 270 s (target 300); one run met all three. The swings come from Token Factory's latency: `score_candidates` took 1 to 42 s (the embedding warm-up doesn't always finish first), `rank_papers` 24 to 53 s, a search agent 26 to 41 s. Next levers: `score_candidates` waiting for in-flight warm-up embeddings, Super VL's reasoning off for the rerank (`enable_thinking: false`), or `PLACE = 6` |
 | Owner | TBD |
 
 ## Goal

@@ -8,7 +8,7 @@
 | Depends on | — ([T10 refresh](../tldraw-integration/T10-paper-card.md) shows "No free figure" when there is none) |
 | Unblocks | The figure widget and ranked-list thumbnails on a real board; [T07 refresh](../tldraw-integration/T07-board-context.md)'s `look_at_figure` |
 | Milestone | W2 One clean run |
-| Status | Built on branch `w2/figures` (Oct 21); criteria 4 and 5 wait for the live check and a browser look |
+| Status | Built on `w2/figures` (Oct 21). Criterion 4 holds: in the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage), 4 to 6 of 8 suggestions per board had a real PMC figure, and the four figure URLs checked (HTTP 200, `image/jpeg`) all load; one PMC page answered with a block page three times and that paper got no figure, as designed. Criterion 5 needs a browser look |
 | Owner | TBD |
 
 ## Goal
