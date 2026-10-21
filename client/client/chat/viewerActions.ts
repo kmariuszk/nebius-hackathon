@@ -1,4 +1,5 @@
 import { Box, type Editor, type TLShape, type TLShapeId } from 'tldraw'
+import { cardLabel } from '../../shared/display.ts'
 import { paperShapeId } from '../../shared/ids.ts'
 import { PAPER_CARD_TYPE, isPaperCard } from '../../shared/paperCard.ts'
 import { currentGoal, followAgent, litPaperIds, openPaperId } from '../viewerState.ts'
@@ -34,7 +35,7 @@ export function registerViewerActions(
 
 	const titleOf = (paperId: string) => {
 		const card = editor.getShape(paperShapeId(paperId) as TLShapeId)
-		return isPaperCard(card) ? card.props.title : null
+		return isPaperCard(card) ? cardLabel(card) : null
 	}
 
 	// ---- the busy-user queue ---------------------------------------------------

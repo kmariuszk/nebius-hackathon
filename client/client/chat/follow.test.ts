@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import type { TLShape } from 'tldraw'
-import { chipLabel, due, isFollowedCard, push, shouldMove, type QueuedAction } from './follow.ts'
+import { Box, type TLShape } from 'tldraw'
+import { chipLabel, due, isFollowedCard, push, registerFollow, shouldMove, type QueuedAction } from './follow.ts'
 import type { ViewerAction } from './viewerBus.ts'
 
 const card = (meta: Record<string, unknown>, type = 'paper-card') =>
@@ -51,14 +51,67 @@ test('the busy queue: expired actions drop, unexpired and non-expiring run', () 
 })
 
 test('chipLabel: focus, open and tour wording', () => {
-	const titleOf = (id: string) => (id === 'pmid:1' ? 'The paper' : null)
+	// viewerActions passes the card's short label ("Liu 2022") for open_paper
+	const titleOf = (id: string) => (id === 'pmid:1' ? 'Liu 2022' : null)
 	assert.equal(chipLabel({ type: 'focus', params: { paperIds: ['pmid:1'] } }, titleOf), 'Show the paper')
 	assert.equal(
 		chipLabel({ type: 'focus', params: { paperIds: ['pmid:1', 'pmid:2'], shapeIds: ['shape:x'] } }, titleOf),
 		'Show 3 papers'
 	)
-	assert.equal(chipLabel({ type: 'open_paper', paperId: 'pmid:1' }, titleOf), 'Open The paper')
+	assert.equal(chipLabel({ type: 'open_paper', paperId: 'pmid:1' }, titleOf), 'Open Liu 2022')
 	assert.equal(chipLabel({ type: 'open_paper', paperId: 'pmid:gone' }, titleOf), 'Open the paper')
 	const tour: ViewerAction = { type: 'tour', title: 'New', steps: [{ paperId: 'p1', line: '' }, { paperId: 'p2', line: '' }] }
 	assert.equal(chipLabel(tour, titleOf), 'Start the tour (2 papers)')
+})
+
+test('registerFollow: a fresh-but-equal run-ID set keeps framing every card placed so far', async () => {
+	const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+	// just enough editor: remote creates in, zoomToBounds out
+	let onCreate: ((shape: TLShape, source: string) => void) | undefined
+	const bounds = new Map<string, Box>()
+	const zooms: Box[] = []
+	const editor = {
+		sideEffects: {
+			registerAfterCreateHandler: (_k: string, fn: (s: TLShape, src: string) => void) => {
+				onCreate = fn
+				return () => {}
+			},
+		},
+		on: () => {},
+		off: () => {},
+		getShape: (id: string) => ({ id, type: 'paper-card' }) as TLShape,
+		getShapePageBounds: (s: TLShape) => bounds.get(s.id),
+		getViewportPageBounds: () => new Box(0, 0, 1, 1), // never "all in view"
+		getZoomLevel: () => 1,
+		zoomToBounds: (box: Box) => void zooms.push(box),
+	} as unknown as import('tldraw').Editor
+	// the busy queue runs actions once idle; the stub's runs right away
+	let runId = 'run_1'
+	registerFollow(editor, { memberId: 'm_me', runIds: () => new Set([runId]), enqueue: (run) => void run() })
+
+	const placed = (id: string, box: Box, run = runId) => {
+		bounds.set(id, box)
+		onCreate!(
+			{ id, type: 'paper-card', meta: { createdBy: 'agent', onBehalfOf: 'm_me', runId: run } } as unknown as TLShape,
+			'remote'
+		)
+	}
+	placed('shape:c1', new Box(0, 0, 10, 10))
+	await sleep(700) // batch 1 -> a move
+	placed('shape:c2', new Box(100, 100, 10, 10))
+	await sleep(700) // batch 2 -> the move frames c1 and c2, not c2 alone
+	assert.equal(zooms.length, 2)
+	// the second move's box spans both cards (c1 at 0,0 and c2 at 100,100)
+	const second = zooms[1]
+	assert.equal(second.minX, 0)
+	assert.equal(second.maxX, 110)
+	assert.equal(second.maxY, 110)
+
+	// a new run resets the framed set: c3 is framed alone
+	runId = 'run_2'
+	placed('shape:c3', new Box(-50, -50, 10, 10))
+	await sleep(700)
+	assert.equal(zooms.length, 3)
+	assert.equal(zooms[2].minX, -50)
+	assert.equal(zooms[2].maxX, -40)
 })

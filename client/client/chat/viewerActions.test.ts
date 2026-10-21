@@ -10,7 +10,11 @@ import { viewerBus, type ViewerAction, type ViewerEvents } from './viewerBus.ts'
 // The Follow-the-agent gate: what the agent asks for is queued behind a busy viewer, or becomes a
 // chat chip when Follow is off; what the viewer clicks always runs.
 
-const CARD = { id: paperShapeId('pmid:1'), type: 'paper-card', props: { paperId: 'pmid:1', title: 'The paper', w: 200, h: 100 } }
+const CARD = {
+	id: paperShapeId('pmid:1'),
+	type: 'paper-card',
+	props: { paperId: 'pmid:1', title: 'The paper', authors: ['Yang Liu'], year: 2022, w: 200, h: 100 },
+}
 
 function rig() {
 	const { editor: base } = fakeEditor([CARD])
@@ -81,7 +85,7 @@ test('with Follow off, open_paper and tour get their own chips; highlight still 
 	assert.equal(openPaperId.get(), null)
 	assert.deepEqual(
 		chips.map((c) => c.label),
-		['Open The paper', 'Start the tour (2 papers)']
+		['Open Liu 2022', 'Start the tour (2 papers)']
 	)
 	// highlight is never gated: it doesn't move the camera
 	agent('highlight', { paperIds: ['pmid:1'] })

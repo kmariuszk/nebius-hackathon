@@ -9,6 +9,7 @@ import { followAgent } from '../viewerState'
 import { chatReducer, initialChatState, type Turn } from './chatState'
 import { openAgentConnection, type AgentConnection } from './connection'
 import { addBoardContext, promptWhenReady } from './context'
+import { sameIds } from './follow.ts'
 import { formatCost, formatTokens, stopReasonText } from './format'
 import { PermissionPrompt } from './PermissionPrompt'
 import { PlanList } from './PlanList'
@@ -56,7 +57,9 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 				if (item.kind === 'tool' && typeof item.meta.runId === 'string') ids.add(item.meta.runId)
 			}
 		}
-		runIds.current = ids
+		// keep the same Set object while the run is unchanged: follow.ts resets on a new run, and a
+		// fresh Set from every streamed update would look like one
+		if (!sameIds(ids, runIds.current)) runIds.current = ids
 	}, [state.turns])
 
 	useEffect(

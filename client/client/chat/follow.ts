@@ -63,6 +63,11 @@ export function due<T>(queue: QueuedAction<T>[], now: number, idle: boolean): { 
 	return { run: queue.filter((q) => q.expiresAt === null || q.expiresAt > now).map((q) => q.action), rest: [] }
 }
 
+/** Set equality: ChatPanel rebuilds the run-ID set on every streamed update, so compare contents. */
+export function sameIds(a: ReadonlySet<string>, b: ReadonlySet<string>): boolean {
+	return a.size === b.size && [...a].every((id) => b.has(id))
+}
+
 // ---- chips for when Follow is off -----------------------------------------
 
 /** The chip's wording: "Show the paper"/"Show N papers", "Open <title>", "Start the tour (N papers)". */
@@ -114,7 +119,8 @@ export function registerFollow(editor: Editor, { memberId, runIds, enqueue }: Fo
 		const bounds = cards.flatMap((s) => editor.getShapePageBounds(s) ?? [])
 		if (!bounds.length) return
 		const view = editor.getViewportPageBounds()
-		const allInView = bounds.every((b) => view.contains(b))
+		// strict contains() would count a card that touches the viewport edge as out of view
+		const allInView = bounds.every((b) => Box.ContainsApproximately(view, b, 0.01))
 		if (
 			!shouldMove({
 				allInView,
@@ -142,7 +148,7 @@ export function registerFollow(editor: Editor, { memberId, runIds, enqueue }: Fo
 	}
 	const offCreate = editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
 		const ids = runIds()
-		if (ids !== runSet) {
+		if (!sameIds(ids, runSet)) {
 			// a new turn (or none): the cards framed belong to the run that placed them
 			runSet = ids
 			placed = []
