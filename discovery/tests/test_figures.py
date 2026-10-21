@@ -98,9 +98,9 @@ async def test_a_block_page_three_times_gives_figures_without_urls_and_says_why(
     assert result["skipped"] == ["figure images: PMC's article page was a block page 3 times"]
     assert page.fetched == 3
 
-    # The reason is cached with the text: later reads don't try again.
+    # A block page may pass: the next read tries again.
     again = await discovery.get_figures(f"pmcid:{PMCID}")
-    assert again["skipped"] == result["skipped"] and page.fetched == 3
+    assert again["skipped"] == result["skipped"] and page.fetched == 6
 
 
 async def test_a_text_cached_before_image_urls_gets_them_once(discovery, page):

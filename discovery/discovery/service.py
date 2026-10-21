@@ -287,7 +287,7 @@ class Discovery:
 
     async def get_fulltext(self, paper_id: str, max_chars: int = fulltext.DEFAULT_MAX_CHARS) -> dict[str, Any]:
         paper = await self.get_paper(paper_id)
-        text, skipped = await self._fulltext(paper)
+        text, skipped, _ = await self._fulltext(paper)
         return {
             "paperId": paper.paper_id,
             "title": paper.title,
@@ -301,11 +301,11 @@ class Discovery:
     async def get_figures(self, paper_id: str) -> dict[str, Any]:
         """The paper's PMC figures with their image URLs, from the same cached full text as `get_fulltext`."""
         paper = await self.get_paper(paper_id)
-        text, skipped = await self._fulltext(paper)
+        text, skipped, images = await self._fulltext(paper)
         if text.source != "pmc":
             skipped.append("figures come from PMC only, and there is no PMC full text for this paper")
-        elif text.imagesSkipped:
-            skipped.append(text.imagesSkipped)
+        elif reason := text.imagesSkipped or images:
+            skipped.append(reason)
         return {
             "paperId": paper.paper_id,
             "source": text.source,
@@ -315,7 +315,7 @@ class Discovery:
 
     async def check_quotes(self, paper_id: str, quotes: list[str]) -> dict[str, Any]:
         paper = await self.get_paper(paper_id)
-        text, _ = await self._fulltext(paper)
+        text, _, _ = await self._fulltext(paper)
         checked = []
         for passage in quotes:
             section = text.find(passage)
@@ -329,13 +329,15 @@ class Discovery:
             )
         return {"paperId": paper.paper_id, "source": text.source, "quotes": checked}
 
-    async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str]]:
-        """The paper's full text from the first source that has it, and why the others didn't."""
+    async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str], str | None]:
+        """The paper's full text from the first source that has it, why the others didn't, and why
+        its figures got no image URLs when PMC's article page couldn't be read (None otherwise)."""
         if cached := self.store.get_fulltext(paper.paper_id):
-            if figures.lacks_image_urls(cached):  # saved before figures had image URLs
-                await figures.add_image_urls(self.client, cached)
+            images = None
+            if figures.lacks_image_urls(cached):  # saved before figures had image URLs, or PMC's page failed
+                images = await figures.add_image_urls(self.client, cached)
                 self.store.save_fulltext(paper.paper_id, cached)
-            return cached, []
+            return cached, [], images
         if "pmcid" not in paper.ids and "pmid" in paper.ids:
             # OpenAlex and Semantic Scholar records often lack the PMCID that PubMed's has.
             try:
@@ -358,18 +360,16 @@ class Discovery:
         for name, attempt in attempts:
             try:
                 if found := await attempt():
+                    images = await figures.add_image_urls(self.client, found)
                     self.store.save_fulltext(paper.paper_id, found)
-                    return found, skipped
+                    return found, skipped, images
                 skipped.append(f"{name}: no full text there")
             except (Skipped, httpx.HTTPError, ET.ParseError) as error:
                 skipped.append(f"{name}: {error}")
-        return fulltext.from_abstract(paper.abstract, url), skipped
+        return fulltext.from_abstract(paper.abstract, url), skipped, None
 
     async def _pmc(self, pmcid: str, url: str, abstract: str | None) -> FullText | None:
-        text = fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
-        if text:
-            await figures.add_image_urls(self.client, text)
-        return text
+        return fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
 
     async def _web(self, url: str) -> FullText | None:
         markdown = await tavily.extract(self.client, url)
