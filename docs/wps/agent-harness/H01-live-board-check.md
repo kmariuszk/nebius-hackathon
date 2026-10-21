@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | The acceptance of H02, H03, H04, D01, D02, D03, D04, D05 and T15 |
 | Milestone | W1 Nothing broken |
-| Status | Not started |
+| Status | Built on branch `w1/live-check` (Oct 20). A first run on unfixed `main` failed as intended on 4 overlapping seed cards and 2 placeholder arguments, and also on the master never answering within 600 s and a Semantic Scholar HTTP 400 for a recommendation with no seeds (fixed with D01's branch); the gate run on Wave 1 is pending |
 | Owner | TBD |
 
 ## Goal
@@ -67,13 +67,17 @@ The fixture waits until `GET /api/v1/boards` and the MCP endpoint answer (30 s),
 
 **Timing** is asserted only with `LIVE_TIMING=strict` (the targets in the group README); otherwise it is reported and printed.
 
+**Placeholder arguments.** The tool cards' `raw_input` is what the model wrote: the trace plugin records it before the agents' own before-tool callbacks run, so it still shows `since: "None"` after [H02](H02-clean-tool-arguments.md) drops it. The check counts what *reached* the papers MCP: the placeholders in papers-tool cards minus the ones the harness logged as dropped (`INFO harness.agents.args: <tool>: dropped <n> placeholder…`). The report keeps both (`placeholderArgs`, `placeholderArgsWritten`).
+
+**A cheaper model for development runs.** `LIVE_MODEL=cheap` makes Nemotron 3.5 Lightning stand in for Super VL (`SUPER_VL_MODEL` for the harness and the papers MCP's rerank), at about a fifth of the price; any other value is a model ID. The report names the model, and strict timing is not asserted with a stand-in, since the targets are for the demo's models. The gate runs (acceptance criterion 2, H04) use the default models.
+
 ## Tasks
 
-- [ ] `harness/tests/live/board_stack.py`: the stack fixture, free ports, temp dirs, readiness wait, teardown with logs.
-- [ ] `harness/tests/live/room.py`: room reader, drawn boxes, overlap count, links by kind, frames, card fields.
-- [ ] `harness/tests/live/test_master_board_live.py`: the run, the assertions, the report.
-- [ ] `.gitignore`: `harness/tests/live/reports/`.
-- [ ] `harness/README.md`: a "Live board check" section (requirements, command, `LIVE_WARM`, `LIVE_TIMING`, how long it takes, what it costs).
+- [x] `harness/tests/live/board_stack.py`: the stack fixture, free ports, temp dirs, readiness wait, teardown with logs.
+- [x] `harness/tests/live/room.py`: room reader, drawn boxes, overlap count, links by kind, frames, card fields.
+- [x] `harness/tests/live/test_master_board_live.py`: the run, the assertions, the report.
+- [x] `.gitignore`: `harness/tests/live/reports/`.
+- [x] `harness/README.md`: a "Live board check" section (requirements, command, `LIVE_WARM`, `LIVE_TIMING`, how long it takes, what it costs).
 
 ## Acceptance criteria
 

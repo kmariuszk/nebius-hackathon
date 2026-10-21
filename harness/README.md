@@ -121,6 +121,29 @@ To try it in an ACP client such as Zed, add a [custom agent](https://zed.dev/doc
 
 Tests: `uv run pytest` runs the adapter as a real subprocess against scripted models and stand-in canvas and papers MCPs (`tests/test_acp_*.py`), no keys needed. `uv run pytest -m live` runs `board_assistant` on Super VL through the same subprocess (`tests/live/`); it skips unless the harness finds `TF_API_KEY`. `tests/fixtures/echo-session.jsonl` is a recorded echo session for the chat panel's tests.
 
+## Live board check
+
+One command runs the real stack on a fresh board and checks what the master leaves on it ([H01](../docs/wps/agent-harness/H01-live-board-check.md)): the papers MCP and the board service start on free ports with their data in a temp dir (`tests/live/board_stack.py`), the board gets the demo question and the five seeds from `docs/demo.md`, and `master` runs on Nemotron through the real ACP adapter with the Start page's first message. Once the turn ends and every card's reading badge is off, the check reads the room's SQLite file (`tests/live/room.py`), the activity feed and the tool cards.
+
+```zsh
+uv run pytest -m live -k master_board -s
+NODE=~/.nvm/versions/node/v22.18.0/bin/node uv run pytest -m live -k master_board -s   # Node 22.18+ not first on PATH
+```
+
+You need `uv`, Node 22.18 or later (on `PATH`, or `NODE=/path/to/node`) and `TF_API_KEY` and `TAVILY_API_KEY` in the repo's `.env`; `OPENALEX_API_KEY` and `NCBI_API_KEY` make the searches fuller. Without them the test skips and says what's missing.
+
+It fails on: a turn that doesn't end with `end_turn`; fewer than 4 suggestions; any two cards whose drawn boxes (172 × 70, centred on the node) overlap, seeds included; a reading badge left on; a suggestion with neither "Why it matters" nor a gap; a placeholder value (`"None"`, `"null"`, `""`, …) that reached a papers tool (the tool cards show the model's own arguments, so the ones the harness dropped are subtracted, from its "dropped … placeholder" log lines); a source skipped with HTTP 400. When the tools exist, it also wants a `cites` link (`citation_links`), 2 to 6 cluster frames (`apply_clusters`) and a figure on some card (`get_figures`). The failure names the cards and calls at fault.
+
+| Variable | Effect |
+| --- | --- |
+| `LIVE_WARM=1` | Discovery uses its cache in `discovery/data` instead of an empty one (the gate runs cold) |
+| `LIVE_TIMING=strict` | Also fail when the first card takes over 90 s, the answer over 120 s or the last badge over 300 s; otherwise the timings are only reported |
+| `LIVE_MODEL=cheap` | Nemotron 3.5 Lightning stands in for Super VL in the harness and in the papers MCP's rerank, at about a fifth of the price (USD 0.06 / 0.24 per million tokens against 0.30 / 0.90); any other value is used as the model ID. For development runs: the timing targets aren't asserted, and a pass or a failure says less about the demo, since Lightning is the model that wrote the placeholder arguments |
+
+Each run writes `tests/live/reports/<UTC time>.json` (gitignored; format in the [group README](../docs/wps/agent-harness/README.md#shared-contracts)) and prints the three timings with the counts. `modelCalls` counts every LiteLLM call the harness made, background passes included; `costUsd` is the chat turn's cost from the last usage update, so the background reading isn't in it. If a check fails, the processes' last 50 log lines are printed and the temp dir is kept.
+
+A run takes about 10 minutes on today's pipeline and makes a few dozen Token Factory calls (the master, three search agents, the reader and context agent per card), plus the papers MCP's own scoring and rerank calls. Run one at a time, never in CI; use `LIVE_MODEL=cheap` while iterating and the default models for the gate.
+
 ## Not built yet
 
 - Verdicts, citation overlap and recency in `score_candidates`: it scores by embedding similarity to the question and the closest seed, so the master places the top of that score. The master's instruction already skips candidates marked `placeable: false` once the papers MCP sends that field.

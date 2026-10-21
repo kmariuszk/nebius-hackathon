@@ -11,3 +11,4 @@ dist/
 .claude/settings.local.json
 discovery/data/
 .pytest_cache/
+harness/tests/live/reports/

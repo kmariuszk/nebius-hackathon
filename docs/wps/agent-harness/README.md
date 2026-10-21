@@ -92,11 +92,11 @@ The canvas skips a `similar` link when a `cites` link already joins the pair (T1
 
 ```json
 {
-  "board": "b_…", "seeds": 5, "warm": false,
+  "board": "b_…", "seeds": 5, "warm": false, "model": "nvidia/Nemotron-3.5-Super-VL",
   "timings": {"tFirstCard": 0.0, "tAnswer": 0.0, "tFilled": 0.0},
   "counts": {"suggestions": 0, "overlaps": 0, "missingWhy": 0, "gapsOnly": 0,
              "citesLinks": 0, "similarLinks": 0, "clusters": 0,
-             "placeholderArgs": 0, "http400Skips": 0, "modelCalls": 0},
+             "placeholderArgs": 0, "placeholderArgsWritten": 0, "http400Skips": 0, "modelCalls": 0},
   "costUsd": 0.0
 }
 ```
