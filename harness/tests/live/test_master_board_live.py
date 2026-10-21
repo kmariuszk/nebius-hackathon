@@ -288,7 +288,8 @@ def build_report(run: Run, stack: Stack) -> dict[str, Any]:
         "details": details,
         "toolCards": [
             {"title": c.get("title"), "status": c.get("status"), "model": c["meta"].get("model"),
-             "seconds": c["meta"].get("seconds"), "costUsd": c["meta"].get("costUsd")}
+             "seconds": c["meta"].get("seconds"), "costUsd": c["meta"].get("costUsd"),
+             **({"error": str(tool_result(c.get("raw_output")))[:500]} if c.get("status") == "failed" else {})}
             for c in cards
         ],
     }
