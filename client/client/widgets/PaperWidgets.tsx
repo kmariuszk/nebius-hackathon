@@ -16,6 +16,7 @@ import { paperShapeId } from '../../shared/ids.ts'
 import type { PaperCardShape } from '../../shared/shapes.ts'
 import { currentGoal, litPaperIds, openPaperId, paperMoreOpen } from '../viewerState.ts'
 import { WidgetsContext, type LinkedPaper, type Toast, type WidgetsApi } from './context.ts'
+import { emptyState } from './emptyStates.ts'
 import { fadeCss, relatedSet, type Related } from './fade.ts'
 import { noteAuthor, plainText } from './notes.ts'
 import {
@@ -124,11 +125,16 @@ function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { sha
 	const [figureOpen, setFigureOpen] = useState(false)
 	const [scroll, setScroll] = useState({ left: 0, right: 0 })
 
-	// which widgets show (v5): the left column only what has data or is on its way
+	// which widgets show (v5): the left column only what has data, is on its way or says why it never
+	// came (emptyStates.ts); a seed's Why says it's a seed, over the suggestions linked to it
 	const isSeed = p.kind === 'seed'
-	const first = !isSeed && (p.oneLine || p.working || p.scores[goal]) ? 'why' : 'linked'
-	const leftKeys = [...(p.glance.length || p.working ? ['glance'] : []), ...(p.figure || p.working ? ['figure'] : [])]
-	const rightKeys = [first, ...(notes.length || (more && !isSeed) || noteDraft ? ['notes'] : []), ...(more && !isSeed ? ['evidence'] : [])]
+	const leftKeys = (['glance', 'figure'] as const).filter((k) => emptyState(p, k).kind !== 'hidden')
+	const rightKeys = [
+		'why',
+		...(isSeed ? ['linked'] : []),
+		...(notes.length || (more && !isSeed) || noteDraft ? ['notes'] : []),
+		...(more && !isSeed ? ['evidence'] : []),
+	]
 	const keys = ['title', 'actions', ...leftKeys, ...rightKeys]
 
 	const leftSig = leftKeys.join()
@@ -353,7 +359,7 @@ function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { sha
 				}}
 			>
 				{slot('title', <TitleWidget />)}
-				{slot('actions', <ActionsWidget />)}
+				{slot('actions', <ActionsWidget onVoted={(decision) => decision === 'discard' && close()} />)}
 				{column('left', layout.columns.left)}
 				{column('right', layout.columns.right)}
 			</Anchored>

@@ -320,6 +320,9 @@
 	line-height: 1.52;
 	margin: 8px 0 0;
 }
+.pw .why-w .ended {
+	margin-top: 8px;
+}
 .pw .ev-u {
 	text-decoration: underline dotted #9a988f 1.5px;
 	text-underline-offset: 4px;
@@ -497,6 +500,11 @@
 }
 .pw .figimg.pending .reading {
 	margin: 0;
+}
+.pw .nofig {
+	padding: 10px 14px;
+	font-size: 12px;
+	color: var(--muted);
 }
 .pw .figcap {
 	padding: 10px 14px 12px;

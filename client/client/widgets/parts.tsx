@@ -6,6 +6,7 @@ import { openPaperId, paperMoreOpen } from '../viewerState.ts'
 import { addPinnedNote } from './boardWrites.ts'
 import { sourceLabel, splitClaims, type ClaimEvidence } from './claims.ts'
 import { useWidgets, type LinkedPaper, type WidgetsApi } from './context.ts'
+import { emptyState } from './emptyStates.ts'
 import { glanceIcon, RELATION_LABEL, type GlanceIcon } from './glance.ts'
 import { castVote, myVote, type Vote } from './votes.ts'
 
@@ -108,10 +109,19 @@ export function WhyWidget() {
 	const score = p.scores[goal]
 	const color = score ? FIT_COLOR[score.fit] : UNSCORED
 	const { segments } = useMemo(() => splitClaims(p.oneLine, p.claims, p.quotes), [p.oneLine, p.claims, p.quotes])
+	const state = emptyState(p, 'why')
 
+	if (state.kind === 'seed') {
+		return (
+			<Widget k="why" className="why-w" style={{ '--fit': 'var(--ink)' } as CSSProperties}>
+				<Head>Why it matters to you</Head>
+				<p className="why">{state.text}</p>
+			</Widget>
+		)
+	}
 	return (
 		<Widget k="why" className="why-w" style={{ '--fit': color } as CSSProperties}>
-			<Head ai>Why it matters to you</Head>
+			<Head ai={state.kind !== 'ended'}>Why it matters to you</Head>
 			<div className="fitrow">
 				<span className="dot" style={{ background: color }} />
 				{score ? (
@@ -129,12 +139,13 @@ export function WhyWidget() {
 					{segments.map((s, i) => (s.claim ? <Claim key={i} text={s.text} claim={s.claim} /> : <Fragment key={i}>{s.text}</Fragment>))}
 				</p>
 			)}
-			{p.working && (
+			{state.kind === 'working' && (
 				<div className="reading">
 					<Spin />
 					Still reading. The rest fills in as it’s ready.
 				</div>
 			)}
+			{state.kind === 'ended' && <div className="meta ended">{state.text}</div>}
 		</Widget>
 	)
 }
@@ -282,10 +293,14 @@ function LinkedRow({ row }: { row: LinkedPaper }) {
 export function GlanceWidget() {
 	const { shape } = useWidgets()
 	const { glance, quotes } = shape.props
+	const state = emptyState(shape.props, 'glance')
+	if (state.kind === 'hidden') return null
 	return (
 		<Widget k="glance" className="glance-w">
-			<Head ai>The paper at a glance</Head>
-			{glance.length === 0 ? (
+			<Head ai={state.kind !== 'ended'}>The paper at a glance</Head>
+			{state.kind === 'ended' ? (
+				<div className="meta">{state.text}</div>
+			) : glance.length === 0 ? (
 				<>
 					<div className="reading first">
 						<Spin />
@@ -379,6 +394,15 @@ export function FigureWidget() {
 	const { shape, openFigure } = useWidgets()
 	const { figure } = shape.props
 	const [failed, setFailed] = useState<string | null>(null)
+	const state = emptyState(shape.props, 'figure')
+	if (state.kind === 'hidden') return null
+	if (state.kind === 'ended') {
+		return (
+			<Widget k="figure" className="fig-w none">
+				<div className="nofig">{state.text}</div>
+			</Widget>
+		)
+	}
 	if (!figure) {
 		return (
 			<Widget k="figure" className="fig-w">
@@ -417,7 +441,8 @@ export function FigureWidget() {
 
 /* ---------- actions, under the node ---------- */
 
-export function ActionsWidget() {
+/** `onVoted` runs once a vote is saved: PaperWidgets decides what opens next. */
+export function ActionsWidget({ onVoted }: { onVoted(decision: Vote): void }) {
 	const api = useWidgets()
 	const { shape, boardId, memberId, more } = api
 	const p = shape.props
@@ -444,10 +469,9 @@ export function ActionsWidget() {
 				(e: Error) => api.toast({ text: `Undo wasn’t saved: ${e.message}` })
 			)
 		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.`, undo })
-		else if (v === 'discard') {
-			api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.`, undo })
-			api.close()
-		} else api.toast({ text: `${label} is back on the board.`, undo })
+		else if (v === 'discard') api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.`, undo })
+		else api.toast({ text: `${label} is back on the board.`, undo })
+		onVoted(v)
 	}
 
 	// the chat opens (connecting if it has to) and sends it
