@@ -22,6 +22,8 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | `get_fulltext` | `paper_id`, `max_chars` (40,000) | `source` (pmc, web, abstract), `url`, `sections` (`title`, `text`), `figures` (`figureId`, `label`, `caption`), `truncated`, `omittedSections`, `skipped` |
 | `check_quotes` | `paper_id`, `quotes` | each quote with `verbatim`, `section` and a `link` that highlights it (`#:~:text=`) |
 
+`since` takes `YYYY`, `YYYY-MM` or `YYYY-MM-DD` (a year or month counts from its first day); anything else is a tool error naming those formats. An optional argument sent as a placeholder (`"None"`, `"none"`, `"null"`, `"NULL"`, `"undefined"` or `""`) counts as left out.
+
 Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Clustering and figure images from `docs/Concept.md` are still to come, and scoring is embedding similarity only so far.
 
 ### Where full text comes from

@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import xml.etree.ElementTree as ET
 from collections.abc import Awaitable, Callable, Iterable
 from dataclasses import asdict
@@ -40,6 +41,11 @@ RERANK_BACKENDS: tuple[RerankBackend, ...] = ("super_vl", "rerank_vl")
 # PubMed similar articles taken per seed; the list is ranked, so the top is enough.
 SIMILAR_PER_SEED = 20
 
+# Strings a model sends for an optional argument it means to leave out.
+PLACEHOLDERS = frozenset({"None", "none", "null", "NULL", "undefined", ""})
+DATE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
+SINCE_FORMAT = "since must be YYYY, YYYY-MM or YYYY-MM-DD"
+
 
 class Discovery:
     def __init__(self, client: httpx.AsyncClient, store: Store, vectors: VectorStore) -> None:
@@ -54,6 +60,7 @@ class Discovery:
         sources: Iterable[SearchSource] = SEARCH_SOURCES,
         since: str | None = None,
     ) -> dict[str, Any]:
+        since = _since(since)
         jobs = {
             "pubmed": lambda: self._pubmed_search(query, limit, since),
             "openalex": lambda: openalex.search(self.client, query, limit, since),
@@ -76,6 +83,7 @@ class Discovery:
         limit: int = 100,
         query: str | None = None,
     ) -> dict[str, Any]:
+        since = _since(since)
         seeds, skipped = await self._papers(seed_ids, "seed")
         excluded = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
 
@@ -416,7 +424,7 @@ class Discovery:
         score = {pmid: s for pmid, s in score.items() if pmid not in seed_pmids}
         top = sorted(score, key=lambda pmid: (-score[pmid], -int(pmid)))[:limit]
         papers = _in_order(await pubmed.efetch(self.client, top), "pmid", top)
-        if since:
+        if since := _since(since):
             papers = [p for p in papers if p.year is None or p.year >= int(since[:4])]
         return papers
 
@@ -479,6 +487,16 @@ def _round_robin(found: dict[str, list[Paper]]) -> list[tuple[str, Paper]]:
     for rank in range(max((len(papers) for papers in found.values()), default=0)):
         merged += [(name, papers[rank]) for name, papers in found.items() if rank < len(papers)]
     return merged
+
+
+def _since(since: str | None) -> str | None:
+    """`since` as a full YYYY-MM-DD date, which every source accepts, or None for a
+    placeholder; raises `ValueError` for anything else."""
+    if since is None or since.strip() in PLACEHOLDERS:
+        return None
+    if not DATE.match(since):
+        raise ValueError(SINCE_FORMAT)
+    return since + "-01" * (2 - since.count("-"))
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:

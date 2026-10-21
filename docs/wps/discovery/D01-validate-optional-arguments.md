@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [H04](../agent-harness/H04-first-run-in-90-seconds.md) |
 | Milestone | W1 Nothing broken |
-| Status | Not started |
+| Status | Built on branch `w1/discovery` (Oct 20); criterion 4 (the manual MCP call against the running server) still needs a live run |
 | Owner | TBD |
 
 ## Goal
@@ -63,10 +63,10 @@ The MCP server builds its argument model from these annotations, so validation h
 
 ## Tasks
 
-- [ ] `server.py`: `PLACEHOLDERS`, `_unset`, `_date`, `Since`, `OptionalIds`; annotate the arguments above; the docstrings say "leave out when not needed".
-- [ ] `service.py`: `_since`, used by `search`, `find_candidates` and `_pubmed_links`.
-- [ ] `discovery/tests/test_server_args.py`.
-- [ ] `discovery/README.md`: one line on the accepted `since` formats.
+- [x] `server.py`: `PLACEHOLDERS`, `_unset`, `_date`, `Since`, `OptionalIds`; annotate the arguments above; the docstrings say "leave out when not needed".
+- [x] `service.py`: `_since`, used by `search`, `find_candidates` and `_pubmed_links`.
+- [x] `discovery/tests/test_server_args.py`.
+- [x] `discovery/README.md`: one line on the accepted `since` formats.
 
 ## Acceptance criteria
 
