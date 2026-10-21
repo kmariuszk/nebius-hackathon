@@ -1,7 +1,9 @@
 import type { TLRecord, TLShape } from '@tldraw/tlschema'
+import { CARD_SIZE } from '../shared/shapes.ts'
 
 // Layout v0 (T02): agents never send coordinates; a new shape goes on the nearest free spot
-// around an anchor. Deterministic, and it never moves anything already on the board.
+// around an anchor. Deterministic, and it never moves anything already on the board. Every
+// paper is drawn as a CARD_SIZE card centred on its node (v6), so that is the room it keeps.
 
 export interface Vec {
 	x: number
@@ -39,7 +41,17 @@ function ownSize(shape: TLShape): { w: number; h: number } | null {
 	return null
 }
 
-/** Page-space boxes of the shapes among `records` (children of frames and groups included; rotation ignored). */
+/** A paper card keeps at least a card's room, centred on its node, however small the node. */
+export function footprint(b: Box): Box {
+	const w = Math.max(b.w, CARD_SIZE.w)
+	const h = Math.max(b.h, CARD_SIZE.h)
+	return { x: b.x - (w - b.w) / 2, y: b.y - (h - b.h) / 2, w, h }
+}
+
+/**
+ * Page-space boxes of the shapes among `records` (children of frames and groups included; rotation
+ * ignored). A paper card's box is its footprint, centred on the node.
+ */
 export function shapeBoxes(records: Iterable<TLRecord>): Map<string, Box> {
 	const shapes = new Map<string, TLShape>()
 	for (const r of records) if (isShape(r)) shapes.set(r.id, r)
@@ -52,7 +64,9 @@ export function shapeBoxes(records: Iterable<TLRecord>): Map<string, Box> {
 	const boxes = new Map<string, Box>()
 	for (const shape of shapes.values()) {
 		const size = ownSize(shape)
-		if (size) boxes.set(shape.id, { ...offset(shape), ...size })
+		if (!size) continue
+		const box = { ...offset(shape), ...size }
+		boxes.set(shape.id, shape.type === 'paper-card' ? footprint(box) : box)
 	}
 	return boxes
 }
@@ -84,21 +98,22 @@ export function bounds(boxes: Iterable<Box>): Box | null {
 }
 
 /**
- * Top-left for a new box of `size`: the first spot on rings around `anchor` (radius k × (size + 40),
- * 8 angles per ring, nearest first) that keeps MARGIN clear of every shape among `records`. With
- * no anchor, it starts just right of the page's content. A batch places shapes one by one, each
- * call seeing the shapes placed before it.
+ * Top-left for a new box of `size`: the first spot on rings around `anchor` (radius k × (the
+ * footprint's long side + 40), 8 angles per ring, nearest first) whose footprint keeps MARGIN
+ * clear of every shape among `records`. With no anchor, it starts just right of the page's
+ * content. A batch places shapes one by one, each call seeing the shapes placed before it.
  */
 export function placeNear(records: Iterable<TLRecord>, size: { w: number; h: number }, anchor: Vec | null): Vec {
 	const boxes = [...shapeBoxes(records).values()]
 	const content = bounds(boxes)
+	const room = footprint({ x: 0, y: 0, ...size })
 	const start =
 		anchor ??
 		(content
-			? { x: content.x + content.w + RING_GAP + size.w / 2, y: content.y + size.h / 2 }
+			? { x: content.x + content.w + RING_GAP + room.w / 2, y: content.y + room.h / 2 }
 			: EMPTY_PAGE_ANCHOR)
 	for (const spot of ringSpots(start, size, MAX_RINGS)) {
-		if (isFree(boxes, { ...spot, ...size })) return spot
+		if (isFree(boxes, footprint({ ...spot, ...size }))) return spot
 	}
 	// unreachable in practice: past the outermost shape every spot is free
 	return { x: Math.round((content?.x ?? 0) + (content?.w ?? 0) + RING_GAP), y: Math.round(content?.y ?? 0) }
@@ -106,8 +121,8 @@ export function placeNear(records: Iterable<TLRecord>, size: { w: number; h: num
 
 /**
  * Top-left (page space) for a new box of `size` inside the frame `frameId`, as placeNear does on
- * the page: the nearest ring spot around `anchor` that lies MARGIN inside the frame and keeps
- * MARGIN clear of every other shape. Null if the frame has no room left.
+ * the page: the nearest ring spot around `anchor` whose footprint lies MARGIN inside the frame
+ * and keeps MARGIN clear of every other shape. Null if the frame has no room left.
  */
 export function placeInside(
 	records: Iterable<TLRecord>,
@@ -123,17 +138,23 @@ export function placeInside(
 	const inner = { x: frame.x + MARGIN, y: frame.y + MARGIN, w: frame.w - 2 * MARGIN, h: frame.h - 2 * MARGIN }
 	const inside = (b: Box) =>
 		b.x >= inner.x && b.y >= inner.y && b.x + b.w <= inner.x + inner.w && b.y + b.h <= inner.y + inner.h
-	const rings = Math.ceil(Math.hypot(frame.w, frame.h) / (Math.max(size.w, size.h) + RING_GAP)) + 1
+	const rings = Math.ceil(Math.hypot(frame.w, frame.h) / ringStep(size)) + 1
 	for (const spot of ringSpots(anchor ?? centre(frame), size, rings)) {
-		const box = { ...spot, ...size }
+		const box = footprint({ ...spot, ...size })
 		if (inside(box) && isFree(boxes, box)) return spot
 	}
 	return null
 }
 
-// Top-left corners on rings around `start` at radius k × (size + 40), 8 angles per ring, nearest first.
+// a card's long side plus RING_GAP: 172 + 40 = 212 px for every node up to 172 wide
+function ringStep(size: { w: number; h: number }) {
+	const room = footprint({ x: 0, y: 0, ...size })
+	return Math.max(room.w, room.h) + RING_GAP
+}
+
+// Node top-left corners on rings around `start` at radius k × ringStep, 8 angles per ring, nearest first.
 function* ringSpots(start: Vec, size: { w: number; h: number }, rings: number): Generator<Vec> {
-	const step = Math.max(size.w, size.h) + RING_GAP
+	const step = ringStep(size)
 	for (let k = 0; k <= rings; k++) {
 		for (let i = 0; i < (k === 0 ? 1 : 8); i++) {
 			const angle = (i * Math.PI) / 4

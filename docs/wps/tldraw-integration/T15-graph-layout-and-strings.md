@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (frames that fit cards), the [T14 refresh](T14-board-editing.md) (link editing on the strings), [H01](../agent-harness/H01-live-board-check.md)'s overlap check |
 | Milestone | W1 Nothing broken |
-| Status | Not started. A first version of the layout fix is on Igor's local branch `feat/name-pinned` (`4c11405`, not pushed, layout tests not updated); this WP spells the change out in full |
+| Status | Built on branch `w1/board` (Oct 20); the harness near-links step is on `w1/harness-bg`; H01's live overlap check pending |
 | Owner | TBD |
 
 ## Goal
@@ -66,14 +66,14 @@ function footprint(b: Box): Box {
 
 ## Tasks
 
-- [ ] `client/shared/shapes.ts`: `CARD_SIZE`; `client/client/shapes/card.ts` uses it.
-- [ ] `client/server/layout.ts`: `footprint`, footprint-aware `shapeBoxes`, `placeNear`, `placeInside`, `ringSpots`.
-- [ ] `client/server/canvasTools.ts`: `anchorFor` on the first card; `resizeByLinks` removed; the cites-over-similar skip; tool description.
-- [ ] `client/server/clusterTools.ts`: `CELL`, no `LABEL_H`, card-centred grid positions.
-- [ ] `client/client/shapes/card.ts`: `seedLinksOf` and the note wording.
-- [ ] `client/server/seedDemo.ts`: positions spread if the test finds overlaps.
+- [x] `client/shared/shapes.ts`: `CARD_SIZE`; `client/client/shapes/card.ts` uses it.
+- [x] `client/server/layout.ts`: `footprint`, footprint-aware `shapeBoxes`, `placeNear`, `placeInside`, `ringSpots`.
+- [x] `client/server/canvasTools.ts`: `anchorFor` on the first card; `resizeByLinks` removed; the cites-over-similar skip; tool description.
+- [x] `client/server/clusterTools.ts`: `CELL`, no `LABEL_H`, card-centred grid positions.
+- [x] `client/client/shapes/card.ts`: `seedLinksOf` and the note wording.
+- [x] `client/server/seedDemo.ts`: positions spread if the test finds overlaps.
 - [ ] `harness/harness/agents/master/background.py` and `candidates.py`: remember `near`, the near-links step.
-- [ ] Tests (below).
+- [x] Tests (below).
 
 ## Acceptance criteria
 
