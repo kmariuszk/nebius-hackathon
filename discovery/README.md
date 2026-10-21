@@ -42,14 +42,14 @@ Two steps, cheap then expensive:
 
 1. `score_candidates` embeds every candidate's and seed's title and abstract with Qwen3-Embedding-8B on Token Factory (it serves no Nemotron embedder) and scores each candidate by the mean of its cosine similarity to the question and to the closest seed, or the question's alone without seeds. It handles hundreds of candidates in a few seconds, and in well under a second once their vectors are stored. The score is a formula, so it can be broken down into its two similarities.
 
-   Texts go to the embeddings endpoint 32 to a request, at most `EMBED_CONCURRENCY` (default 4) requests at once across the server, each with a 90-second timeout. A request that times out, answers 429 or answers 5xx is tried twice more, after 2 s and then 5 s (or what `Retry-After` asks). Candidates still without a vector are left out and `skipped` says how many and why (`"3 candidates weren't scored: embeddings timed out after 3 tries"`); the call is a tool error with the reason only when the question or every candidate can't be embedded. Papers that `search` and `find_candidates` return (and the seeds) are embedded in the background as soon as they're found, so `score_candidates` mostly reads stored vectors.
+   Texts go to the embeddings endpoint 32 to a request, at most `EMBED_CONCURRENCY` (default 4) requests at once across the server, each with a 90-second timeout. A request that times out, answers 429 or answers 5xx is tried twice more, after 2 s and then 5 s (or what `Retry-After` asks). Candidates still without a vector are left out and `skipped` says how many and why (`"3 candidates weren't scored: embeddings timed out after 3 tries"`); the call is a tool error with the reason only when the question or every candidate can't be embedded. Papers that `search` and `find_candidates` return (and the seeds) are embedded in the background as soon as they're found, so `score_candidates` mostly reads stored vectors; it waits up to 60 s for a warm-up still embedding its papers rather than sending them again.
 2. `rerank` reorders up to 100 candidates for the goal. Pass it the top of `score_candidates`, so the 100 it sees are the closest in meaning rather than the first found.
 
 `rerank` has two backends, picked per call by `backend` or for the server by `RERANK_BACKEND` (default `super_vl`):
 
 | Backend | Model | How | Reasons | Off-topic papers |
 | --- | --- | --- | --- | --- |
-| `super_vl` | Nemotron 3.5 Super VL on Token Factory | One listwise request with the seeds as context | Yes | Left out |
+| `super_vl` | Nemotron 3.5 Super VL on Token Factory | One listwise request with the seeds as context, reasoning off unless `RERANK_THINKING=1` | Yes | Left out |
 | `rerank_vl` | Llama Nemotron Rerank VL 1B v2 on NVIDIA's hosted API | Scores each candidate's title and abstract against the goal alone; `score` is the logit through a sigmoid | Empty | Kept, ranked low |
 
 Token Factory serves no rerank model, so `rerank_vl` needs `NVIDIA_API_KEY` from [build.nvidia.com](https://build.nvidia.com). Without the key, or if NVIDIA's API fails, the call is ranked by `super_vl` instead; `backend` in the result names the backend that actually ranked, and `skipped` says why it changed. Super VL takes about 30 seconds for 60 candidates, and its order, 0-to-1 `score` and `reason` are the model's judgement.

@@ -47,13 +47,17 @@ DATE = re.compile(r"^\d{4}(-\d{2}(-\d{2})?)?$")
 SINCE_FORMAT = "since must be YYYY, YYYY-MM or YYYY-MM-DD"
 
 
+# Seconds scoring waits for warm-ups in flight before embedding what's left itself.
+WARM_WAIT = 60.0
+
+
 class Discovery:
     def __init__(self, client: httpx.AsyncClient, store: Store, vectors: VectorStore) -> None:
         self.client = client
         self.store = store
         self.vectors = vectors
         self._warm_tasks: set[asyncio.Task[None]] = set()
-        self._warming: set[str] = set()
+        self._warming: dict[str, asyncio.Task[None]] = {}
 
     async def search(
         self,
@@ -205,6 +209,7 @@ class Discovery:
         if not candidates:
             return {"top": [], "scored": 0, "skipped": skipped}
 
+        await self._warmed(seeds + candidates)
         vectors, failures = await self._paper_vectors(embedder, seeds + candidates)
         for role, papers, what in (("candidates", candidates, "scored"), ("seeds", seeds, "used")):
             reasons = Counter(failures[paper.paper_id] for paper in papers if paper.paper_id in failures)
@@ -507,7 +512,6 @@ class Discovery:
         except Skipped:
             return  # No key: score_candidates says which to set when it's called.
         ids = {paper.paper_id for paper in fresh}
-        self._warming |= ids
 
         async def warm() -> None:
             try:
@@ -518,11 +522,23 @@ class Discovery:
             except Exception:
                 log.warning("Embedding warm-up failed", exc_info=True)
             finally:
-                self._warming -= ids
+                for paper_id in ids:
+                    self._warming.pop(paper_id, None)
 
         task = asyncio.create_task(warm())
+        self._warming |= dict.fromkeys(ids, task)
         self._warm_tasks.add(task)
         task.add_done_callback(self._warm_tasks.discard)
+
+    async def _warmed(self, papers: list[Paper]) -> None:
+        """Wait, up to `WARM_WAIT` seconds, for warm-ups already embedding these papers.
+
+        Scoring them alongside would send the same texts again and queue behind the warm-up's
+        requests for the same few embedding slots (Oct 21: scoring took up to 42 s).
+        """
+        tasks = {self._warming[paper.paper_id] for paper in papers if paper.paper_id in self._warming}
+        if tasks:
+            await asyncio.wait(tasks, timeout=WARM_WAIT)
 
     def _save_all(self, found: Iterable[tuple[str, Paper]]) -> dict[str, tuple[Paper, list[str]]]:
         """Save each paper; returns paper ID → (stored paper, sources that found it)."""
