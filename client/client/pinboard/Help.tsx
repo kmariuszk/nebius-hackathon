@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { loopPath } from '../shapes/card'
+import { useDismiss } from './useDismiss'
 
 // The ? at the bottom right (T13): the v6 key, "How to read the board", then how to edit it. The
 // wording is the v6 demo board's, for what this board draws.
@@ -20,19 +21,7 @@ const string = (color: string, width: number, dotted = false) => (
 export function Help() {
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
-	useEffect(() => {
-		if (!open) return
-		const outside = (e: PointerEvent) => {
-			if (!ref.current?.contains(e.target as Node)) setOpen(false)
-		}
-		const escape = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false)
-		document.addEventListener('pointerdown', outside)
-		document.addEventListener('keydown', escape)
-		return () => {
-			document.removeEventListener('pointerdown', outside)
-			document.removeEventListener('keydown', escape)
-		}
-	}, [open])
+	useDismiss(ref, open, () => setOpen(false))
 	return (
 		<div className="pb-controls" ref={ref}>
 			<button type="button" className="pb-ctl" aria-expanded={open} onClick={() => setOpen(!open)} title="How to read the board">

@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 import { nodeLabel } from '../../shared/display'
 import type { PaperCardShape } from '../../shared/shapes'
 import { boardDerived, FIT_COLOR, FIT_LABEL } from '../shapes/card'
 import { currentGoal, filters, type BoardFilters } from '../viewerState'
 import { activeCount, CITED_AT_LEAST, DEFAULT_FILTERS, filterOptions, toggled } from './filters'
+import { useDismiss } from './useDismiss'
 
 // The v6 Filter button in the toolbar and its panel (T09): fit, type, quality, year and discarded
 // papers, for this viewer only. Options no paper on the board has data for are left out.
@@ -15,14 +16,7 @@ export function FilterButton({ editor }: { editor: Editor }) {
 	const count = useValue('active filters', () => activeCount(filters.get()), [])
 	const [open, setOpen] = useState(false)
 	const ref = useRef<HTMLDivElement>(null)
-	useEffect(() => {
-		if (!open) return
-		const close = (e: PointerEvent) => {
-			if (!ref.current?.contains(e.target as Node)) setOpen(false)
-		}
-		document.addEventListener('pointerdown', close)
-		return () => document.removeEventListener('pointerdown', close)
-	}, [open])
+	useDismiss(ref, open, () => setOpen(false))
 	return (
 		<div
 			className="pb-filter"

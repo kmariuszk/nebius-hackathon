@@ -5,6 +5,7 @@ import type { PaperCardShape } from '../../shared/shapes'
 import { boardApi } from '../api'
 import { changes } from '../pinboard/changes'
 import { linkedCards } from '../pinboard/Strings'
+import { useDismiss } from '../pinboard/useDismiss'
 import { linkEditorAt } from './linkState'
 import {
 	DELETED_TOAST,
@@ -90,15 +91,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		changes.record(boardId, { type: 'link_renamed', ...link, label: next })
 	}
 	// a click anywhere else keeps what was typed, as on the v6 board
-	const latest = useRef(() => commit(draft))
-	latest.current = () => commit(draft)
-	useEffect(() => {
-		const outside = (e: PointerEvent) => {
-			if (!ref.current?.contains(e.target as Node)) latest.current()
-		}
-		document.addEventListener('pointerdown', outside, true)
-		return () => document.removeEventListener('pointerdown', outside, true)
-	}, [])
+	useDismiss(ref, true, () => commit(draft), { capture: true, escape: false })
 
 	const hide = () => {
 		const before = arrow.meta

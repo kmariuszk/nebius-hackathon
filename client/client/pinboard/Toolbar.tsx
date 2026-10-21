@@ -8,6 +8,7 @@ import { NOTE_DRAG_TYPE } from '../editing/pinNotes'
 import { toast } from '../editing/toast'
 import { changes, describeChange, updateSuggestions } from './changes'
 import { FilterButton } from './FilterPanel'
+import { useDismiss } from './useDismiss'
 
 // The v6 toolbar: a Note to stick on the board or on a paper, Filter, and after your edits "N changes ·
 // the agent is waiting · Update suggestions". tldraw's own tools stay on their keyboard shortcuts.
@@ -60,14 +61,7 @@ function Changes({ editor, boardId }: { editor: Editor; boardId: string }) {
 	useEffect(() => {
 		if (!count) setOpen(false)
 	}, [count])
-	useEffect(() => {
-		if (!open) return
-		const close = (e: PointerEvent) => {
-			if (!ref.current?.contains(e.target as Node)) setOpen(false)
-		}
-		document.addEventListener('pointerdown', close)
-		return () => document.removeEventListener('pointerdown', close)
-	}, [open])
+	useDismiss(ref, open, () => setOpen(false))
 	if (!count) return null
 
 	const labelOf = (paperId: string) => {
