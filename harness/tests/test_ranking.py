@@ -214,16 +214,19 @@ def test_the_board_master_ranks_with_rank_papers_and_has_no_rerank_or_set_scores
 
 
 def test_token_factory_models_retry_twice():
-    assert models.super_vl()._additional_args["num_retries"] == 2
-    assert models.lightning()._additional_args["num_retries"] == 1
     assert models.super_vl()._additional_args["timeout"] == 120 and models.lightning()._additional_args["timeout"] == 45
-    # The OpenAI client doesn't retry on its own; Lightning falls back to Super VL, Super VL to nothing.
-    assert models.super_vl()._additional_args["max_retries"] == models.lightning()._additional_args["max_retries"] == 0
-    assert models.lightning()._additional_args["fallbacks"] == [{"model": f"openai/{models.SUPER_VL}", "timeout": 120}]
-    assert "fallbacks" not in models.super_vl()._additional_args
+    # Neither LiteLLM nor the OpenAI client retries on its own; the fallbacks are the two retries.
+    for llm in (models.super_vl(), models.lightning()):
+        assert llm._additional_args["num_retries"] == llm._additional_args["max_retries"] == 0
+    assert models.lightning()._additional_args["fallbacks"] == [
+        {"model": f"openai/{models.LIGHTNING}", "timeout": 45},
+        {"model": f"openai/{models.SUPER_VL}", "timeout": 120},
+    ]
+    assert models.super_vl()._additional_args["fallbacks"] == [{"model": f"openai/{models.SUPER_VL}", "timeout": 120}] * 2
 
 
 def test_model_timeout_leaves_lightning_at_45_seconds(monkeypatch):
     monkeypatch.setenv("MODEL_TIMEOUT", "200")
     assert models.super_vl()._additional_args["timeout"] == 200
     assert models.lightning()._additional_args["timeout"] == 45
+    assert models.lightning()._additional_args["fallbacks"][-1]["timeout"] == 200
