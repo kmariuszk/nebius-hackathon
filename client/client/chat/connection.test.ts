@@ -93,16 +93,15 @@ test('initialize, session/new with the canvas MCP, and a streamed prompt turn', 
 const said = (updates: SessionNotification[]) =>
 	updates.map((n) => (n.update.sessionUpdate === 'agent_message_chunk' && n.update.content.type === 'text' ? n.update.content.text : '')).join('')
 
-test('_canvas/snapshot answers with a PNG of the page', async () => {
+test('_canvas/snapshot answers with a PNG of the page', async (t) => {
 	const asked: SnapshotRequest[] = []
 	const png = { mimeType: 'image/png' as const, data: 'iVBORw0KGgo=', width: 1600, height: 980, caption: "The researcher's current view, with 3 cards" }
-	const off = setSnapshotRenderer(async (request) => (asked.push(request), png))
+	t.after(setSnapshotRenderer(async (request) => (asked.push(request), png)))
 	const { opening, updates } = open()
 	const conn = await opening
 	await conn.prompt([{ type: 'text', text: 'snapshot please' }])
-	off()
-	// the fake harness asks for the viewport and reports the answer, an error message or "ok"
-	assert.match(said(updates), /^snapshot: ok\./)
+	// the fake harness asks for the viewport and reports the answer's size and caption, or its error
+	assert.ok(said(updates).startsWith("snapshot: 1600×980, The researcher's current view, with 3 cards."), said(updates))
 	assert.deepEqual(asked, [{ target: 'viewport' }])
 	conn.close()
 })

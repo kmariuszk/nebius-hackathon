@@ -293,6 +293,24 @@ test('apply_clusters takes cluster_papers’ real result, and a second run with 
 	assertNoOverlaps(ctx)
 })
 
+test(
+	'a second apply_clusters puts the one more paper into its cluster’s frame',
+	{ todo: 'it stays on the page: c-pmid_200 is full, another frame sits below it, and spotInFrame only grows a frame downwards' },
+	async () => {
+		const ctx = newCtx()
+		addPapers(ctx, { papers: REAL.clusters.flatMap((c) => c.paperIds).map((id) => paper(id)) })
+		clusters = REAL as ClusterResult
+		await applyClusters(ctx, {})
+		addPapers(ctx, { papers: [paper('pmid:250')] })
+		clusters = {
+			...REAL,
+			clusters: REAL.clusters.map((c) => (c.clusterId === 'c-pmid_200' ? { ...c, paperIds: [...c.paperIds, 'pmid:250'] } : c)),
+		} as ClusterResult
+		await applyClusters(ctx, {})
+		assert.equal(card(ctx, 'pmid:250').parentId, frame(ctx, 'c-pmid_200').id)
+	}
+)
+
 test('apply_clusters writes nothing when the papers MCP fails, and needs two papers', async () => {
 	const ctx = newCtx()
 	addPapers(ctx, { papers: [paper('a'), paper('down')] })

@@ -83,8 +83,9 @@ async function runPrompt(id: unknown, params: { sessionId: string; prompt: { typ
 		_meta: { agent: 'echo', model: 'nvidia/Nemotron-3.5-Super-VL' },
 	})
 	if (text.includes('snapshot')) {
-		const answer = await request('_canvas/snapshot', { sessionId, target: 'viewport' })
-		update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `snapshot: ${answer.error?.message ?? 'ok'}. ` } })
+		const { error, result } = await request('_canvas/snapshot', { sessionId, target: 'viewport' })
+		const seen = error ? error.message : `${result.width}×${result.height}, ${result.caption}`
+		update(sessionId, { sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: `snapshot: ${seen}. ` } })
 	}
 	update(sessionId, {
 		sessionUpdate: 'tool_call_update',
