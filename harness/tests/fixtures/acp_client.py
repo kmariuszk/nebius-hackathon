@@ -25,11 +25,17 @@ LIMIT = 50 * 1024 * 1024
 
 
 class RecordingClient:
-    """An ACP client that records every session update and `_canvas/*` notification."""
+    """An ACP client that records every session update and `_canvas/*` notification and request.
+
+    `answers` maps an extension method ("canvas/snapshot") to its result, or to an
+    exception to fail with; methods without an answer fail as not implemented.
+    """
 
     def __init__(self) -> None:
         self.updates: list[Any] = []
         self.notifications: list[tuple[str, dict[str, Any]]] = []
+        self.requests: list[tuple[str, dict[str, Any]]] = []
+        self.answers: dict[str, Any] = {}
         self.changed = asyncio.Event()
 
     async def session_update(self, session_id: str, update: Any, **kwargs: Any) -> None:
@@ -43,7 +49,13 @@ class RecordingClient:
         self.notifications.append((method, params))
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        raise NotImplementedError(method)
+        self.requests.append((method, params))
+        answer = self.answers.get(method)
+        if answer is None:
+            raise NotImplementedError(method)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
 
     async def wait_for(self, predicate: Any, timeout: float = 10) -> Any:
         """The first recorded update matching `predicate`, waiting for it if needed."""
