@@ -335,6 +335,9 @@ async def test_master_board_fills_from_the_demo_seeds(board_stack: Stack, reques
     run = await run_master(board_stack)
     report = build_report(run, board_stack)
     report["failures"] = failures(report, run.listed)
+    if report["failures"]:
+        # kept with the stack's data, so a hang or a slow model can be read afterwards
+        (board_stack.data_dir.parent / "harness.log").write_text(run.stderr)
     REPORTS.mkdir(exist_ok=True)
     path = REPORTS / f"{datetime.now(UTC):%Y%m%dT%H%M%SZ}.json"
     path.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n")

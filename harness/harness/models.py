@@ -14,6 +14,9 @@ from harness import settings
 TOKEN_FACTORY_URL = "https://api.tokenfactory.nebius.com/v1/"
 SUPER_VL = "nvidia/Nemotron-3.5-Super-VL"
 LIGHTNING = "nvidia/Nemotron-3_5-Lightning"
+# Seconds one model call may take. Unbounded, a call Token Factory never answers blocked its
+# agent for good (Lightning stopped answering for minutes on Oct 21); a timed-out call is retried.
+MODEL_TIMEOUT = 120.0
 
 
 def super_vl() -> LiteLlm:
@@ -29,12 +32,14 @@ def lightning() -> LiteLlm:
 def token_factory(model_id: str) -> LiteLlm:
     """Any Token Factory model, through LiteLLM's OpenAI-compatible provider.
 
-    A failed call, such as a 429, is retried twice (LiteLLM backs off exponentially
-    on a 429), since the limit is shared by the chat, the background and the papers MCP.
+    A failed call, such as a 429 or one that takes longer than `MODEL_TIMEOUT` (or the
+    `MODEL_TIMEOUT` setting), is retried twice (LiteLLM backs off exponentially on a 429),
+    since the limit is shared by the chat, the background and the papers MCP.
     """
     return LiteLlm(
         model=f"openai/{model_id}",
         api_base=settings.get("TF_BASE_URL", TOKEN_FACTORY_URL),
         api_key=settings.require("TF_API_KEY"),
         num_retries=2,
+        timeout=float(settings.get("MODEL_TIMEOUT", "") or MODEL_TIMEOUT),
     )

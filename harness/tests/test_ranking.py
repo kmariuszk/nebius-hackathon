@@ -216,3 +216,4 @@ def test_the_board_master_ranks_with_rank_papers_and_has_no_rerank_or_set_scores
 def test_token_factory_models_retry_twice():
     assert models.super_vl()._additional_args["num_retries"] == 2
     assert models.lightning()._additional_args["num_retries"] == 2
+    assert models.super_vl()._additional_args["timeout"] == models.lightning()._additional_args["timeout"] == 120
