@@ -61,7 +61,7 @@ The canvas skips a `similar` link when a `cites` link already joins the pair (T1
 
 | Part | Rule |
 | --- | --- |
-| Papers | The suggestions the master placed in this conversation (`candidates.placed`), plus the next best of the latest `score_candidates`, up to `RERANK_POOL = 20` |
+| Papers | The suggestions the master placed in this conversation (`candidates.placed`), without seeds and discarded papers; only placed papers are written, so unplaced candidates aren't ranked (Oct 21: ranking 20 instead of 8 made `rank_papers` take 34 to 52 s) |
 | Goals | The board's goals from the last `get_board`; one `rerank` per goal, in parallel |
 | Goal text | The researcher's question (`candidates.QUESTION`) plus the goal's description: `new-findings` "new results on the question", `methods` "methods the researcher could reuse"; any other goal ID uses its label |
 | Writes | `set_scores` for every placed suggestion and every goal: fit `high` when the rerank score is 0.7 or more, `medium` from 0.4, else `low`; papers the rerank left out get score 0.2, fit `low`, why "Not in the agent's top picks for this goal" |

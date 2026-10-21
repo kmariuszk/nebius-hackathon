@@ -52,7 +52,8 @@ def rerank_per_goal(papers_mcp, failing: str | None = None) -> list[tuple[float,
         spans.append((started, time.monotonic()))
         if which == failing:
             raise ValueError("Super VL timed out")
-        ranked = [{"rank": i + 1, "paperId": p, "score": s, "reason": r} for i, (p, s, r) in enumerate(ORDERS[which])]
+        order = [(p, s, r) for p, s, r in ORDERS[which] if p in paper_ids]  # like the real one: only what it's given
+        ranked = [{"rank": i + 1, "paperId": p, "score": s, "reason": r} for i, (p, s, r) in enumerate(order)]
         return {"ranked": ranked[:k], "backend": "super_vl", "skipped": []}
 
     return spans
@@ -114,12 +115,12 @@ async def test_rank_papers_ranks_every_placed_paper_for_every_goal_and_places_no
     assert called.count("rank_papers") == 1 and not {"rerank", "set_scores"} & set(called)
     assert not {"rerank", "set_scores"} & set(model.requests[0].tools_dict)
 
-    # One rerank per goal, in parallel, on the placed suggestions then the next scored candidate.
+    # One rerank per goal, in parallel, on the placed suggestions only (pmid:11 was scored but not placed).
     reranks = [args for name, args in papers_mcp.calls if name == "rerank"]
     assert sorted(r["goal"] for r in reranks) == [f"{QUESTION}\nLooking for: methods the researcher could reuse",
                                                   f"{QUESTION}\nLooking for: new results on the question"]
     for r in reranks:
-        assert r["paper_ids"] == ["pmid:14", "pmid:13", "pmid:12", "pmid:11"] and r["k"] == 4
+        assert r["paper_ids"] == ["pmid:14", "pmid:13", "pmid:12"] and r["k"] == 3
         assert r["seed_ids"] == ["pmid:9"] and r["exclude_ids"] == ["pmid:2"]
     (start_a, end_a), (start_b, end_b) = spans
     assert max(start_a, start_b) < min(end_a, end_b)
@@ -168,19 +169,15 @@ async def test_a_failed_goal_ranking_leaves_that_goals_scores_alone_and_says_so(
     assert skipped.startswith("Ranking for methods failed: rerank:")
 
 
-def test_the_pool_is_the_placed_suggestions_then_the_next_scored():
+def test_the_pool_is_the_placed_suggestions_only():
     state = {
         "board:b1": {"papers": ["pmid:9"], "discarded": ["pmid:2"], "seeds": ["pmid:9"], "goals": ["methods"]},
-        "placed:p1": {"pmid:8": "seed", "pmid:5": "suggestion", "pmid:4": "suggestion"},
+        "placed:p1": {"pmid:8": "seed", "pmid:5": "suggestion", "pmid:4": "suggestion", "pmid:2": "suggestion"},
         "scored:s1": ["pmid:4", "pmid:9", "pmid:2", "pmid:8", "pmid:7", *[f"pmid:{n}" for n in range(100, 130)]],
     }
-    # Seeds (on the board or placed as seeds) and discarded papers are left out; 20 papers in all.
-    pool = candidates.pool_for_rerank(state)
-    assert pool[:4] == ["pmid:5", "pmid:4", "pmid:7", "pmid:100"] and len(pool) == candidates.RERANK_POOL
+    # Seeds (on the board or placed as seeds), discarded papers and unplaced candidates are left out.
+    assert candidates.pool_for_rerank(state) == ["pmid:5", "pmid:4"]
     assert candidates.seeds(state) == ["pmid:9", "pmid:8"]
-    # Every placed suggestion is ranked, even past the cap.
-    state["placed:p2"] = {f"pmid:{n}": "suggestion" for n in range(200, 225)}
-    assert len(candidates.pool_for_rerank(state)) == 27
 
 
 def test_note_keeps_the_boards_goals_seeds_and_question():

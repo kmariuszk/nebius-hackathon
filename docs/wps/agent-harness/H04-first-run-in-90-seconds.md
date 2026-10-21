@@ -35,7 +35,7 @@ On a fresh board with the five demo seeds and a cold discovery cache, the first 
 **`rank_papers`** (`harness/harness/agents/master/ranking.py`, contract in the [group README](README.md#shared-contracts)). A `BaseToolset` like `ProcessPapers`, exposing one `FunctionTool`, `rank_papers()`, with no arguments:
 
 1. Read from the session state that `candidates.note` keeps: the placed suggestions (`candidates.placed`, kind not `seed`), the latest scored order (`candidates.scored`), the question (`candidates.QUESTION`), the seeds and goals from the last `get_board` (`note` also stores `goals` and the seed IDs from `get_board`, a small addition).
-2. Pool: the placed suggestions, then the next scored candidates, up to `RERANK_POOL = 20`, without discarded papers.
+2. Pool: the placed suggestions, without seeds and discarded papers. (First built with the next scored candidates up to 20; the Oct 21 live runs showed that cost 34 to 52 s of Super VL reading for papers `rank_papers` never writes, so the pool is the placed papers only.)
 3. One `rerank` per goal, in parallel (`asyncio.gather`), through a `Step` with `board.papers("rerank")`, so the calls carry the turn's headers: `goal` is the question plus the goal's description, `seed_ids` the seeds, `exclude_ids` the discarded papers, `k = len(pool)`.
 4. One `set_scores` per placed suggestion through a `Step` with `board.canvas("set_scores")`, every goal at once: score and fit from the rerank (high from 0.7, medium from 0.4, else low), `why` the rerank's reason cut to 200 characters; left out → 0.2, low, "Not in the agent's top picks for this goal".
 5. Return `{goals: {<goalId>: [{paperId, title, year, reason}] (placed papers only, best first)}, scored: <n>, skipped: [...]}`.

@@ -41,9 +41,6 @@ QUESTION = "question"
 CARD_FIELDS = ("title", "authors", "year", "venue", "url", "type", "foundBy")
 FROM_SEEDS = "expanded from the seeds"
 # Most papers `rank_papers` reranks per goal: the placed suggestions, then the next scored.
-RERANK_POOL = 20
-
-
 class FreshAgentTool(AgentTool):
     """An agent as a tool, built fresh for every call.
 
@@ -261,12 +258,10 @@ def scored(state: dict[str, Any]) -> list[str]:
 
 
 def pool_for_rerank(state: dict[str, Any]) -> list[str]:
-    """What `rank_papers` reranks: every suggestion placed in this conversation, then the next of
-    the latest scoring up to `RERANK_POOL` papers in all, without seeds and discarded papers."""
+    """What `rank_papers` reranks: every suggestion placed in this conversation, without seeds and
+    discarded papers. Only placed papers are written, so ranking others would only cost reading time."""
     cards, skip = placed(state), discarded(state) | set(seeds(state))
-    suggestions = [paper_id for paper_id, kind in cards.items() if kind != "seed" and paper_id not in skip]
-    more = [paper_id for paper_id in scored(state) if paper_id not in cards and paper_id not in skip]
-    return list(dict.fromkeys(suggestions + more))[: max(RERANK_POOL, len(suggestions))]
+    return [paper_id for paper_id, kind in cards.items() if kind != "seed" and paper_id not in skip]
 
 
 def note(*, tool: BaseTool, args: dict[str, Any], tool_context: ToolContext, tool_response: Any) -> None:
