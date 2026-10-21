@@ -70,6 +70,8 @@ Built when the user presses Send:
 5. **From the PDF reader** (T10 Phase B): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
 6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last Update suggestions, as JSON: `{since, changes: [{type, …, at}]}`, where `type` is `moved`, `link_added`, `link_renamed`, `link_hidden`, `link_removed`, `note_added`, `note_pinned`, `note_unpinned`, `note_removed`, `voted` or `cluster_renamed` ([T13](T13-board-chrome.md) lists each one's fields). The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
 
+Requests sent through `chatBus` (Update suggestions, Find more like this, the onboarding prompt) carry no board context: they go as their text and their own resources (Update suggestions' changes), without items 2 to 4.
+
 Chips under the user's message show what was attached ("3 cards", "your view", "page 5"); clicking one focuses it locally (T06).
 
 ### 2. The agent asks to look (harness, `harness/harness/board/viewer.py`)

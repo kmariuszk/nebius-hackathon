@@ -5,7 +5,7 @@ import { Box, type Editor } from 'tldraw'
 import type { SnapshotResult } from '../../shared/acpExt.ts'
 import { defaultPaperCardProps } from '../../shared/shapes.ts'
 import { currentGoal, openPaperId } from '../viewerState.ts'
-import { addBoardContext, contextResources, MAX_SHAPES, PICTURE_LINE, SHAPE_MIME, toContextShape } from './context.ts'
+import { addBoardContext, contextResources, MAX_SHAPES, PICTURE_LINE, promptWhenReady, SHAPE_MIME, toContextShape } from './context.ts'
 import type { SnapshotRequest } from './snapshot.ts'
 
 interface Fake {
@@ -134,12 +134,11 @@ test('up to 20 selected shapes, a line for the rest, the open paper, then the vi
 })
 
 const SHOT: SnapshotResult = { mimeType: 'image/png', data: 'iVBORw0KGgo=', width: 1600, height: 980, caption: "The researcher's current view, with 1 card" }
-const CHANGES = { uri: 'tldraw://demo/changes', mimeType: 'application/json', text: '[]' }
-const PROMPT: ContentBlock[] = [{ type: 'text', text: 'What do these have in common?' }, { type: 'resource', resource: CHANGES }]
+const PROMPT: ContentBlock[] = [{ type: 'text', text: 'What do these have in common?' }]
 const kinds = (blocks: ContentBlock[]) =>
 	blocks.map((b) => (b.type === 'resource' ? b.resource.uri : b.type === 'text' ? `text: ${b.text}` : `${b.type}`))
 
-test('with "Include my view": text, selection, view summary, the request\'s resources, then the line and the picture', async () => {
+test('with "Include my view": text, selection, view summary, then the line and the picture', async () => {
 	const asked: SnapshotRequest[] = []
 	const take = async (request: SnapshotRequest) => (asked.push(request), SHOT)
 	const blocks = await addBoardContext(board([LIU], [LIU.id]), 'demo', PROMPT, { includeView: true, take })
@@ -147,7 +146,6 @@ test('with "Include my view": text, selection, view summary, the request\'s reso
 		'text: What do these have in common?',
 		`tldraw://demo/${LIU.id}`,
 		'tldraw://demo/viewport',
-		'tldraw://demo/changes',
 		`text: ${PICTURE_LINE}The researcher's current view, with 1 card`,
 		'image',
 	])
@@ -158,7 +156,7 @@ test('with "Include my view": text, selection, view summary, the request\'s reso
 test('with "Include my view" off no picture is taken or sent', async () => {
 	let taken = 0
 	const take = async () => (taken++, SHOT)
-	const blocks = await addBoardContext(board([LIU], []), 'demo', PROMPT.slice(0, 1), { includeView: false, take })
+	const blocks = await addBoardContext(board([LIU], []), 'demo', PROMPT, { includeView: false, take })
 	assert.deepEqual(kinds(blocks), ['text: What do these have in common?', 'tldraw://demo/viewport'])
 	assert.equal(taken, 0)
 	assert.ok(!blocks.some((b) => b.type === 'image'))
@@ -171,9 +169,26 @@ test('a view that can\'t be drawn (an empty board) sends the prompt without a pi
 	const quiet = console.info
 	console.info = () => {}
 	try {
-		const blocks = await addBoardContext(board([], []), 'demo', PROMPT.slice(0, 1), { includeView: true, take })
+		const blocks = await addBoardContext(board([], []), 'demo', PROMPT, { includeView: true, take })
 		assert.deepEqual(kinds(blocks), ['text: What do these have in common?', 'tldraw://demo/viewport'])
 	} finally {
 		console.info = quiet
 	}
+})
+
+test('Stop pressed while the context is built cancels the turn: the prompt is never sent', async () => {
+	let ready = (_: ContentBlock[]) => {}
+	const building = new Promise<ContentBlock[]>((resolve) => (ready = resolve))
+	const sent: ContentBlock[][] = []
+	let stopped = false
+	const turn = promptWhenReady(building, async (p) => (sent.push(p), { stopReason: 'end_turn' }), () => stopped)
+	stopped = true // Stop, before the picture is drawn
+	ready(PROMPT)
+	assert.deepEqual(await turn, { stopReason: 'cancelled' })
+	assert.equal(sent.length, 0)
+
+	// not stopped: the prompt goes once its blocks are ready, and its answer is the turn's
+	const answer = await promptWhenReady(Promise.resolve(PROMPT), async (p) => (sent.push(p), { stopReason: 'end_turn' }), () => false)
+	assert.deepEqual(answer, { stopReason: 'end_turn' })
+	assert.deepEqual(sent, [PROMPT])
 })

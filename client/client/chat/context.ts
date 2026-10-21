@@ -1,4 +1,4 @@
-import type { ContentBlock } from '@agentclientprotocol/sdk'
+import type { ContentBlock, PromptResponse } from '@agentclientprotocol/sdk'
 import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import type { SnapshotResult } from '../../shared/acpExt.ts'
 import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
@@ -9,9 +9,10 @@ import { shapesInView, takeSnapshot, type SnapshotRequest } from './snapshot.ts'
 
 // What the researcher is looking at, added to what they typed when they press Send (T07; group
 // README, Shared contracts, "Prompt content"): the text first, then the selected shapes and the
-// open paper as compact JSON, a summary of the view, the request's own resources and, with
-// "Include my view" on, a picture of the view after a line saying what it is. The harness turns
-// the resources into <selected-shape> and <viewport> tags (harness/acp/mapping.py).
+// open paper as compact JSON, a summary of the view and, with "Include my view" on, a picture of
+// the view after a line saying what it is. Requests from chatBus (Update suggestions, Find more
+// like this, the first prompt) go without it. The harness turns the resources into
+// <selected-shape> and <viewport> tags (harness/acp/mapping.py).
 
 export const SHAPE_MIME = 'application/vnd.tldraw.shape+json'
 export const MAX_SHAPES = 20
@@ -137,10 +138,9 @@ export async function viewPicture(
 	}
 }
 
-/** The prompt in the contract's order: text, context resources, the request's resources, then pictures. */
+/** The prompt in the contract's order: what was typed, the context resources, then pictures. */
 export function withContext(blocks: ContentBlock[], resources: ContentBlock[], pictures: ContentBlock[]): ContentBlock[] {
-	const [text, ...rest] = blocks
-	return [text, ...resources, ...rest, ...pictures]
+	return [...blocks, ...resources, ...pictures]
 }
 
 export interface ContextOptions {
@@ -149,7 +149,7 @@ export interface ContextOptions {
 	take?: (request: SnapshotRequest) => Promise<SnapshotResult>
 }
 
-/** `blocks` (the text and any resources of the request) with what the researcher is looking at. */
+/** `blocks` (what the researcher typed) with what they are looking at. */
 export async function addBoardContext(
 	editor: Editor,
 	boardId: string,
@@ -158,4 +158,17 @@ export async function addBoardContext(
 ): Promise<ContentBlock[]> {
 	const resources = contextResources(editor, boardId)
 	return withContext(blocks, resources, includeView ? await viewPicture(take) : [])
+}
+
+/**
+ * Sends the prompt once its blocks are ready, unless Stop was pressed while they were built: no
+ * prompt is open then, so the agent's cancel has nothing to stop, and the turn ends cancelled here.
+ */
+export async function promptWhenReady(
+	blocks: Promise<ContentBlock[]>,
+	prompt: (blocks: ContentBlock[]) => Promise<PromptResponse>,
+	stopped: () => boolean
+): Promise<Pick<PromptResponse, 'stopReason' | 'usage'>> {
+	const ready = await blocks
+	return stopped() ? { stopReason: 'cancelled' } : prompt(ready)
 }

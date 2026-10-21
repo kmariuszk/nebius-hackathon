@@ -6,7 +6,7 @@ import './chat.css'
 import { chatBus, chatTurns, endedTurns, promptBlocks, type AskRequest } from './chatBus'
 import { chatReducer, initialChatState, type Turn } from './chatState'
 import { openAgentConnection, type AgentConnection } from './connection'
-import { addBoardContext } from './context'
+import { addBoardContext, promptWhenReady } from './context'
 import { formatCost, formatTokens, stopReasonText } from './format'
 import { PermissionPrompt } from './PermissionPrompt'
 import { PlanList } from './PlanList'
@@ -134,7 +134,9 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 		[boardId, memberId, disconnect]
 	)
 
+	const stopped = useRef(false)
 	const sendPrompt = (c: AgentConnection, request: AskRequest, withContext = false) => {
+		stopped.current = false
 		dispatch({ type: 'send', text: request.text })
 		const blocks = promptBlocks(request)
 		// what they typed goes with what they're looking at: the selection, the view and its picture
@@ -145,7 +147,7 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 						return blocks
 					})
 				: Promise.resolve(blocks)
-		prompt.then((p) => c.prompt(p)).then(
+		promptWhenReady(prompt, (p) => c.prompt(p), () => stopped.current).then(
 			(res) => dispatch({ type: 'stop', stopReason: res.stopReason, usage: res.usage }),
 			(e) => {
 				// a dropped connection is reported by onClose
@@ -182,6 +184,7 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 	}, [status, running, asked])
 
 	const stop = () => {
+		stopped.current = true
 		cancelPermissions()
 		void conn.current?.cancel()
 	}
