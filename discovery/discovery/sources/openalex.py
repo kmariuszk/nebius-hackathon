@@ -1,4 +1,4 @@
-"""OpenAlex: keyword search, lookups by DOI or PMID, and papers citing the seeds.
+"""OpenAlex: keyword search, lookups by DOI or PMID, papers citing the seeds and reference lists.
 
 OpenAlex now needs a free API key (`OPENALEX_API_KEY`); without one, requests
 share a small daily budget per IP address that runs out quickly.
@@ -10,11 +10,13 @@ from typing import Any
 
 import httpx
 
-from discovery.papers import Paper
+from discovery.papers import Paper, normalise
 from discovery.sources import Throttle, key, raise_for_status
 
 BASE = "https://api.openalex.org"
 _throttle = Throttle(10)
+# IDs per filter request; OpenAlex takes up to 100 values in one OR filter.
+BATCH = 50
 
 
 async def _get(client: httpx.AsyncClient, path: str, params: dict[str, Any]) -> dict[str, Any]:
@@ -54,6 +56,32 @@ async def citing(
     params = {"filter": ",".join(filters), "sort": "cited_by_count:desc", "per-page": min(limit, 100)}
     data = await _get(client, "/works", params)
     return [parse_work(work) for work in data["results"] if work.get("title")]
+
+
+async def references(client: httpx.AsyncClient, work_ids: list[str]) -> dict[str, list[str]]:
+    """For each of these works, the OpenAlex IDs of the works it references."""
+    works = await _select(client, "openalex", work_ids, "id,referenced_works")
+    return {
+        normalise("openalex", work["id"]): [normalise("openalex", ref) for ref in work.get("referenced_works") or []]
+        for work in works
+    }
+
+
+async def by_doi(client: httpx.AsyncClient, dois: list[str]) -> dict[str, str]:
+    """The OpenAlex ID of each of these DOIs that OpenAlex has, by DOI."""
+    # A comma or a pipe would split the filter, and OpenAlex would answer 400.
+    values = [f"https://doi.org/{doi}" for doi in dois if not {",", "|"} & set(doi)]
+    works = await _select(client, "doi", values, "id,doi")
+    return {normalise("doi", work["doi"]): normalise("openalex", work["id"]) for work in works if work.get("doi")}
+
+
+async def _select(client: httpx.AsyncClient, field: str, values: list[str], fields: str) -> list[dict[str, Any]]:
+    """The works whose `field` is one of `values`, `BATCH` values a request, with only `fields`."""
+    works: list[dict[str, Any]] = []
+    for start in range(0, len(values), BATCH):
+        params = {"filter": f"{field}:" + "|".join(values[start : start + BATCH]), "select": fields, "per-page": 100}
+        works += (await _get(client, "/works", params))["results"]
+    return works
 
 
 def parse_work(work: dict[str, Any]) -> Paper:

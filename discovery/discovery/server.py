@@ -13,6 +13,7 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import AfterValidator, BeforeValidator
 
+from discovery import citations
 from discovery.fulltext import DEFAULT_MAX_CHARS
 from discovery.service import (
     DATE,
@@ -169,6 +170,22 @@ def build_server(discovery: Discovery) -> MCPServer:
             return await discovery.score_candidates(question, candidate_ids, seed_ids, limit)
         except (ValueError, Skipped) as error:
             # A ToolError keeps its text; anything else reaches the model as "Error executing tool".
+            raise ToolError(str(error)) from error
+
+    @server.tool()
+    async def citation_links(paper_ids: list[str]) -> dict[str, Any]:
+        """Which of these papers cite which: PubMed's reference lists, and OpenAlex's for
+        papers without a PMID.
+
+        Args:
+            paper_ids: 2 to 200 paper IDs, such as every paper on a board.
+
+        Returns links ([{from, to, source}]: `from` cites `to`, both among paper_ids and
+        under the IDs given; source is pubmed or openalex) and what was skipped and why.
+        """
+        try:
+            return await citations.citation_links(discovery, paper_ids)
+        except ValueError as error:
             raise ToolError(str(error)) from error
 
     @server.tool()
