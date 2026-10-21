@@ -18,12 +18,14 @@ log = logging.getLogger(__name__)
 PRICES: dict[str, tuple[float, float]] = {
     "nvidia/Nemotron-3.5-Super-VL": (0.30, 0.90),
     "nvidia/Nemotron-3_5-Lightning": (0.06, 0.24),
+    "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": (0.06, 0.24),
 }
 
-# Context windows in tokens (the catalogue lists both at 1,024K).
+# Context windows in tokens, from the same catalogue.
 CONTEXT_WINDOWS: dict[str, int] = {
     "nvidia/Nemotron-3.5-Super-VL": 1_024_000,
     "nvidia/Nemotron-3_5-Lightning": 1_024_000,
+    "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": 262_000,
 }
 DEFAULT_CONTEXT_WINDOW = 128_000
 
