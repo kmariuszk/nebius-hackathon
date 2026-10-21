@@ -461,7 +461,7 @@ def test_without_a_board_the_master_is_unchanged():
     assert [type(t).__name__ for t in agent.tools] == ["SearchTool", "FreshAgentTool", "McpToolset"]
     assert agent.tools[2].tool_filter == ["resolve_seed", "get_paper", "rerank"]
     assert agent.instruction == master.INSTRUCTION and agent.after_agent_callback is None
-    assert agent.before_tool_callback is master.candidates.fill_rerank
+    assert agent.before_tool_callback.callbacks == (master.clean_args, master.candidates.fill_rerank)
 
 
 def test_a_scripted_run_gives_each_fresh_reader_the_script(tmp_path):

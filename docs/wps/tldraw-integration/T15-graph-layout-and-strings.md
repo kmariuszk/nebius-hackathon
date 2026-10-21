@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (frames that fit cards), the [T14 refresh](T14-board-editing.md) (link editing on the strings), [H01](../agent-harness/H01-live-board-check.md)'s overlap check |
 | Milestone | W1 Nothing broken |
-| Status | Built on branch `w1/board` (Oct 20); the harness near-links step is on `w1/harness-bg`; H01's live overlap check pending |
+| Status | Built (Oct 20): board and browser parts on `w1/board`, the harness near-links step on `w1/harness-bg` (criterion 6: `test_placed_papers_are_linked_to_their_neighbours_without_the_model`), both merged into `w1/integration`; H01's live overlap check pending |
 | Owner | TBD |
 
 ## Goal
@@ -72,7 +72,7 @@ function footprint(b: Box): Box {
 - [x] `client/server/clusterTools.ts`: `CELL`, no `LABEL_H`, card-centred grid positions.
 - [x] `client/client/shapes/card.ts`: `seedLinksOf` and the note wording.
 - [x] `client/server/seedDemo.ts`: positions spread if the test finds overlaps.
-- [ ] `harness/harness/agents/master/background.py` and `candidates.py`: remember `near`, the near-links step.
+- [x] `harness/harness/agents/master/background.py` and `candidates.py`: remember `near`, the near-links step.
 - [x] Tests (below).
 
 ## Acceptance criteria
