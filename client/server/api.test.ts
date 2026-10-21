@@ -5,7 +5,7 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import assert from 'node:assert/strict'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -18,14 +18,17 @@ import { handleApi } from './api.ts'
 import { closeBoardDb, setBoardDbPath } from './boardDb.ts'
 import { handleCanvasMcp } from './canvasMcp.ts'
 import { streamCount } from './events.ts'
+import { textPdf } from './fixtures/textPdf.ts'
 import { createPapersClient, type PapersClient } from './papersClient.ts'
 import { setPdfDir } from './pdfProxy.ts'
+import { setUploadsDir } from './pdfSeed.ts'
 import { closeAllRooms, putShapes, readRoom, setRoomsDir } from './rooms.ts'
 
 const dir = mkdtempSync(join(tmpdir(), 'board-api-'))
 setRoomsDir(join(dir, 'rooms'))
 setBoardDbPath(join(dir, 'board.db'))
 setPdfDir(join(dir, 'pdfs'))
+setUploadsDir(join(dir, 'uploads'))
 
 // like discovery's papers MCP: records as structured content, unknown papers as tool errors
 const TIROSH = {
@@ -40,8 +43,15 @@ const TIROSH = {
 	openAccessPdf: 'http://127.0.0.1:9/tirosh.pdf',
 	type: 'journal-article',
 }
+const SADE = {
+	paperId: 'pmid:30388456',
+	ids: { pmid: '30388456', doi: '10.1016/j.cell.2018.10.038' },
+	title: 'Defining T cell states associated with response to checkpoint immunotherapy in melanoma',
+	year: 2018,
+}
 const records: Record<string, object> = {
 	[TIROSH.paperId]: TIROSH,
+	[SADE.paperId]: SADE,
 	'pmid:2': { paperId: 'pmid:2', title: 'No PDF', openAccessPdf: null },
 }
 
@@ -54,8 +64,14 @@ function papersServer() {
 	server.registerTool('get_paper', { inputSchema: { paper_id: z.string() } }, async ({ paper_id }) =>
 		reply(records[paper_id], `Unknown paper ID ${paper_id}`)
 	)
-	server.registerTool('resolve_seed', { inputSchema: { doi: z.string().optional(), pmid: z.string().optional() } }, async ({ doi, pmid }) =>
-		reply(Object.values(records).find((r) => JSON.stringify(r).includes(`"${pmid ?? doi}"`)), `No paper for ${pmid ?? doi}`)
+	server.registerTool(
+		'resolve_seed',
+		{ inputSchema: { doi: z.string().optional(), pmid: z.string().optional(), title: z.string().optional() } },
+		async ({ doi, pmid, title }) =>
+			reply(
+				Object.values(records).find((r) => (title ? (r as { title: string }).title === title : JSON.stringify(r).includes(`"${pmid ?? doi}"`))),
+				`No paper for ${pmid ?? doi ?? title}`
+			)
 	)
 	return server
 }
@@ -407,6 +423,71 @@ test('a seed by PMID becomes a seed card authored by the member; an unknown one 
 	assert.equal(unknown.body.error.code, 'paper_not_found')
 	const types = (await call('GET', `/boards/${board}/activity`)).body.map((e: { type: string }) => e.type)
 	assert.deepEqual(types.filter((t: string) => t === 'seed.added').length, 2)
+})
+
+/** Posts a file as the Start page does: multipart, field "file". */
+async function postFile(board: string, name: string, data: Uint8Array<ArrayBuffer>, type = 'application/pdf') {
+	const form = new FormData()
+	form.append('file', new Blob([data], { type }), name)
+	const res = await fetch(`${base}/api/v1/boards/${board}/seeds`, { method: 'POST', headers: { authorization: 'Bearer m_ana' }, body: form })
+	return { status: res.status, body: await res.json() }
+}
+
+test('a PDF seed is found by its DOI, else by its title; without either it is a 422 that says what to do', async () => {
+	const board = roomWith('pmid:1')
+	const withDoi = textPdf([
+		{ text: 'Research article', size: 9 },
+		{ text: 'Dissecting the multicellular ecosystem', size: 18 },
+		{ text: 'Science 352, 189 (2016). DOI: 10.1126/science.aad0501.', size: 8 },
+	])
+	const byDoi = await postFile(board, 'tirosh.pdf', withDoi)
+	assert.equal(byDoi.status, 201, JSON.stringify(byDoi.body))
+	assert.deepEqual([byDoi.body.paperId, byDoi.body.board.kind, byDoi.body.board.addedBy], [TIROSH.paperId, 'seed', 'm_ana'])
+	assert.equal(cardOf(board, TIROSH.paperId).props.title, TIROSH.title)
+	// kept with the uploads, where /api/uploads/<id> serves it
+	const upload = byDoi.body.upload.replace('/api/uploads/', '')
+	assert.deepEqual(new Uint8Array(readFileSync(join(dir, 'uploads', upload))), withDoi)
+	assert.equal(readFileSync(join(dir, 'uploads', `${upload}.type`), 'utf8'), 'application/pdf')
+
+	const manuscript = textPdf([
+		{ text: 'Author manuscript', size: 9 },
+		{ text: 'Defining T cell states associated with response', size: 18 },
+		{ text: 'to checkpoint immunotherapy in melanoma', size: 18 },
+		{ text: 'Moshe Sade-Feldman, Keren Yizhak', size: 11 },
+	])
+	const byTitle = await postFile(board, 'sade-feldman.pdf', manuscript)
+	assert.equal(byTitle.status, 201, JSON.stringify(byTitle.body))
+	assert.equal(byTitle.body.paperId, SADE.paperId)
+
+	const notes = await postFile(board, 'notes.pdf', textPdf([{ text: 'Lab meeting notes', size: 12 }]))
+	assert.deepEqual([notes.status, notes.body], [422, { error: { code: 'no_doi', message: "Couldn't find a DOI in notes.pdf. Paste its DOI instead." } }])
+	const garbled = await postFile(board, 'scan.pdf', new TextEncoder().encode('not a pdf'))
+	assert.deepEqual([garbled.status, garbled.body.error.code], [422, 'bad_pdf'])
+
+	const text = await postFile(board, 'refs.txt', new TextEncoder().encode('10.1126/science.aad0501'), 'text/plain')
+	assert.deepEqual([text.status, text.body.error.code, text.body.error.message], [415, 'unsupported_type', "refs.txt isn't a PDF"])
+
+	const types = (await call('GET', `/boards/${board}/activity`)).body.map((e: { type: string }) => e.type)
+	assert.equal(types.filter((t: string) => t === 'seed.added').length, 2, 'only the two found papers became seeds')
+	assert.equal(readRoom(board, (txn) => [...txn.values()].filter((r) => r.typeName === 'shape').length), 3)
+})
+
+test('Home’s counts: papers on the board and, for the caller, what’s new since they last looked', async () => {
+	const board = roomWith('seed:1', 'pmid:2')
+	await call('PUT', `/boards/${board}/members/me`, { body: { displayName: 'Ana' } })
+	const agent = await canvasMcp(board, 'm_ben')
+	await agent.tool('add_papers', { papers: [{ paperId: 'pmid:3', title: 'Three', near: 'seed:1' }] })
+	await agent.client.close()
+
+	const read = (await call('GET', `/boards/${board}`)).body
+	assert.deepEqual([read.seedCount, read.paperCount, read.newCount], [1, 3, 1])
+	assert.equal(read.newCount, read.newSinceLastSeen)
+	const listed = (await call('GET', '/boards')).body.find((b: { id: string }) => b.id === board)
+	assert.deepEqual([listed.seedCount, listed.paperCount, listed.newCount], [1, 3, 1])
+	assert.equal((await call('GET', `/boards/${board}`, { member: null })).body.newCount, undefined, 'newCount needs a bearer')
+
+	await call('POST', `/boards/${board}/seen`, { body: { seq: read.lastSeq } })
+	assert.equal((await call('GET', '/boards')).body.find((b: { id: string }) => b.id === board).newCount, 0)
 })
 
 test('the PDF route refuses a link that isn’t https on a public host, and 404s without one', async () => {

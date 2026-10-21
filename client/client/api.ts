@@ -20,6 +20,21 @@ export interface Member {
 	joinedAt: string
 }
 
+/** `GET /boards/:id`, the fields the browser reads. */
+export interface Board {
+	id: string
+	title: string
+	question: string
+	context: string
+	seedCount: number
+	paperCount: number
+	/** The newest event's seq: what `seen` marks as read. */
+	lastSeq: number
+	agentActive: boolean
+	/** For the caller: events since they last looked ("Catch me up"). */
+	newCount?: number
+}
+
 export interface VoteResult {
 	status: PaperStatus
 	keepBy: string[]
@@ -42,6 +57,9 @@ async function call<T>(method: string, path: string, memberId: string, body?: un
 export function boardApi(boardId: string, memberId: string) {
 	const board = `/boards/${encodeURIComponent(boardId)}`
 	return {
+		get: () => call<Board>('GET', board, memberId),
+		/** Everything up to `seq` counts as seen: Home's "Catch me up" count starts over. */
+		seen: (seq: number) => call<void>('POST', `${board}/seen`, memberId, { seq }),
 		/** Join the board; with a name, also set the name the others see. */
 		join: (displayName?: string) => call<Member>('PUT', `${board}/members/me`, memberId, { displayName }),
 		/** Keep, Discard, or (null) take the vote back; the card updates for everyone through sync. */

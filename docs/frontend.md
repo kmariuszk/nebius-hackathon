@@ -18,11 +18,14 @@ The demo board is the v6 mockup from `docs/mockups/` (see its README for every s
 ## How they link
 
 ```
-Start ──(create board)──▶ board /{id}
+/ ──────────────────────▶ Start
+Start ──(create board)──▶ board /{id}?start=1
 Home ──(open)───────────▶ board /{id}
 Home ──(Catch me up)────▶ board /{id}?tour=1
 Board ──(‹ Boards)──────▶ Home
 ```
+
+`?start=1` makes the board open its chat and send the agent the onboarding prompt; the board then drops it from the URL, so a reload doesn't start the agent again.
 
 Add `?mock=1` to any page to use sample data instead of the board service. With sample data there's no real board to open, so every board link opens the demo board instead, and its **‹ Boards** button goes back to Home with sample data.
 
@@ -30,24 +33,28 @@ To try it: `cd client && pnpm dev`, then open `/landing/index.html?mock=1`. Use 
 
 ## What the board service needs to provide
 
-The start pages call four endpoints, all in `landing/api.js` with their request and response shapes. Paths follow Concept.md's REST API under `/api/v1`:
+The start pages call three endpoints, all in `landing/api.js` with their request and response shapes. Paths follow Concept.md's REST API under `/api/v1`, and the board service serves all three:
 
 1. `POST /boards` with `{title, question, context}`
-2. `POST /boards/{id}/seeds`, once per paper, with `{doi}`, `{pmid}` or a multipart `file`
-3. `POST /boards/{id}/runs` with `{kind: "onboarding"}`
-4. `GET /boards`, for Home: `id`, `title`, `seedCount`, `paperCount`, `newCount`, `members`
+2. `POST /boards/{id}/seeds`, once per paper, with `{doi}`, `{pmid}` or a multipart `file` (a PDF, looked up by its DOI or its title)
+3. `GET /boards`, for Home: `id`, `title`, `seedCount`, `paperCount`, `newCount`, `members`
 
-`docs/landing.md` has the details, including the three additions to the contract (`{pmid}` seeds, an empty question, no seeds).
+There's no `POST /boards/{id}/runs`: the agent starts in the board's chat (`?start=1`), and only sample data still calls it. `docs/landing.md` has the details: the PDF rules, the three additions to the contract (`{pmid}` seeds, an empty question, no seeds), and how `/seen` resets `newCount`.
 
 What the board shows per paper (the quotes and their checks, the "at a glance" steps, figures, clusters, papers people add, and the changes the agent catches up on) is listed in `docs/mockups/README.md`, under "What the UI needs from the backend" and "What it needs from the backend".
 
 ## What the React board needs to do
 
 - **A way back:** a "‹ Boards" button at the top left that opens `/landing/home.html`.
+- **Start the agent from a link:** done. With `?start=1`, the board opens its chat and sends the onboarding prompt (`client/client/pages/Room.tsx`, through `chatBus`).
+- **Mark the board seen:** done. After 10 seconds on the board it posts `/seen`, so Home's "Catch me up" count starts over.
 - **Catch me up from a link:** when the URL has `?tour=1`, start Catch me up as the board opens.
 - **The design:** follow the demo board.
 
+## Decided
+
+- **The front door:** `/` is the Start page (`client/client/pages/Root.tsx` loads `/landing/index.html`); the quick random room is at `/new`.
+
 ## Left for the board team to decide
 
-- **The front door:** `/` still redirects to a random room in `client/client/pages/Root.tsx`. Point it at `/landing/index.html` once the endpoints above exist; until then Start can only show "Can't reach the board service".
 - **The demo board link:** `demoBoardUrl` in `landing/config.js` points at the static demo board. Point it at a real prepared board when there is one.

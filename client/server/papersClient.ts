@@ -51,8 +51,8 @@ const clusterResult = z.object({
 
 export type ClusterResult = z.infer<typeof clusterResult>
 
-/** A seed to look up by its DOI or its PMID. */
-export type SeedQuery = { doi: string } | { pmid: string }
+/** A seed to look up by its DOI, its PMID, or (for a PDF without a DOI) its title. */
+export type SeedQuery = { doi: string } | { pmid: string } | { title: string }
 
 /** Why a call failed: the papers MCP is down, it has no such paper, or it answered with something else. */
 export class PapersError extends Error {
@@ -202,9 +202,9 @@ export function createPapersClient(url = process.env.PAPERS_MCP_URL || DEFAULT_P
 			return record
 		},
 		resolveSeed(seed) {
-			return 'doi' in seed
-				? callForPaper('resolve_seed', { doi: seed.doi }, seed.doi)
-				: callForPaper('resolve_seed', { pmid: seed.pmid }, `PMID ${seed.pmid}`)
+			if ('doi' in seed) return callForPaper('resolve_seed', { doi: seed.doi }, seed.doi)
+			if ('pmid' in seed) return callForPaper('resolve_seed', { pmid: seed.pmid }, `PMID ${seed.pmid}`)
+			return callForPaper('resolve_seed', { title: seed.title }, `“${seed.title}”`)
 		},
 	}
 }

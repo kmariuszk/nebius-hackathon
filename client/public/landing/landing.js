@@ -134,6 +134,7 @@
       ],
     };
     let busy = false;
+    let board = null; // made by the first ↑; a retry adds what's left to it instead of making another
     const caseNow = () => { const t = ta.value.trim().length > 0, p = papers.length > 0; return t && p ? 'both' : t ? 'text' : p ? 'papers' : 'empty'; };
     function setHint(text, err) { hint.textContent = text; hint.classList.toggle('err', !!err); }
     function render() {
@@ -144,13 +145,13 @@
         return chip;
       }));
       const c = caseNow(), n = papers.length;
-      if (!busy) setHint({
+      if (!busy) setHint(board ? `Your board is ready. Press ↑ to ${n ? 'add what’s left and ' : ''}open it.` : {
         empty: 'A question, a rough description of your topic, or a few papers. Any of these works; together works best.',
         text: 'We’ll find papers for this, then you pick a few to start from.',
         papers: `We’ll work out what links ${n === 1 ? 'this paper' : 'these ' + n + ' papers'} and look for more. You can sharpen the question on the board.`,
         both: `We’ll search around your ${n === 1 ? 'paper' : n + ' papers'} for this question.`,
       }[c]);
-      send.disabled = busy || c === 'empty';
+      send.disabled = busy || (c === 'empty' && !board);
     }
     // pasted DOIs and PubMed links become paper chips
     const ID_RE = /\b(10\.\d{4,9}\/[^\s,;<>"]+[^\s,;.)<>"])|(?:https?:\/\/)?pubmed\.ncbi\.nlm\.nih\.gov\/(\d+)\/?|\bPMID:?\s*(\d{6,9})\b/gi;
@@ -176,22 +177,39 @@
     send.addEventListener('click', submit);
 
     async function submit() {
-      if (busy || caseNow() === 'empty') return;
+      if (busy || (caseNow() === 'empty' && !board)) return;
       const question = ta.value.trim();
       busy = true; render();
       try {
-        setHint('Creating your board…');
-        const board = await API.createBoard({ title: question ? question.slice(0, 80) : 'Untitled board', question, context: '' });
-        for (let i = 0; i < papers.length; i++) {
-          setHint(`Adding your papers… ${i + 1} of ${papers.length}`);
-          const p = papers[i];
-          await API.addSeed(board.id, p.file ? { file: p.file } : p.doi ? { doi: p.doi } : { pmid: p.pmid });
+        if (!board) {
+          setHint('Creating your board…');
+          // without a question there's no title either, and the agent is asked to work the question out
+          board = await API.createBoard({ title: question.slice(0, 80), question, context: '' });
         }
-        setHint('Starting the agent…');
-        await API.startRun(board.id, 'onboarding');
+        // a paper the board service can't find (a PDF without a DOI, an unknown DOI) stays here with
+        // its reason; the others still become seeds
+        const todo = [...papers], missed = [];
+        for (const [i, p] of todo.entries()) {
+          setHint(`Adding your papers… ${i + 1} of ${todo.length}`);
+          try {
+            await API.addSeed(board.id, p.file ? { file: p.file } : p.doi ? { doi: p.doi } : { pmid: p.pmid });
+            papers.splice(papers.indexOf(p), 1); render();
+          } catch (e) {
+            if (!(e.status >= 400 && e.status < 500)) throw e;
+            missed.push(e.message);
+          }
+        }
+        if (missed.length) {
+          busy = false; render();
+          const added = todo.length - missed.length;
+          setHint(`${missed.join(' ')} ${added ? 'The other papers are on your board. ' : ''}Press ↑ again once you’ve removed or replaced ${missed.length === 1 ? 'it' : 'them'}.`, true);
+          return;
+        }
+        setHint('Opening your board…');
         // with sample data there's no real board to open, so the demo board stands in for it
-        if (API.mock) { toast('Opening the board…'); setTimeout(() => (location.href = C.boardUrl(board.id)), 1200); return; }
-        location.href = C.boardUrl(board.id);
+        if (API.mock) { await API.startRun(board.id, 'onboarding'); toast('Opening the board…'); setTimeout(() => (location.href = C.boardUrl(board.id)), 1200); return; }
+        // the board opens its chat and starts the agent (client/client/pages/Room.tsx)
+        location.href = withQuery(C.boardUrl(board.id), 'start=1');
       } catch (e) {
         busy = false; render();
         setHint(`${e.message || 'Something went wrong.'} Your question and papers are still here; try again.`, true);

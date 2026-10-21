@@ -30,6 +30,7 @@ import { addEvent, lastSeq, latestEvents, newSince, streamEvents } from './event
 import { placeNear } from './layout.ts'
 import { papersClient, PapersError, type PaperRecord, type PapersClient } from './papersClient.ts'
 import { PdfError, servePdf } from './pdfProxy.ts'
+import { MAX_SEED_PDF_BYTES, pdfSeed, savePdf } from './pdfSeed.ts'
 import { HttpError, readRoom, writeRoom, writer } from './rooms.ts'
 import { castVote, triage } from './triage.ts'
 
@@ -187,16 +188,20 @@ const activityQuery = z.object({ after: seq.default(0), limit: z.coerce.number()
 
 // ---- views
 
+// the room's cards are read first, so the seed and paper counts are up to date
 function boardView(board: BoardRow, caller: string | null) {
 	const seen = caller ? (findMember(board.id, caller)?.lastSeenSeq ?? 0) : 0
+	const paperCount = syncPapers(board.id).length
+	const fresh = caller ? newSince(board.id, seen, caller) : 0
 	return {
 		...board,
 		members: membersOf(board.id),
 		seedCount: seedCount(board.id),
+		paperCount,
 		lastSeq: lastSeq(board.id),
 		agentActive: isAgentActive(board.id),
-		// for the caller: papers they haven't voted on, and the "Catch me up" badge (T13)
-		...(caller ? { unvoted: unvotedCount(board.id, caller), newSinceLastSeen: newSince(board.id, seen, caller) } : {}),
+		// for the caller: papers they haven't voted on, and the "Catch me up" badge (T13; Home calls it newCount)
+		...(caller ? { unvoted: unvotedCount(board.id, caller), newSinceLastSeen: fresh, newCount: fresh } : {}),
 	}
 }
 
@@ -298,10 +303,8 @@ function listBoards(c: Call): Reply {
 }
 
 function getBoard(c: Call): Reply {
-	// opening an old room makes its row; reading its cards brings the paper counts up to date
-	const board = ensureBoard(c.boardId)
-	syncPapers(c.boardId)
-	return ok(boardView(board, c.member))
+	// opening an old room makes its row
+	return ok(boardView(ensureBoard(c.boardId), c.member))
 }
 
 async function patchBoard(c: Call): Promise<Reply> {
@@ -337,13 +340,67 @@ function seedFields(r: PaperRecord): Partial<PaperCardProps> {
 	}
 }
 
+// the form around the file: field headers and boundaries
+const MAX_FORM = MAX_SEED_PDF_BYTES + 64 * 1024
+
+/** The `file` of a multipart/form-data body: a PDF of at most 20 MB. */
+async function readPdfForm(req: IncomingMessage): Promise<{ name: string; data: Uint8Array }> {
+	const tooLarge = () => new ApiError(413, 'too_large', `A PDF can be at most ${MAX_SEED_PDF_BYTES / 1024 / 1024} MB`)
+	if (Number(req.headers['content-length'] ?? 0) > MAX_FORM) throw tooLarge()
+	const chunks: Buffer[] = []
+	let size = 0
+	for await (const chunk of req as AsyncIterable<Buffer>) {
+		size += chunk.length
+		if (size > MAX_FORM) throw tooLarge()
+		chunks.push(chunk)
+	}
+	let form: FormData
+	try {
+		form = await new Response(Buffer.concat(chunks), { headers: { 'content-type': req.headers['content-type'] ?? '' } }).formData()
+	} catch {
+		throw new ApiError(400, 'bad_request', 'The body must be multipart/form-data')
+	}
+	const file = form.get('file')
+	if (!(file instanceof File)) throw new ApiError(400, 'invalid', 'Send the PDF as the form field "file"')
+	const name = file.name || 'the file'
+	if (file.type !== 'application/pdf') throw new ApiError(415, 'unsupported_type', `${name} isn't a PDF`)
+	if (file.size > MAX_SEED_PDF_BYTES) throw tooLarge()
+	return { name, data: new Uint8Array(await file.arrayBuffer()) }
+}
+
+const notFound = (e: unknown): e is PapersError => e instanceof PapersError && e.code === 'not_found'
+
+// A dropped PDF (T16) is looked up by the first DOI in it, else by its title; it's kept with the
+// uploads once it has become a seed.
+async function resolvePdf(c: Call, resolveSeed: NonNullable<PapersClient['resolveSeed']>) {
+	const { name, data } = await readPdfForm(c.req)
+	let found: Awaited<ReturnType<typeof pdfSeed>>
+	try {
+		found = await pdfSeed(data)
+	} catch {
+		throw new ApiError(422, 'bad_pdf', `Couldn't read ${name} as a PDF. Paste its DOI instead.`)
+	}
+	let doiMiss: PapersError | null = null
+	for (const seed of [found.doi && { doi: found.doi }, found.title && { title: found.title }]) {
+		if (!seed) continue
+		try {
+			return { record: await resolveSeed(seed), upload: savePdf(data) }
+		} catch (e) {
+			if (!notFound(e)) throw e
+			if ('doi' in seed) doiMiss = e
+		}
+	}
+	throw doiMiss ?? new ApiError(422, 'no_doi', `Couldn't find a DOI in ${name}. Paste its DOI instead.`)
+}
+
 // A new seed card is placed right of the board's content, authored by the member; a card already
-// there (an agent's suggestion, say) becomes a seed.
+// there (an agent's suggestion, say) becomes a seed. The seed is a DOI, a PMID, or a PDF.
 async function postSeed(c: Call): Promise<Reply> {
 	const member = needMember(c)
-	const seed = await readBody(c.req, seedInput)
+	const pdf = /^multipart\/form-data\b/i.test(c.req.headers['content-type'] ?? '')
+	const seed = pdf ? null : await readBody(c.req, seedInput)
 	if (!c.papers.resolveSeed) throw new ApiError(501, 'not_implemented', 'This papers client has no resolve_seed')
-	const record = await c.papers.resolveSeed(seed)
+	const { record, upload } = seed ? { record: await c.papers.resolveSeed(seed), upload: null } : await resolvePdf(c, c.papers.resolveSeed)
 	join(c.boardId, member)
 	const card = writeRoom(c.boardId, (txn) => {
 		const w = writer(txn)
@@ -366,7 +423,8 @@ async function postSeed(c: Call): Promise<Reply> {
 	})
 	upsertPaper(c.boardId, card)
 	addEvent({ boardId: c.boardId, actor: member, type: 'seed.added', payload: { paperId: record.paperId, title: card.props.title } })
-	return { status: 201, body: paperView(c.boardId, card, findPaper(c.boardId, record.paperId), record, []) }
+	const body = paperView(c.boardId, card, findPaper(c.boardId, record.paperId), record, [])
+	return { status: 201, body: upload ? { ...body, upload: `/api/uploads/${upload}` } : body }
 }
 
 function listPapers(c: Call): Reply {
