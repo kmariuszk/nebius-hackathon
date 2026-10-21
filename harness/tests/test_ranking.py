@@ -221,3 +221,9 @@ def test_token_factory_models_retry_twice():
     assert models.super_vl()._additional_args["max_retries"] == models.lightning()._additional_args["max_retries"] == 0
     assert models.lightning()._additional_args["fallbacks"] == [{"model": f"openai/{models.SUPER_VL}", "timeout": 120}]
     assert "fallbacks" not in models.super_vl()._additional_args
+
+
+def test_model_timeout_leaves_lightning_at_45_seconds(monkeypatch):
+    monkeypatch.setenv("MODEL_TIMEOUT", "200")
+    assert models.super_vl()._additional_args["timeout"] == 200
+    assert models.lightning()._additional_args["timeout"] == 45

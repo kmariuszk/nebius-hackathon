@@ -38,16 +38,17 @@ def lightning() -> LiteLlm:
     )
 
 
-def token_factory(model_id: str, timeout: float = MODEL_TIMEOUT, fallback: str | None = None) -> LiteLlm:
+def token_factory(model_id: str, timeout: float | None = None, fallback: str | None = None) -> LiteLlm:
     """Any Token Factory model, through LiteLLM's OpenAI-compatible provider.
 
-    A failed call, such as a 429 or one that takes longer than `timeout` (or the
-    `MODEL_TIMEOUT` setting), is retried twice (LiteLLM backs off exponentially on a 429),
+    A failed call, such as a 429 or one that takes longer than `timeout` (by default the
+    `MODEL_TIMEOUT` setting, else `MODEL_TIMEOUT`), is retried twice (LiteLLM backs off exponentially on a 429),
     since the limit is shared by the chat, the background and the papers MCP. With a
     `fallback` model it is retried once, then sent to that model. The OpenAI client's own
     retries are off, so a stuck call costs `timeout` per try, not three times that.
     """
-    timeout = float(settings.get("MODEL_TIMEOUT", "") or timeout)
+    if timeout is None:
+        timeout = float(settings.get("MODEL_TIMEOUT", "") or MODEL_TIMEOUT)
     fallbacks = [{"model": f"openai/{fallback}", "timeout": max(timeout, MODEL_TIMEOUT)}] if fallback else None
     return LiteLlm(
         model=f"openai/{model_id}",
