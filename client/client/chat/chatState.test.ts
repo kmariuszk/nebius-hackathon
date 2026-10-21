@@ -111,6 +111,51 @@ test('text after a tool card starts a new message; thoughts collapse when the an
 	assert.equal(new Set(items.map((i) => i.key)).size, items.length, 'unique keys')
 })
 
+// A master turn as the harness sends it (mapping.py's chunks, trace.py's cards): narration, and
+// whitespace-only chunks between the tool cards. Modelled on a live turn; no capture is checked in.
+const masterTurn: { params: SessionNotification }[] = JSON.parse(
+	readFileSync(new URL('./fixtures/masterTurn.json', import.meta.url), 'utf8')
+)
+
+test('whitespace-only chunks between tool cards join the message before them and never start an empty one', () => {
+	const state = reduce([
+		{ type: 'send', text: 'Start this board.' },
+		...masterTurn.map((m) => update(m.params.update)),
+		{ type: 'stop', stopReason: 'end_turn' },
+	])
+	const items = state.turns[0].items
+	assert.deepEqual(
+		items.map((i) => (i.kind === 'tool' ? i.title : `${i.kind}:${i.kind === 'permission' ? '' : i.text}`)),
+		[
+			'message:Let me look at the board first.\n\n',
+			'master: get_board',
+			'master: search',
+			'search: find_candidates',
+			'message:The search found eight. Adding them near the seeds.',
+			'master: add_papers',
+			'message:I added [Sade-Feldman 2018](paper:pmid:30388456).\n\nIt ties the seeds together.',
+		]
+	)
+	assert.ok(items.every((i) => i.kind !== 'message' || i.text.trim()), 'no blank bubbles')
+	assert.deepEqual(state.turns[0].plan?.map((e) => e.status), ['completed', 'in_progress', 'pending'])
+})
+
+test('a whitespace-only chunk before any text starts nothing, not even a turn', () => {
+	const blank = update({ sessionUpdate: 'agent_message_chunk', content: { type: 'text', text: '\n' } })
+	assert.equal(reduce([blank]), initialChatState)
+	const state = reduce([
+		{ type: 'send', text: 'go' },
+		update({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: 'hmm' } }),
+		blank,
+		update({ sessionUpdate: 'agent_thought_chunk', content: { type: 'text', text: ' ' } }),
+	])
+	assert.deepEqual(
+		state.turns[0].items.map((i) => i.kind === 'thought' && [i.text, i.done]),
+		[['hmm ', false]],
+		'a blank message chunk neither starts a message nor collapses the thought'
+	)
+})
+
 test('a new messageId starts a new message', () => {
 	const state = reduce([
 		{ type: 'send', text: 'go' },

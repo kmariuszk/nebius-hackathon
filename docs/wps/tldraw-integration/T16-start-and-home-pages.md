@@ -8,7 +8,7 @@
 | Depends on | The [T05 refresh](T05-chat-panel.md) (`chatBus`) |
 | Unblocks | Demo steps 1–3 on a real board instead of `?mock=1`; [H01](../agent-harness/H01-live-board-check.md)'s onboarding prompt |
 | Milestone | W1 Nothing broken |
-| Status | Not started. A first version of the Start flow is on Igor's local branch `feat/name-pinned` (`95358a0`, not pushed); its landing `Authorization` header part is already on `main` (`552eda7`) |
+| Status | Built on branch `w1/chat-start` (Oct 20): Start without `/runs` (`?start=1` and the onboarding prompt through `chatBus`), PDF seeds (`pdfjs-dist` 6.4.299), Home's `paperCount` and `newCount`, `/seen` after 10 s, `/` to Start and `/new`. Left: criteria 1, 3 and 4 by hand in a browser, and how many of the five demo seeds' PMC PDFs resolve |
 | Owner | TBD |
 
 ## Goal
@@ -58,14 +58,14 @@ With no question (papers only, [landing.md](../../landing.md)'s contract): "Star
 
 ## Tasks
 
-- [ ] `client/public/landing/landing.js`: no `startRun` in real mode; `?start=1`.
-- [ ] `client/client/api.ts`: `get()`, `seen(seq)`.
-- [ ] `client/client/pages/Room.tsx`: `start` handling through `chatBus`; `seen` after 10 s.
-- [ ] `client/server/pdfSeed.ts`, `postSeed` multipart; `client/server/papersClient.ts` title seeds; `pdfjs-dist` added with `pnpm add pdfjs-dist@6.4.299`.
-- [ ] `client/server/api.ts`: `paperCount`, `newCount`.
-- [ ] `client/client/pages/Root.tsx`: `/` to Start, `/new` for a random room; `client/client/main.tsx` route.
-- [ ] `docs/landing.md`, `docs/frontend.md`: the real flow, `?start=1`, PDF rules, the front door decided.
-- [ ] Tests (below).
+- [x] `client/public/landing/landing.js`: no `startRun` in real mode; `?start=1`.
+- [x] `client/client/api.ts`: `get()`, `seen(seq)`.
+- [x] `client/client/pages/Room.tsx`: `start` handling through `chatBus`; `seen` after 10 s.
+- [x] `client/server/pdfSeed.ts`, `postSeed` multipart; `client/server/papersClient.ts` title seeds; `pdfjs-dist` added with `pnpm add pdfjs-dist@6.4.299`.
+- [x] `client/server/api.ts`: `paperCount`, `newCount`.
+- [x] `client/client/pages/Root.tsx`: `/` to Start, `/new` for a random room; `client/client/main.tsx` route.
+- [x] `docs/landing.md`, `docs/frontend.md`: the real flow, `?start=1`, PDF rules, the front door decided.
+- [x] Tests (below).
 
 ## Acceptance criteria
 

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { defaultBindingUtils, defaultShapeUtils, Editor, Tldraw, type TLComponents } from 'tldraw'
 import { boardApi } from '../api'
+import { chatBus } from '../chat/chatBus'
 import { ChatPanel } from '../chat/ChatPanel'
 import { getBookmarkPreview } from '../getBookmarkPreview'
 import { getDisplayName, getMemberId } from '../identity'
@@ -34,6 +35,16 @@ const components: TLComponents = {
 	DebugMenu: null,
 }
 
+/** The first prompt on a board made from the Start page; H01's live check sends the same text. */
+export function onboardingPrompt(question: string) {
+	return question.trim()
+		? `Start this board. The research question is: "${question.trim()}". The seed papers are already on the board. Find related papers, put the best ones on the board near the seeds, and tell me what you found.`
+		: 'Start this board. The seed papers are already on the board. Work out the research question from them, then find related papers, put the best ones on the board near the seeds, and tell me what you found.'
+}
+
+// after this long on the board, what happened before counts as seen
+const SEEN_AFTER_MS = 10_000
+
 const WALL_KEY = 'pinboard-wall'
 function loadWall(): Wall {
 	try {
@@ -55,6 +66,31 @@ export function Room() {
 		boardApi(roomId, memberId)
 			.join(getDisplayName() ?? undefined)
 			.catch((e) => console.warn(`Couldn't join board ${roomId}:`, e))
+	}, [roomId, memberId])
+
+	// a board made on the Start page opens with ?start=1: the chat opens and the agent starts on it
+	useEffect(() => {
+		const url = new URL(window.location.href)
+		if (!url.searchParams.has('start')) return
+		// gone from the URL first, so a reload (or React running this twice) doesn't start it again
+		url.searchParams.delete('start')
+		window.history.replaceState(window.history.state, '', url)
+		boardApi(roomId, memberId)
+			.get()
+			.catch((e) => console.warn(`Couldn't read board ${roomId}; starting without its question:`, e))
+			.then((board) => chatBus.ask({ text: onboardingPrompt(board ? board.question || board.title : '') }))
+	}, [roomId, memberId])
+
+	// Home's "Catch me up" count starts over once the researcher has been here a while
+	useEffect(() => {
+		const api = boardApi(roomId, memberId)
+		const timer = setTimeout(() => {
+			api
+				.get()
+				.then((board) => api.seen(board.lastSeq))
+				.catch((e) => console.warn(`Couldn't mark board ${roomId} as seen:`, e))
+		}, SEEN_AFTER_MS)
+		return () => clearTimeout(timer)
 	}, [roomId, memberId])
 
 	// Create a store connected to multiplayer.

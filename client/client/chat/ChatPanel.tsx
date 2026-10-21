@@ -3,6 +3,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useReducer, useRef, 
 import type { Editor } from 'tldraw'
 import { AgentMessage } from './AgentMessage'
 import './chat.css'
+import { chatBus, promptBlocks, type AskRequest } from './chatBus'
 import { chatReducer, initialChatState, type Turn } from './chatState'
 import { openAgentConnection, type AgentConnection } from './connection'
 import { formatCost, formatTokens, stopReasonText } from './format'
@@ -128,13 +129,9 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 		[boardId, memberId, disconnect]
 	)
 
-	const send = () => {
-		const text = draft.trim()
-		const c = conn.current
-		if (!text || !c || running) return
-		setDraft('')
-		dispatch({ type: 'send', text })
-		c.prompt([{ type: 'text', text }]).then(
+	const sendPrompt = (c: AgentConnection, request: AskRequest) => {
+		dispatch({ type: 'send', text: request.text })
+		c.prompt(promptBlocks(request)).then(
 			(res) => dispatch({ type: 'stop', stopReason: res.stopReason, usage: res.usage }),
 			(e) => {
 				// a dropped connection is reported by onClose
@@ -142,6 +139,33 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 			}
 		)
 	}
+
+	const send = () => {
+		const text = draft.trim()
+		const c = conn.current
+		if (!text || !c || running) return
+		setDraft('')
+		sendPrompt(c, { text })
+	}
+
+	// requests from elsewhere in the app (chatBus): open the panel, which connects, then send each
+	// one once the chat is ready and no turn is running
+	const asks = useRef<AskRequest[]>([])
+	const [asked, setAsked] = useState(0)
+	useEffect(
+		() =>
+			chatBus.onAsk((request) => {
+				asks.current.push(request)
+				setAsked((n) => n + 1)
+				setOpen(true)
+			}),
+		[setOpen]
+	)
+	useEffect(() => {
+		const c = conn.current
+		if (status !== 'ready' || !c || running || !asks.current.length) return
+		sendPrompt(c, asks.current.shift()!)
+	}, [status, running, asked])
 
 	const stop = () => {
 		cancelPermissions()
