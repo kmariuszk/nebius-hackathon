@@ -8,7 +8,8 @@ was placed near (kind `similar`). Then, per paper, each step has its own runner:
 1. the reader agent reads the paper on its own and answers with its artifacts as JSON;
 2. a model-free step writes them to the card: each quote and highlight that is
    word for word in the abstract with `add_quote`, the summary and what
-   couldn't be checked with `set_card`;
+   couldn't be checked with `set_card`, then the first figure the reader
+   picked that `get_figures` has an image for;
 3. the context agent relates the paper to the board: "why it matters", the
    glance steps and links to the closest papers; when it saved no "why", it
    tries once more with the errors it got;
@@ -276,10 +277,13 @@ class ProcessPapers(BaseToolset):
         return []
 
     async def write_reading(self, job: Job, reading: dict[str, Any], gaps: list[str]) -> dict[str, Any]:
-        """The reader's artifacts onto the card; returns the paper's title, abstract and card quotes."""
+        """The reader's artifacts onto the card, with its first figure pick that has an image; returns
+        the paper's title, abstract and card quotes."""
         card: dict[str, Any] = {"quotes": []}
         passages = [q.get("text") for q in reading.get("quotes") or []]
         passages += [h.get("text") for h in reading.get("highlights") or []]
+        figures = reading.get("figures") or []
+        picks = [str(f["figureId"]) for f in figures if isinstance(f, dict) and f.get("figureId")]
         if reading.get("source") == "abstract":
             gaps.append(ABSTRACT_ONLY)
 
@@ -300,6 +304,12 @@ class ProcessPapers(BaseToolset):
                 fields["gaps"] = gaps[:8]
             if fields:
                 await call("set_card", paperId=job.paper_id, **fields)
+            if picks:
+                try:
+                    if figure := card_figure(picks, await call("get_figures", paper_id=job.paper_id)):
+                        await call("set_card", paperId=job.paper_id, figure=figure)
+                except ToolFailed:
+                    pass  # logged by `call`; a card without a figure is no gap
 
         await self.step("reader", job, write, papers=True)
         return card
@@ -322,7 +332,7 @@ class ProcessPapers(BaseToolset):
     async def step(self, name: str, job: Job, action: Callable[[Calls], Awaitable[None]], papers: bool = False) -> None:
         tools = [self.board.canvas("get_board", "add_quote", "set_card", "mark_working", "link_papers")]
         if papers:
-            tools.append(self.board.papers("get_paper"))
+            tools.append(self.board.papers("get_paper", "get_figures"))
         await self.run(Step(name=name, tools=tools, action=action, paper_id=job.paper_id), "", job)
 
     async def ask(self, agent: LlmAgent, text: str, job: Job, tried: list[dict[str, Any]] | None = None) -> str:
@@ -398,6 +408,17 @@ def relate_request(job: Job, reading: dict[str, Any], card: dict[str, Any]) -> s
         f"Summary: {reading.get('summary', '')}\n"
         f"Highlights:\n{highlights or 'none'}"
     )
+
+
+def card_figure(picks: list[str], found: dict[str, Any]) -> dict[str, Any] | None:
+    """`set_card`'s figure: the reader's first pick that `get_figures` has an image for, or None."""
+    by_id = {f.get("figureId"): f for f in found.get("figures") or [] if isinstance(f, dict) and f.get("imageUrl")}
+    figure = next((by_id[p] for p in picks if p in by_id), None)
+    if figure is None:
+        return None
+    caption = str(figure.get("caption") or "")[:1500]
+    return {"imageUrl": figure["imageUrl"], "label": str(figure.get("label") or "")[:40], "caption": caption,
+            "captionByAi": False}
 
 
 def recorded(

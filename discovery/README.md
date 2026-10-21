@@ -19,16 +19,21 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `exclude_ids`, `k`, `backend` (super_vl, rerank_vl) | `ranked` (summary, `rank`, `score`, `reason`), `backend`, `model`, `seconds`, `candidates`, `skipped` |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
-| `get_fulltext` | `paper_id`, `max_chars` (40,000) | `source` (pmc, web, abstract), `url`, `sections` (`title`, `text`), `figures` (`figureId`, `label`, `caption`), `truncated`, `omittedSections`, `skipped` |
+| `get_fulltext` | `paper_id`, `max_chars` (40,000) | `source` (pmc, web, abstract), `url`, `sections` (`title`, `text`), `figures` (`figureId`, `label`, `caption`, `imageUrl`), `truncated`, `omittedSections`, `skipped` |
+| `get_figures` | `paper_id` | `paperId`, `source`, `figures` (`figureId`, `label`, `caption`, `imageUrl` or null), `skipped` |
 | `check_quotes` | `paper_id`, `quotes` | each quote with `verbatim`, `section` and a `link` that highlights it (`#:~:text=`) |
 
 `since` takes `YYYY`, `YYYY-MM` or `YYYY-MM-DD` (a year or month counts from its first day); anything else is a tool error naming those formats. An optional argument sent as a placeholder (`"None"`, `"none"`, `"null"`, `"NULL"`, `"undefined"` or `""`) counts as left out.
 
-Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Clustering and figure images from `docs/Concept.md` are still to come, and scoring is embedding similarity only so far.
+Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Clustering from `docs/Concept.md` is still to come, and scoring is embedding similarity only so far.
 
 ### Where full text comes from
 
-`get_fulltext` tries, in order: PMC's JATS XML through E-utilities (`efetch db=pmc`, which also serves author manuscripts), arXiv's HTML page through Tavily Extract, then the open-access PDF or the DOI landing page through Tavily Extract. A page under 3,000 characters is treated as a landing page or paywall. When nothing works it returns the abstract with `source: "abstract"`, and `skipped` says why. Full text is cached in SQLite, so `check_quotes` checks against every section, including the ones `max_chars` cut. Back matter (acknowledgements, funding, author contributions and so on) is dropped, Methods sections go last, and no section takes more than a sixth of the budget. Figures (label and caption, no image yet) come from PMC only.
+`get_fulltext` tries, in order: PMC's JATS XML through E-utilities (`efetch db=pmc`, which also serves author manuscripts), arXiv's HTML page through Tavily Extract, then the open-access PDF or the DOI landing page through Tavily Extract. A page under 3,000 characters is treated as a landing page or paywall. When nothing works it returns the abstract with `source: "abstract"`, and `skipped` says why. Full text is cached in SQLite, so `check_quotes` checks against every section, including the ones `max_chars` cut. Back matter (acknowledgements, funding, author contributions and so on) is dropped, Methods sections go last, and no section takes more than a sixth of the budget.
+
+### Figures
+
+Figures come from PMC only: label and caption from the JATS XML, and the image URL from the PMC article page (`discovery/figures.py`), since the JATS names the image file but not its CDN path. Each `<figure id>` on the page holds an `<img src>` on `cdn.ncbi.nlm.nih.gov`; figures are matched by ID, then by image file name. A page without a `<figure>` is a block page, which PMC sometimes sends: it's fetched twice more, 2 s apart. The URLs are cached with the full text. When no figure got one, `get_figures`'s `skipped` says why (`"figure images: PMC's article page was a block page 3 times"`), and that reason is cached too, so later reads don't fetch the page again. A full text cached before image URLs existed gets them on its next read. `get_figures` reads the same cached full text as `get_fulltext`, so the background can fetch figures without the whole text.
 
 ### How ranking works today
 
@@ -55,6 +60,7 @@ Concept.md's step 5 also adds citation overlap with the seeds, recency and a Lig
 | Source | Used for | Key |
 | --- | --- | --- |
 | PubMed E-utilities | Keyword search, records with abstracts, similar/citing/reference links, PMC full text | None; `NCBI_API_KEY` raises the limit from 3 to 10 requests a second |
+| PMC article pages | Figure image URLs | None |
 | OpenAlex | Keyword search across fields, DOI lookups, papers citing the seeds | `OPENALEX_API_KEY` (free); required since keyless use shares a tiny per-IP budget |
 | Semantic Scholar | Recommendations from the seeds, steered away from excluded papers | Optional `SEMANTIC_SCHOLAR_API_KEY` |
 | Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv, each hit resolved to a paper ID; Extract for arXiv and publisher full text | `TAVILY_API_KEY` |

@@ -91,9 +91,11 @@ class FakeCanvas:
             glance: list[dict[str, Any]] | None = None,
             summary: str | None = None,
             gaps: list[str] | None = None,
+            figure: dict[str, Any] | None = None,
         ) -> dict[str, Any]:
             """Fill in a paper's card."""
-            given = {"oneLine": oneLine, "claims": claims, "glance": glance, "summary": summary, "gaps": gaps}
+            given = {"oneLine": oneLine, "claims": claims, "glance": glance, "summary": summary, "gaps": gaps,
+                     "figure": figure}
             fields = {k: v for k, v in given.items() if v is not None}
             record(ctx, "set_card", paperId=paperId, **fields)
             return {"ok": True, "written": sorted(fields)}

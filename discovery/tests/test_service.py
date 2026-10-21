@@ -279,6 +279,7 @@ async def test_tools_over_mcp(discovery):
         assert tools == {
             "search", "find_candidates", "score_candidates", "rerank", "resolve_seed", "get_paper",
             "get_fulltext", "check_quotes",
+            "get_figures",
         }
         rerank_tool = next(t for t in (await client.list_tools()).tools if t.name == "rerank")
         assert "rerank_vl" in json.dumps(rerank_tool.input_schema["properties"]["backend"])
@@ -299,7 +300,9 @@ async def test_fulltext_from_pmc_puts_methods_last_and_drops_back_matter(discove
     assert result["sections"][1]["text"].startswith(
         "We find that “TOX drives exhaustion” in tumours across patients. Spatial. Exhausted"
     )
-    assert result["figures"] == [{"figureId": "F1", "label": "Figure 1", "caption": "TOX levels. Per patient."}]
+    assert result["figures"] == [
+        {"figureId": "F1", "label": "Figure 1", "caption": "TOX levels. Per patient.", "imageUrl": None}
+    ]
     assert not result["truncated"] and result["skipped"] == []
 
     short = await discovery.get_fulltext("pmid:500", max_chars=2_000)

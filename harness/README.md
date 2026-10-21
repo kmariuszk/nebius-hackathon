@@ -72,6 +72,8 @@ Under ACP the master gets the chat's board (`build(board)`, interfaces I1) and f
 
 `process_papers` (`agents/master/background.py`) first links the papers to the ones they were placed near, in one model-free `link_papers` call (kind `similar`), so each card's string shows as soon as reading starts. Then it reads each placed paper in the background, with its own runners: the `reader`; a model-free step that writes the reader's quotes (`add_quote`, which keeps only sentences from the abstract for now), its summary and what it couldn't check (`set_card` `summary`, `gaps`); then the `context` agent; then `mark_working` off. If no `set_card` from the context agent wrote `oneLine`, it runs once more with the errors it got; if it still didn't, the card's `gaps` say "The agent couldn't write why this paper matters: <reason>", and a card with `oneLine` but no glance says "The agent couldn't draw the paper at a glance." Any other failed step still clears the badge and says why in `gaps`. Every failed tool call in a background pass is logged at WARNING as `background <paperId> <agent> <tool>: <error>`, so the log says why a card has a gap. At most 3 papers are read at a time and the background agents make at most 30 model calls a minute, since Token Factory's limit is shared. Background writes carry the run ID of the turn that placed the paper and the researcher's member ID, like the turn's own writes. Closing the chat stops the passes still running, and each clears its badge.
 
+The step that writes the reader's quotes and summary also writes its figure: when the reader picked figures, it calls the papers MCP's `get_figures` and puts the first pick with an image URL on the card (`set_card` `figure`, with PMC's label and caption and `captionByAi: false`). No pick with an image means no figure; a failed `get_figures` is logged and leaves the card without one, never a gap.
+
 ### The reader's artifacts
 
 On the board, `process_papers` writes them to the card; in the chat, the master answers with them:
@@ -82,7 +84,7 @@ On the board, `process_papers` writes them to the card; in the chat, the master 
 | `quotes`, `highlights` (`text`) | `add_quote`, for the passages that are word for word in the abstract |
 | `source` `abstract` | `set_card` `gaps`: "Read from the abstract only" |
 | `tldr`, `highlights`, `summary` | The context agent's request, for `oneLine`, claims and glance |
-| `figures` (`figureId`, `label`, `why`) | Not yet: `set_card` takes a figure with an image URL, which `get_fulltext` doesn't give |
+| `figures` (`figureId`, `label`, `why`) | `set_card` `figure`: the first pick with an image URL from `get_figures` (PMC papers only) |
 
 `source` says what it read: `pmc` or `web` for the full text, `abstract` when no full text was found, which `notes` then says too.
 
@@ -148,6 +150,5 @@ A run takes about 10 minutes on today's pipeline and makes a few dozen Token Fac
 
 - Verdicts, citation overlap and recency in `score_candidates`: it scores by embedding similarity to the question and the closest seed, so the master places the top of that score. The master's instruction already skips candidates marked `placeable: false` once the papers MCP sends that field.
 - Clustering (`cluster_papers`, `apply_clusters`, `label_cluster`): neither MCP has the tools yet, so the master doesn't cluster.
-- Figures on the card: `get_fulltext` lists PMC figures by label and caption but no image URL, which `set_card` needs; the reader picks figures from their captions, not by looking at them.
 - Full-text quotes on the card: the canvas MCP's `add_quote` only accepts sentences from the abstract, so the reader's full-text quotes are left out.
 - Tool cards for the background passes: they run after the turn, so the chat shows no cards for them; the board shows their progress with the reading badge.
