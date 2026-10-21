@@ -23,6 +23,7 @@ from google.genai import types
 from pydantic import BaseModel, Field, ValidationError
 
 from harness import models, toolsets
+from harness.agents.args import clean_args
 
 RESULT_KEY = "search_result"
 # Room for the reasoning and `done` with 15 candidates. Lightning otherwise keeps repeating calls up to its 8192 cap.
@@ -36,7 +37,8 @@ The request gives a sub-query. It may also list seed paper IDs (the researcher's
 and paper IDs to exclude.
 
 Every reply must be a tool call. Make at most 3 calls before `done`: `search` at most twice and \
-`find_candidates` at most once.
+`find_candidates` at most once. Leave out optional arguments you don't use; never write None or null \
+for them.
 
 1. Call `search` with the sub-query and `limit` 10. If few results look on-topic, call it once more \
 with a broader rewording.
@@ -123,6 +125,7 @@ def build() -> LlmAgent:
         model=models.lightning(),
         instruction=INSTRUCTION,
         tools=[toolsets.papers("search", "find_candidates"), done],
+        before_tool_callback=clean_args,
         after_model_callback=first_call_only,
         # No forced tool choice (see the module docstring); the cap stays as a backstop.
         generate_content_config=types.GenerateContentConfig(max_output_tokens=MAX_REPLY_TOKENS),

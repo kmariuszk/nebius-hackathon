@@ -11,6 +11,7 @@ from __future__ import annotations
 from google.adk.agents import LlmAgent
 
 from harness import models
+from harness.agents.args import clean_args
 from harness.agents.master.candidates import SearchTool
 from harness.agents.search import agent as search
 from harness.board.prompts import BOARD_CONTEXT, CANVAS_RULES
@@ -43,4 +44,5 @@ def build(board: BoardTools | None = None) -> LlmAgent:
             *board.viewer(),
             board.plan(),
         ],
+        before_tool_callback=clean_args,
     )

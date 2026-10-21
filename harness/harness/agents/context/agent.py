@@ -16,6 +16,7 @@ from functools import cache
 from google.adk.agents import LlmAgent
 
 from harness import models
+from harness.agents.args import clean_args
 from harness.board.tools import BoardTools
 
 INSTRUCTION = """\
@@ -60,6 +61,7 @@ def build(board: BoardTools | None = None) -> LlmAgent:
         model=models.lightning(),
         instruction=INSTRUCTION,
         tools=[board.canvas("get_board", "add_quote", "set_card", "link_papers")],
+        before_tool_callback=clean_args,
     )
 
 
