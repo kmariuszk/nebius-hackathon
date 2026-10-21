@@ -8,7 +8,7 @@
 | Depends on | — ([T10 refresh](../tldraw-integration/T10-paper-card.md) shows "No free figure" when there is none) |
 | Unblocks | The figure widget and ranked-list thumbnails on a real board; [T07 refresh](../tldraw-integration/T07-board-context.md)'s `look_at_figure` |
 | Milestone | W2 One clean run |
-| Status | Not started |
+| Status | Built on branch `w2/figures` (Oct 21); criteria 4 and 5 wait for the live check and a browser look |
 | Owner | TBD |
 
 ## Goal
@@ -40,12 +40,12 @@ A paper with a free full text in PubMed Central shows a real figure from it in t
 
 ## Tasks
 
-- [ ] `discovery/discovery/fulltext.py`: `Figure.imageUrl`, `Figure.graphic`, `from_jats` reads `graphic`; `from_record` defaults both to `None`.
-- [ ] `discovery/discovery/sources/pubmed.py`: `pmc_figure_urls` with the block-page retry.
-- [ ] `discovery/discovery/service.py`: fill `imageUrl` in `_fulltext`; `get_figures`; `server.py`: the tool.
-- [ ] `discovery/tests/fixtures/pmc_PMC4944528.html`: the article page trimmed to two `<figure>` blocks; tests in `test_papers.py` or a new `test_figures.py`.
-- [ ] `harness/harness/agents/master/background.py`: the figure write; `harness/tests/test_master_board.py`.
-- [ ] `discovery/README.md`, `harness/README.md` (remove "Figures on the card" from "Not built yet"), [interfaces.md I5 and I9](../tldraw-integration/interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp).
+- [x] `discovery/discovery/fulltext.py`: `Figure.imageUrl`, `Figure.graphic`, `from_jats` reads `graphic`; `from_record` defaults both to `None`.
+- [x] `discovery/discovery/sources/pubmed.py`: `pmc_figure_urls` with the block-page retry. Built as `page_urls` and `parse_page` in a new `discovery/discovery/figures.py`, with the fill step (`add_image_urls`), since the article page isn't E-utilities.
+- [x] `discovery/discovery/service.py`: fill `imageUrl` in `_fulltext`; `get_figures`; `server.py`: the tool. A lookup that found no image keeps its reason with the cached text (`FullText.imagesSkipped`, which `get_figures` reports in `skipped`), so only texts cached before D05 are filled again, once.
+- [x] `discovery/tests/fixtures/pmc_PMC4944528.html`: the article page trimmed to two `<figure>` blocks; tests in `test_papers.py` or a new `test_figures.py`.
+- [x] `harness/harness/agents/master/background.py`: the figure write; `harness/tests/test_master_board.py`. Tests in a new `harness/tests/test_figures_write.py`.
+- [x] `discovery/README.md`, `harness/README.md` (remove "Figures on the card" from "Not built yet"), [interfaces.md I5 and I9](../tldraw-integration/interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp).
 
 ## Acceptance criteria
 

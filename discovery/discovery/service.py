@@ -14,13 +14,12 @@ import re
 import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Awaitable, Callable, Iterable
-from dataclasses import asdict
 from typing import Any, Literal
 
 import httpx
 import numpy as np
 
-from discovery import fulltext
+from discovery import figures, fulltext
 from discovery import rerank as listwise
 from discovery import rerank_vl
 from discovery.embeddings import EmbedError, Embedder
@@ -290,7 +289,22 @@ class Discovery:
             "source": text.source,
             "url": text.url,
             **text.fit(max_chars),
-            "figures": [asdict(f) for f in text.figures],
+            "figures": [f.to_summary() for f in text.figures],
+            "skipped": skipped,
+        }
+
+    async def get_figures(self, paper_id: str) -> dict[str, Any]:
+        """The paper's PMC figures with their image URLs, from the same cached full text as `get_fulltext`."""
+        paper = await self.get_paper(paper_id)
+        text, skipped = await self._fulltext(paper)
+        if text.source != "pmc":
+            skipped.append("figures come from PMC only, and there is no PMC full text for this paper")
+        elif text.imagesSkipped:
+            skipped.append(text.imagesSkipped)
+        return {
+            "paperId": paper.paper_id,
+            "source": text.source,
+            "figures": [f.to_summary() for f in text.figures],
             "skipped": skipped,
         }
 
@@ -313,6 +327,9 @@ class Discovery:
     async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str]]:
         """The paper's full text from the first source that has it, and why the others didn't."""
         if cached := self.store.get_fulltext(paper.paper_id):
+            if figures.lacks_image_urls(cached):  # saved before figures had image URLs
+                await figures.add_image_urls(self.client, cached)
+                self.store.save_fulltext(paper.paper_id, cached)
             return cached, []
         if "pmcid" not in paper.ids and "pmid" in paper.ids:
             # OpenAlex and Semantic Scholar records often lack the PMCID that PubMed's has.
@@ -344,7 +361,10 @@ class Discovery:
         return fulltext.from_abstract(paper.abstract, url), skipped
 
     async def _pmc(self, pmcid: str, url: str, abstract: str | None) -> FullText | None:
-        return fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
+        text = fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
+        if text:
+            await figures.add_image_urls(self.client, text)
+        return text
 
     async def _web(self, url: str) -> FullText | None:
         markdown = await tavily.extract(self.client, url)

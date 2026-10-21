@@ -1,7 +1,7 @@
 """The papers MCP: the paper tools every agent uses (docs/Concept.md, Papers MCP tools).
 
-Scoring is embedding similarity only so far; verdicts, clustering and figure
-images are still to come. The tools here are the ones the search, master and
+Scoring is embedding similarity only so far; verdicts and clustering are
+still to come. The tools here are the ones the search, master and
 reader agents need.
 """
 
@@ -213,11 +213,21 @@ def build_server(discovery: Discovery) -> MCPServer:
                 so they are the first to be cut.
 
         Returns source (pmc, web or abstract), the url the text came from, sections
-        ([{title, text}]), figures ([{figureId, label, caption}]; PMC papers only),
-        whether the text was truncated, the omitted section titles, and the sources
-        that were skipped and why.
+        ([{title, text}]), figures ([{figureId, label, caption, imageUrl}]; PMC papers
+        only), whether the text was truncated, the omitted section titles, and the
+        sources that were skipped and why.
         """
         return await discovery.get_fulltext(paper_id, max_chars)
+
+    @server.tool()
+    async def get_figures(paper_id: str) -> dict[str, Any]:
+        """The paper's figures with their image URLs, to show one on its card (PMC papers only).
+
+        Returns source (pmc, web or abstract), figures ([{figureId, label, caption,
+        imageUrl}]; imageUrl is null when PMC's article page had no image for it), and
+        what was skipped and why.
+        """
+        return await discovery.get_figures(paper_id)
 
     @server.tool()
     async def check_quotes(paper_id: str, quotes: list[str]) -> dict[str, Any]:
