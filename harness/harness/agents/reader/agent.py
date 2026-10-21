@@ -13,6 +13,7 @@ from __future__ import annotations
 from google.adk.agents import LlmAgent
 
 from harness import models, toolsets
+from harness.agents.args import clean_args
 
 INSTRUCTION = """\
 You read one research paper on its own and write the artifacts that go next to its card on a discovery \
@@ -59,6 +60,7 @@ def build() -> LlmAgent:
         model=models.super_vl(),
         instruction=INSTRUCTION,
         tools=[toolsets.papers("get_fulltext", "check_quotes")],
+        before_tool_callback=clean_args,
     )
 
 

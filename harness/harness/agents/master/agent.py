@@ -24,6 +24,7 @@ from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 
 from harness import models, toolsets
+from harness.agents.args import chain, clean_args
 from harness.agents.context import agent as context
 from harness.agents.master import candidates
 from harness.agents.master.background import ProcessPapers
@@ -184,7 +185,7 @@ def build(
                 AgentTool(agent=reader_agent()),
                 toolsets.papers("resolve_seed", "get_paper", "rerank"),
             ],
-            before_tool_callback=candidates.fill_rerank,
+            before_tool_callback=chain(clean_args, candidates.fill_rerank),
         )
     background = ProcessPapers(board, reader_agent, context_agent)
     return LlmAgent(
@@ -205,7 +206,7 @@ def build(
             *board.viewer(),
             board.plan(),
         ],
-        before_tool_callback=candidates.fill,
+        before_tool_callback=chain(clean_args, candidates.fill),
         after_tool_callback=candidates.note,
         after_agent_callback=background.after_turn,
     )

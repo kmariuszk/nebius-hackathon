@@ -94,6 +94,35 @@ async def test_a_reply_with_many_calls_runs_only_the_first(papers_mcp):
     assert state[search.RESULT_KEY]["candidates"][0]["paperId"] == "pmid:1"
 
 
+def with_filters(papers_mcp) -> None:
+    """Give the stand-in's `search` the real one's optional `since` and `sources`, recorded when sent."""
+    papers_mcp.server.remove_tool("search")
+
+    @papers_mcp.server.tool()
+    async def search(query: str, limit: int = 20, since: str | None = None, sources: list[str] | None = None) -> dict:
+        filters = {k: v for k, v in {"since": since, "sources": sources}.items() if v is not None}
+        papers_mcp.calls.append(("search", {"query": query, "limit": limit, **filters}))
+        paper = {"paperId": "pmid:1", "title": "Single-cell melanoma atlas", "foundBy": ["pubmed"]}
+        return {"papers": [paper], "countsBySource": {"pubmed": 1}, "skipped": []}
+
+
+async def test_placeholder_arguments_never_reach_the_papers_mcp(papers_mcp):
+    # Oct 19 live run: Lightning wrote "None" for the filters it didn't use, and every source came back empty.
+    with_filters(papers_mcp)
+    agent = search.build()
+    agent.model = ScriptedLlm(
+        turns=[
+            call("search", query="melanoma T cells", limit=10, since="None", sources="None"),
+            call("done", sub_query="melanoma T cells", candidates=[CANDIDATE], seed_candidates=0, notes=""),
+        ]
+    )
+
+    _, state = await run(agent, "Sub-query: melanoma T cells")
+
+    assert papers_mcp.calls == [("search", {"query": "melanoma T cells", "limit": 10})]
+    assert state[search.RESULT_KEY]["candidates"][0]["paperId"] == "pmid:1"
+
+
 def test_search_agent_replies_are_capped():
     assert search.build().generate_content_config.max_output_tokens == search.MAX_REPLY_TOKENS
 
@@ -122,3 +151,4 @@ def test_search_agent_runs_on_lightning():
     assert agent.model.model == "openai/nvidia/Nemotron-3_5-Lightning"
     assert "Never invent" in agent.instruction
     assert "at most 3 calls before `done`" in agent.instruction
+    assert "never write None or null" in agent.instruction

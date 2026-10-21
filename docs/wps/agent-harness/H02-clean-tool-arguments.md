@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | H04 |
 | Milestone | W1 Nothing broken |
-| Status | Not started |
+| Status | Built on branch `w1/harness-args` (Oct 20); acceptance criterion 3 waits for the H01 live check |
 | Owner | TBD |
 
 ## Goal
@@ -62,11 +62,11 @@ def chain(*callbacks) -> Callable[..., dict[str, Any] | None]:
 
 ## Tasks
 
-- [ ] `harness/harness/agents/args.py`: `PLACEHOLDERS`, `clean_args`, `chain`.
-- [ ] Wire it into the five agents above.
-- [ ] One sentence in `search/agent.py`'s `INSTRUCTION`.
-- [ ] `harness/tests/test_args.py`.
-- [ ] A scripted case in `harness/tests/test_search_agent.py`.
+- [x] `harness/harness/agents/args.py`: `PLACEHOLDERS`, `clean_args`, `chain`.
+- [x] Wire it into the five agents above.
+- [x] One sentence in `search/agent.py`'s `INSTRUCTION`.
+- [x] `harness/tests/test_args.py`.
+- [x] A scripted case in `harness/tests/test_search_agent.py`.
 
 ## Acceptance criteria
 
