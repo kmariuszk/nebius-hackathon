@@ -17,6 +17,9 @@ LIGHTNING = "nvidia/Nemotron-3_5-Lightning"
 # Seconds one model call may take. Unbounded, a call Token Factory never answers blocked its
 # agent for good (Lightning stopped answering for minutes on Oct 21); a timed-out call is retried.
 MODEL_TIMEOUT = 120.0
+# Lightning answers a search or context step in 3 to 20 s, but its first reply once took 104 s
+# (Oct 21), so its calls are cut sooner and sent again.
+LIGHTNING_TIMEOUT = 45.0
 
 
 def super_vl() -> LiteLlm:
@@ -26,13 +29,13 @@ def super_vl() -> LiteLlm:
 
 def lightning() -> LiteLlm:
     """The search and context agents: fast, high-volume tool calls."""
-    return token_factory(settings.get("LIGHTNING_MODEL", LIGHTNING))
+    return token_factory(settings.get("LIGHTNING_MODEL", LIGHTNING), LIGHTNING_TIMEOUT)
 
 
-def token_factory(model_id: str) -> LiteLlm:
+def token_factory(model_id: str, timeout: float = MODEL_TIMEOUT) -> LiteLlm:
     """Any Token Factory model, through LiteLLM's OpenAI-compatible provider.
 
-    A failed call, such as a 429 or one that takes longer than `MODEL_TIMEOUT` (or the
+    A failed call, such as a 429 or one that takes longer than `timeout` (or the
     `MODEL_TIMEOUT` setting), is retried twice (LiteLLM backs off exponentially on a 429),
     since the limit is shared by the chat, the background and the papers MCP.
     """
@@ -41,5 +44,5 @@ def token_factory(model_id: str) -> LiteLlm:
         api_base=settings.get("TF_BASE_URL", TOKEN_FACTORY_URL),
         api_key=settings.require("TF_API_KEY"),
         num_retries=2,
-        timeout=float(settings.get("MODEL_TIMEOUT", "") or MODEL_TIMEOUT),
+        timeout=float(settings.get("MODEL_TIMEOUT", "") or timeout),
     )

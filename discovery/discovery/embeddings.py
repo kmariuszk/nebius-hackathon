@@ -24,8 +24,11 @@ DEFAULT_URL = "https://api.tokenfactory.nebius.com/v1/"
 DEFAULT_MODEL = "Qwen/Qwen3-Embedding-8B"
 # Texts per request; 32 titles and abstracts answer well inside the timeout.
 BATCH = 32
-TIMEOUT = 90
-# Seconds before the second and third tries; a Retry-After header wins.
+# Seconds each try may take. A batch usually answers in about 2 s, but some take minutes
+# (Oct 21: 2, 2, 107 and 162 s for four identical batches), so the first tries are cut short and
+# sent again, which mostly lands on a quick answer; the last try waits long for a slow endpoint.
+TIMEOUTS = (15, 30, 90)
+# Seconds before the next try after a 429 or a 5xx; a Retry-After header wins. A timeout is tried again at once.
 RETRY_WAITS = (2, 5)
 # Qwen3 embeddings expect an instruction before a query and none before a document.
 QUERY_INSTRUCTION = (
@@ -103,17 +106,19 @@ class Embedder:
 
     async def _embed(self, texts: list[str]) -> list[list[float]]:
         """One request, tried again after a timeout, a 429 or a 5xx; raises `EmbedError`."""
-        for tries, wait in enumerate([*RETRY_WAITS, None], start=1):
+        for tries, (wait, timeout) in enumerate(zip([*RETRY_WAITS, None], TIMEOUTS), start=1):
             try:
                 async with _semaphore():
                     response = await self.client.post(
                         self.base_url.rstrip("/") + "/embeddings",
                         headers={"Authorization": f"Bearer {self.api_key}"},
                         json={"model": self.model, "input": texts},
-                        timeout=TIMEOUT,
+                        timeout=timeout,
                     )
             except httpx.TimeoutException:
                 problem = "timed out"
+                if wait is not None:
+                    continue
             except httpx.HTTPError as error:
                 raise EmbedError(f"embeddings failed: {type(error).__name__}: {error}") from error
             else:
