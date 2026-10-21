@@ -48,6 +48,7 @@ SINCE_FORMAT = "since must be YYYY, YYYY-MM or YYYY-MM-DD"
 
 
 # Seconds scoring waits for warm-ups in flight before embedding what's left itself.
+# A deliberate cap below an embedding batch's worst case (sum(embeddings.TIMEOUTS)): after it, scoring sends the texts itself rather than wait.
 WARM_WAIT = 60.0
 
 
@@ -72,7 +73,7 @@ class Discovery:
             "openalex": lambda: openalex.search(self.client, query, limit, since),
             "web": lambda: self._web_search(query, limit, since),
         }
-        found, skipped = await _run({name: jobs[name]() for name in dict.fromkeys(sources)})
+        found, skipped = await run_jobs({name: jobs[name]() for name in dict.fromkeys(sources)})
         papers = list(self._save_all(_round_robin(found)).values())[:limit]
         self._warm([paper for paper, _ in papers])
         return {
@@ -91,7 +92,8 @@ class Discovery:
         query: str | None = None,
     ) -> dict[str, Any]:
         since = _since(since)
-        seeds, skipped = await self._papers(seed_ids, "seed")
+        loaded, skipped = await self.load_papers(seed_ids, "seed")
+        seeds = list(loaded.values())
         excluded = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
 
         jobs: dict[str, Awaitable[list[Paper]]] = {}
@@ -111,7 +113,7 @@ class Discovery:
                 jobs[strategy] = semantic_scholar.recommend(
                     self.client, [s.paper_id for s in seeds], negative, limit
                 )
-        found, failed = await _run(jobs)
+        found, failed = await run_jobs(jobs)
         papers = self._save_all(_round_robin(found))
         candidates = [
             (paper, by) for paper, by in papers.values() if not excluded & set(paper.aliases())
@@ -140,7 +142,8 @@ class Discovery:
             raise ValueError(
                 f"Unknown rerank backend {backend!r} (RERANK_BACKEND): use one of {', '.join(RERANK_BACKENDS)}"
             )
-        seeds, skipped = await self._papers(seed_ids or [], "seed")
+        loaded, skipped = await self.load_papers(seed_ids or [], "seed")
+        seeds = list(loaded.values())
         # Seeds and excluded papers are never ranked, under any of their IDs.
         seen = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
         # Cap before loading: each ID missing from the store costs scholarly API calls.
@@ -151,11 +154,11 @@ class Discovery:
                 f"{listwise.MAX_CANDIDATES} were not ranked"
             )
             wanted = wanted[: listwise.MAX_CANDIDATES]
-        candidates, failed = await self._papers(wanted, "candidate")
+        loaded, failed = await self.load_papers(wanted, "candidate")
         skipped += failed
         # The same paper under two IDs is ranked once.
         unique = []
-        for paper in candidates:
+        for paper in loaded.values():
             if not seen & set(paper.aliases()):
                 seen |= set(paper.aliases())
                 unique.append(paper)
@@ -195,13 +198,14 @@ class Discovery:
         the question or every candidate can't be.
         """
         embedder = Embedder.from_env(self.client)
-        seeds, skipped = await self._papers(seed_ids or [], "seed")
-        candidates, failed = await self._papers(candidate_ids, "candidate")
+        loaded, skipped = await self.load_papers(seed_ids or [], "seed")
+        seeds = list(loaded.values())
+        loaded, failed = await self.load_papers(candidate_ids, "candidate")
         skipped += failed
         # Seeds are never scored, and a paper under two IDs is scored once.
         seen = {seed.paper_id for seed in seeds}
         unique = []
-        for paper in candidates:
+        for paper in loaded.values():
             if paper.paper_id not in seen:
                 seen.add(paper.paper_id)
                 unique.append(paper)
@@ -375,18 +379,19 @@ class Discovery:
         markdown = await tavily.extract(self.client, url)
         return fulltext.from_markdown(markdown, url) if markdown else None
 
-    async def _papers(self, paper_ids: list[str], role: str) -> tuple[list[Paper], list[str]]:
-        """The records for `paper_ids`, loaded concurrently, and a note for each that failed."""
+    async def load_papers(self, paper_ids: list[str], role: str) -> tuple[dict[str, Paper], list[str]]:
+        """The records for `paper_ids`, loaded concurrently. Returns each paper under the ID it was
+        given as (each given ID once, in order), and a note, named by `role`, for each that failed."""
         unique = list(dict.fromkeys(paper_ids))
         results = await asyncio.gather(*map(self.get_paper, unique), return_exceptions=True)
-        papers, skipped = [], []
+        papers, skipped = {}, []
         for paper_id, result in zip(unique, results):
             if isinstance(result, (ValueError, Skipped, httpx.HTTPError)):
                 skipped.append(f"{role} {paper_id}: {result}")
             elif isinstance(result, BaseException):
                 raise result
             else:
-                papers.append(result)
+                papers[paper_id] = result
         return papers, skipped
 
     def _aliases(self, paper_ids: list[str]) -> set[str]:
@@ -413,7 +418,7 @@ class Discovery:
         return _in_order(await pubmed.efetch(self.client, pmids), "pmid", pmids)
 
     async def _keyword(self, query: str, limit: int, since: str | None) -> list[Paper]:
-        found, _ = await _run(
+        found, _ = await run_jobs(
             {
                 "pubmed": self._pubmed_search(query, limit, since),
                 "openalex": openalex.search(self.client, query, limit, since),
@@ -552,8 +557,8 @@ class Discovery:
         return papers
 
 
-async def _run(jobs: dict[str, Awaitable[list[Any]]]) -> tuple[dict[str, list[Any]], list[str]]:
-    """Run the jobs concurrently; returns their results and a note for each that failed."""
+async def run_jobs(jobs: dict[str, Awaitable[list[Any]]]) -> tuple[dict[str, list[Any]], list[str]]:
+    """Run the jobs concurrently. Returns each job's result by name, and a note for each that failed."""
     results = await asyncio.gather(*jobs.values(), return_exceptions=True)
     found, skipped = {}, []
     for name, result in zip(jobs, results):
