@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | H04 |
 | Milestone | W1 Nothing broken |
-| Status | Built (Oct 20, `w2/harness-args` → Wave 1). Criterion 3 holds: in the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage), Super VL wrote 1 to 3 placeholder arguments in three runs and none reached the papers MCP; every search agent made 3 calls or fewer before `done` |
+| Status | Built (Oct 20, `w1/harness-args`, Wave 1). Criterion 3 holds: in the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage), Super VL wrote 1 to 3 placeholder arguments in three runs and none reached the papers MCP; every search agent made 3 calls or fewer before `done` |
 | Owner | TBD |
 
 ## Goal
