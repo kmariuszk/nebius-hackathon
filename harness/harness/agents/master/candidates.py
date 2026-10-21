@@ -40,8 +40,8 @@ CARD_FIELDS = ("title", "authors", "year", "venue", "url", "type", "foundBy")
 FROM_SEEDS = "expanded from the seeds"
 
 
-class SearchTool(AgentTool):
-    """The search agent as a tool, built fresh for every call.
+class FreshAgentTool(AgentTool):
+    """An agent as a tool, built fresh for every call.
 
     `AgentTool` closes its agent's MCP toolset when a run ends, so parallel
     calls sharing one agent would cut each other's MCP session. A fresh agent
@@ -53,12 +53,22 @@ class SearchTool(AgentTool):
         self._build = build
 
     async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
+        return await self.run_agent(self._build(), args, tool_context)
+
+    async def run_agent(self, agent: LlmAgent, args: dict[str, Any], tool_context: ToolContext) -> Any:
+        run = AgentTool(agent=agent, include_plugins=self.include_plugins)
+        return await run.run_async(args=args, tool_context=tool_context)
+
+
+class SearchTool(FreshAgentTool):
+    """The search agent as a tool, built fresh for every call, adding the IDs it finds to the pool."""
+
+    async def run_async(self, *, args: dict[str, Any], tool_context: ToolContext) -> Any:
         answer: dict[str, Any] = {}
         found: dict[str, str] = {}
         agent = self._build()
         agent.after_tool_callback = partial(record, tool_context, answer, found)
-        run = AgentTool(agent=agent, include_plugins=self.include_plugins)
-        text = await run.run_async(args=args, tool_context=tool_context)
+        text = await self.run_agent(agent, args, tool_context)
         # A run that ends with `done` has no text reply, so AgentTool returns "";
         # the answer `done` accepted is the result.
         return grounded(answer, found) if answer else text

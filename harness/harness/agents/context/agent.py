@@ -30,17 +30,18 @@ other papers.
 Samples, Method, Readout, Finding. Each step comes from one abstract sentence. If a step's sentence \
 isn't one of the card's quotes yet, call `add_quote` with that sentence copied word for word from the \
 abstract, one call per sentence, all in the same turn. Each call returns a `quoteId`.
-3. Call `set_card` once with the paper ID and:
+3. Call `set_card` with the paper ID and:
    - `oneLine`: why this paper matters for the board's question, one or two sentences of at most \
 400 characters, naming the seed or paper it relates to when there is one.
    - `claims`: 1 to 3 phrases copied exactly from `oneLine`, each with `evidence`: the IDs of the quotes \
 that back it, or ["seeds"] when it compares the paper with the seeds.
-   - `glance`: the steps, each {"label", "text" (at most 15 words), "quoteId" (the quote it comes from, \
-or null), "relation" ("same" if the seeds share it, "adds" if it is new compared with the seeds, \
-"other", or null for the Finding)}.
-4. In the same turn as `set_card`, call `link_papers` with up to 3 links of kind "similar" from this \
-paper to the papers on the board closest to it, seeds included. Leave it out when none is close.
-5. Reply with one short sentence: what the card now says and what you linked.
+4. In the same turn, call `set_card` a second time with the paper ID and `glance`: the steps, each \
+{"label", "text" (at most 15 words), "quoteId" (the quote it comes from, or null), "relation" ("same" if \
+the seeds share it, "adds" if it is new compared with the seeds, "other", or null for the Finding)}. \
+Two calls, so a mistake in the glance can't lose `oneLine`.
+5. In the same turn too, call `link_papers` with up to 3 links of kind "similar" from this paper to the \
+papers on the board closest to it, seeds included. Leave it out when none is close.
+6. Reply with one short sentence: what the card now says and what you linked.
 
 Only use quote IDs from the request or from `add_quote`, and paper IDs from the request or `get_board`. \
 Never invent them. If a tool returns an error, fix the call and try once more; if it fails again, \

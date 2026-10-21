@@ -78,9 +78,10 @@ def partial(part: types.Part) -> LlmResponse:
 def use_script(root: BaseAgent, path: str) -> None:
     """Replace the model of every agent in the tree with its turns from the file.
 
-    A `SearchTool` builds a fresh agent per call; each one continues its template's turns.
+    A `FreshAgentTool` (the search agent, the master's reader) builds a fresh agent per call;
+    each one continues its template's turns.
     """
-    from harness.agents.master.candidates import SearchTool
+    from harness.agents.master.candidates import FreshAgentTool
 
     script = json.loads(Path(path).read_text(encoding="utf-8"))
     agents = list(walk_agents(root))
@@ -88,7 +89,7 @@ def use_script(root: BaseAgent, path: str) -> None:
         if isinstance(agent, LlmAgent):
             agent.model = ScriptedModel(agent=agent.name, turns=script.get(agent.name, []))
     for tool in (tool for agent in agents for tool in getattr(agent, "tools", [])):
-        if isinstance(tool, SearchTool):
+        if isinstance(tool, FreshAgentTool):
             tool._build = _scripted(tool._build, tool.agent.model)
 
 
