@@ -1,6 +1,7 @@
 import { computed, type Computed, type Editor, type TLShapeId } from 'tldraw'
 import { CARD_SIZE, type PaperCardShape } from '../../shared/shapes.ts'
-import { currentGoal } from '../viewerState.ts'
+import { passes } from '../pinboard/filters.ts'
+import { currentGoal, filters } from '../viewerState.ts'
 
 // The v6 card (docs/mockups/flashcard-v6.html): every paper is a 172×70 card, centred where the
 // node's props.w × props.h box is, so the widgets keep working unchanged. The server's layout
@@ -64,10 +65,12 @@ export interface BoardDerived {
 	ranks: Map<string, number>
 	/** The agent's red note under a new card. */
 	notes: Map<string, string>
-	/** New, not discarded papers in reading order, for Catch me up. */
+	/** New papers in reading order, for Catch me up. */
 	fresh: string[]
 	/** The suggestions themselves, in reading order, for the ranked list. */
 	ranked: PaperCardShape[]
+	/** Suggestions in the ranking before the other filters, for "Showing N of M". */
+	total: number
 }
 
 const cache = new WeakMap<Editor, Computed<BoardDerived>>()
@@ -82,16 +85,20 @@ export function boardDerived(editor: Editor): BoardDerived {
 	return c.get()
 }
 
+// ranks, the list and Catch me up hold only papers that pass this viewer's filters (T09), so
+// the red numbers always match the list; discarded papers join them when the viewer shows them
 function derive(editor: Editor): BoardDerived {
 	const goal = currentGoal.get()
+	const f = filters.get()
 	const cards = editor
 		.getCurrentPageShapes()
-		.filter((s): s is PaperCardShape => s.type === 'paper-card' && s.props.status !== 'discarded')
+		.filter((s): s is PaperCardShape => s.type === 'paper-card' && (s.props.status !== 'discarded' || f.showDiscarded))
 	const score = (s: PaperCardShape) => s.props.scores[goal]?.score ?? -1
-	const ranked = cards.filter((s) => !isSaved(s) && s.props.scores[goal]).sort((a, b) => score(b) - score(a))
+	const suggestions = cards.filter((s) => !isSaved(s) && s.props.scores[goal])
+	const ranked = suggestions.filter((s) => passes(s.props, f, goal)).sort((a, b) => score(b) - score(a))
 	const ranks = new Map(ranked.map((s, i) => [s.props.paperId, i + 1]))
 	const fresh = cards
-		.filter((s) => s.props.status === 'new')
+		.filter((s) => s.props.status === 'new' && passes(s.props, f, goal))
 		.sort((a, b) => (ranks.get(a.props.paperId) ?? 1e9) - (ranks.get(b.props.paperId) ?? 1e9))
 		.map((s) => s.props.paperId)
 
@@ -104,7 +111,7 @@ function derive(editor: Editor): BoardDerived {
 		if (s.props.type === 'preprint' || s.props.peerReviewed === false) notes.set(s.props.paperId, 'preprint, not peer reviewed')
 		else if (s.props.type === 'review') notes.set(s.props.paperId, 'a review: background reading')
 	}
-	return { ranks, notes, fresh, ranked }
+	return { ranks, notes, fresh, ranked, total: suggestions.length }
 }
 
 /**

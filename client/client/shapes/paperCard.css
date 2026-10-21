@@ -28,6 +28,10 @@
 .pb-wrap.gone {
 	opacity: 0.35;
 }
+/* left out by this viewer's filters: faded, never hidden */
+.pb-wrap.faded {
+	opacity: 0.25;
+}
 .pb-tilt {
 	position: absolute;
 	inset: 0;

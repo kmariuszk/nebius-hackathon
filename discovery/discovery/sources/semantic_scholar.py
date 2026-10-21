@@ -15,7 +15,7 @@ from discovery.papers import Paper, parse_id
 from discovery.sources import Skipped, Throttle
 
 BASE = "https://api.semanticscholar.org"
-FIELDS = "title,year,venue,abstract,authors,externalIds,openAccessPdf,publicationTypes"
+FIELDS = "title,year,venue,abstract,authors,externalIds,openAccessPdf,publicationTypes,citationCount"
 _throttle = Throttle(1)
 
 _PREFIX = {"doi": "DOI:", "pmid": "PMID:", "pmcid": "PMCID:", "arxiv": "ARXIV:", "s2": ""}
@@ -72,4 +72,5 @@ def parse_paper(paper: dict[str, Any]) -> Paper:
         abstract=paper.get("abstract"),
         open_access_pdf=(paper.get("openAccessPdf") or {}).get("url") or None,
         type="review" if "Review" in types else "article",
+        cited_by=paper.get("citationCount"),
     )
