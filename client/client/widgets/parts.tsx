@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import { nodeLabel, sentenceCase, shortAuthors } from '../../shared/display.ts'
 import type { Fit, GlanceStep, PaperQuote } from '../../shared/paperCard.ts'
 import { chatBus } from '../chat/chatBus.ts'
+import { BotIcon } from '../pinboard/BotIcon.tsx'
 import { openPaperId, paperMoreOpen, tour, type Tour } from '../viewerState.ts'
 import { addPinnedNote } from './boardWrites.ts'
 import { sourceLabel, splitClaims, type ClaimEvidence } from './claims.ts'
@@ -399,7 +400,7 @@ export function FigureWidget() {
 	if (state.kind === 'hidden') return null
 	if (state.kind === 'ended') {
 		return (
-			<Widget k="figure" className="fig-w none">
+			<Widget k="figure" className="fig-w">
 				<div className="nofig">{state.text}</div>
 			</Widget>
 		)
@@ -549,12 +550,7 @@ function TourBar({ tour }: { tour: Tour }) {
 		<div className="tour">
 			<div className="r1">
 				<span className="av">
-					<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-						<rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" strokeWidth="1.5" />
-						<circle cx="6" cy="9" r="1.2" fill="#fff" />
-						<circle cx="10" cy="9" r="1.2" fill="#fff" />
-						<path d="M8 4.5V2" stroke="#fff" strokeWidth="1.5" />
-					</svg>
+					<BotIcon />
 				</span>
 				{tour.title.toUpperCase()} · {tour.i + 1} OF {tour.steps.length}
 				<span className="dots">

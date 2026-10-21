@@ -682,7 +682,7 @@ export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<type
 					...(kind === 'similar' ? { dash: 'dashed', arrowheadEnd: 'none' } : {}),
 				},
 				// who says they're linked: the citation's source, else PubMed for a citation and the agent for similarity
-				meta: agentMeta(ctx, { kind, label: '', by: source ?? (kind === 'cites' ? 'pubmed' : 'agent'), hiddenByHuman: false }),
+				meta: agentMeta(ctx, { kind, label: '', by: kind === 'cites' ? (source ?? 'pubmed') : 'agent', hiddenByHuman: false }),
 			})
 			for (const [terminal, card] of [['start', a], ['end', b]] as const) {
 				w.createBinding({
@@ -866,8 +866,8 @@ export const canvasTools = [
 		'Link pairs of papers on the board with an arrow; at most 100 links per call, and both papers need cards. ' +
 			'kind: cites (a citation: `from` cites `to`) or similar (your judgement that the two are closely ' +
 			'related; direction doesn\'t matter). source (optional): where a citation comes from, pubmed (the ' +
-			'default for cites) or openalex; the arrow records it, and records a similar link without one as the ' +
-			'agent\'s. Linking a pair again is a no-op. Skipped with a reason: a paper linked to itself, a missing ' +
+			'default for cites) or openalex; the arrow records it, and records every similar link as the agent\'s. ' +
+			'Linking a pair again is a no-op. Skipped with a reason: a paper linked to itself, a missing ' +
 			'card, a similar link between papers a citation already joins, and links a person removed or hid; ' +
 			'never try to recreate those. Links can\'t be labelled or removed through this server. Returns ' +
 			'{linked, skipped}.',

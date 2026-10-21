@@ -32,9 +32,11 @@ export const highlightParams = z.object({
 
 export const openPaperParams = z.object({ sessionId, paperId: z.string().min(1) })
 
+export const DEFAULT_TOUR_TITLE = 'Catch-up'
+
 export const tourParams = z.object({
 	sessionId,
-	title: z.string().default('Catch-up'),
+	title: z.string().default(DEFAULT_TOUR_TITLE),
 	steps: z.array(z.object({ paperId: z.string().min(1), line: z.string() })),
 })
 

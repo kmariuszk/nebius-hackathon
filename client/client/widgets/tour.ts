@@ -1,4 +1,5 @@
 import { transact, type Editor, type TLShapeId } from 'tldraw'
+import { DEFAULT_TOUR_TITLE } from '../../shared/acpExt.ts'
 import { paperShapeId } from '../../shared/ids.ts'
 import type { PaperCardProps } from '../../shared/paperCard.ts'
 import { boardDerived, type BoardDerived } from '../shapes/card.ts'
@@ -9,8 +10,6 @@ import type { Vote } from './votes.ts'
 // board's own data (the top bar's button, ?tour=1) or from the agent's `_canvas/tour`. Each step
 // opens its paper's widgets (T10); the tour bar in the actions widget steps through them, and
 // Keep or Discard moves on. Nothing here writes to the room, and stepping costs no model calls.
-
-export const TOUR_TITLE = 'Catch-up'
 
 export type TourAction =
 	| { type: 'start'; steps: TourStep[]; title: string }
@@ -88,7 +87,7 @@ export function visibleCard(editor: Editor, paperId: string): PaperCardProps | u
 export const boardSteps = (editor: Editor) => stepsFromBoard(boardDerived(editor), currentGoal.get(), (paperId) => visibleCard(editor, paperId))
 
 /** The top bar's Catch me up, and ?tour=1. */
-export const startCatchUp = (editor: Editor) => runTour({ type: 'start', steps: boardSteps(editor), title: TOUR_TITLE })
+export const startCatchUp = (editor: Editor) => runTour({ type: 'start', steps: boardSteps(editor), title: DEFAULT_TOUR_TITLE })
 
 /**
  * Moves this viewer's tour and opens the paper it's on (each opens with More closed). Ending closes
