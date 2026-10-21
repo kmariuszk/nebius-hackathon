@@ -5,7 +5,8 @@ import type { PaperCardShape } from '../../shared/shapes'
 import { kindOf, linkTag } from '../editing/linkRules'
 import { hoveredLink, linkEditorAt, openLinkEditor } from '../editing/linkState'
 import { isSaved } from '../shapes/card'
-import { openPaperId } from '../viewerState'
+import { currentGoal, filters, openPaperId } from '../viewerState'
+import { stringFadedByFilters } from './filters'
 
 // v6 strings (docs/mockups/flashcard-v6.html): the links between papers are drawn here, under the
 // cards, running pin to pin with a little sag. The built-in arrows that hold the links stay in the
@@ -79,6 +80,8 @@ function sag(A: Pt, B: Pt) {
 
 function computeLines(editor: Editor): Line[] {
 	const open = openPaperId.get()
+	const f = filters.get()
+	const goal = currentGoal.get()
 	const hoveredId = editor.getHoveredShapeId()
 	const hovered = hoveredId ? editor.getShape(hoveredId) : undefined
 	const nh = !open && isPaperCard(hovered) ? hovered.props.paperId : null
@@ -101,7 +104,8 @@ function computeLines(editor: Editor): Line[] {
 		const lit = arrow.id === pointed || arrow.id === editing
 		const on = inc(open) || inc(nh) || lit
 		const mine = kind === 'user' || !!label
-		const faded = !lit && ((!!open && !on) || (!!nh && !inc(nh)))
+		const filtered = stringFadedByFilters([a.props, b.props], f, goal, open)
+		const faded = !lit && (filtered || (!!open && !on) || (!!nh && !inc(nh)))
 		const p = sag(A, B)
 		const knots = [a, b].filter((c) => !isSaved(c) && c.props.paperId !== open).map((c) => (c === a ? A : B))
 		const tag = mine || on ? linkTag(kind, label) : null
@@ -109,7 +113,7 @@ function computeLines(editor: Editor): Line[] {
 			id: arrow.id,
 			d: p.d,
 			mid: p.mid,
-			cls: `${kind}${on ? ' on' : ''}${faded ? ' faded' : ''}${!on && !faded ? ' rest' : ''}`,
+			cls: `${kind}${on && !faded ? ' on' : ''}${faded ? ' faded' : ''}${!on && !faded ? ' rest' : ''}`,
 			knots,
 			tag,
 			mine,

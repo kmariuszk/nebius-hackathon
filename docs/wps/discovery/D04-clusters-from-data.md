@@ -32,14 +32,14 @@ After the first run, the board's papers sit in two to six named clusters of simi
 
 **`cluster_papers(paper_ids, k=None)`** (`discovery/discovery/clusters.py`, tool in `server.py`), 2 to 500 IDs:
 
-1. Records (`self._papers`) and unit vectors (`self._paper_vectors(Embedder.from_env(...), papers)`, so stored vectors are reused).
+1. Records (`discovery.load_papers(paper_ids, "paper")`) and unit vectors (`discovery.paper_vectors(Embedder.from_env(...), papers)`, so stored vectors are reused).
 2. `k`: the argument if given; else 1 when there are fewer than 6 papers, else `clamp(round(sqrt(n / 2)), 2, 6)`.
 3. k-means++ on the unit vectors (cosine), numpy only, seeded with 0, at most 25 iterations, so the same papers always give the same clusters.
 4. A cluster of one paper joins the cluster whose centroid is closest.
 5. Each cluster's medoid (the member with the highest mean similarity to the others) gives `clusterId = "c-" + slug(medoid paper ID)` (the slug rule from `client/shared/ids.ts`): adding a paper rarely changes the medoid, so `apply_clusters` finds the same frame next time.
 6. Members ordered by similarity to the medoid, most similar first.
 7. `similarities`: for every paper, its 3 nearest neighbours `{a, b, similarity}` (cosine, rounded to 3 places), deduplicated.
-8. Labels: one Lightning request per cluster, in parallel, through Token Factory's chat completions (`LIGHTNING_MODEL`, `response_format: json_object`, temperature 0): "Name this group of papers in 2 to 4 words a biologist would use, from their titles. Reply {\"label\": \"…\"}", with up to 8 member titles. A failure or an empty answer gives `label: null`.
+8. Labels: one Lightning request per cluster, in parallel, through Token Factory's chat completions (`LIGHTNING_MODEL`, `response_format: json_object`, temperature 0): "Name this group of papers in 2 to 4 words a biologist would use, from their titles. Reply {\"label\": \"…\"}", with up to 8 member titles, reasoning off (`chat_template_kwargs: {"enable_thinking": false}`, as `rerank` sends it). A failure or an empty answer asks Super VL (`SUPER_VL_MODEL`) once the same way; when that fails too, `label: null`.
 9. Return `{clusters: [{clusterId, paperIds, label}], similarities}`; papers that couldn't be loaded or embedded go in `skipped` and in no cluster.
 
 **Stretch (optional):** blend citation overlap into similarity, Concept's `0.6 × cosine + 0.4 × citation overlap`, using [D03](D03-citation-links.md)'s links (overlap = shared references over the smaller list). Behind an argument `blend: bool = False`.
@@ -70,7 +70,7 @@ It runs once per board per chat (a flag on `ProcessPapers`), after `rank_papers`
 1. On a fixed matrix of 12 vectors in three tight groups, `cluster_papers` returns three clusters with the expected members, the same output on every call.
 2. A lone paper far from the rest joins the nearest cluster; no cluster has one member when there are 6 or more papers.
 3. Adding one paper close to an existing cluster keeps every `clusterId` the same.
-4. A Lightning failure gives `label: null` and the clusters still come back.
+4. A Lightning failure asks Super VL instead; when both fail, `label: null` and the clusters still come back.
 5. A scripted master turn on a board with 8 papers and no clusters ends with one `apply_clusters` call; on a board that has a cluster, none.
 6. [H01](../agent-harness/H01-live-board-check.md) on the five demo seeds ends with 2 to 6 labelled frames and no overlapping cards inside them; running the prompt again makes no new frames.
 

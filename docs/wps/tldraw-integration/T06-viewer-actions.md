@@ -8,7 +8,7 @@
 | Unblocks | T09 (row click reuses focus), T12, the catch-me-up tour (harness owner) |
 | Milestone | M3; the Oct 20 refresh (the tour) is W2 One clean run |
 | Priority | P1 (refresh) |
-| Status | Refresh built on branch `w2/tour` (Oct 21): Catch me up is a local tour (`widgets/tour.ts`, tested) started by the top bar, `?tour=1` and `_canvas/tour`, with the tour bar in the actions widget and `/seen` when it ends; left: refresh criteria 1–4 by hand in a browser (two browsers for 4). Harness half done: the four tools send `_canvas/*`; `focus`, `highlight` and `open_paper` handled in the browser. Oct 22: the busy-user queue and "Follow the agent" (criteria 4, 5 and 7) built on branch `feat/follow-agent` |
+| Status | Refresh built (PR #28, Oct 21): Catch me up is a local tour (`widgets/tour.ts`, tested) started by the top bar, `?tour=1` and `_canvas/tour`, with the tour bar in the actions widget and `/seen` when it ends; left: refresh criteria 1–4 by hand in a browser (two browsers for 4). Harness half done: the four tools send `_canvas/*`; `focus`, `highlight` and `open_paper` handled in the browser. Oct 22: the busy-user queue and "Follow the agent" (criteria 4, 5 and 7) built on branch `feat/follow-agent` |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -117,7 +117,7 @@ The agent can point at things for the person it is talking to: zoom their view t
 - No tool cards for these (T04's plugin skips them); their effect is visible on the canvas.
 - [T07](T07-board-context.md) adds two more tools to the same list that *look* rather than point (`look_at_board`, `look_at_paper`); they use the `_canvas/snapshot` request and do get tool cards, so the researcher sees when the agent looked.
 
-**Browser side** (`client/client/canvas/viewerActions.ts`, subscribed to `viewerBus` from T05):
+**Browser side** (`client/client/chat/viewerActions.ts`, subscribed to `viewerBus` from T05):
 
 | Action | Behaviour |
 | --- | --- |
@@ -135,7 +135,7 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 
 - [x] `harness/harness/board/viewer.py`; `BoardTools.viewer()` returns the four tools.
 - [ ] Echo mode sends `_canvas/focus` for selected shapes.
-- [ ] `client/client/canvas/tour.ts`: tour state (steps, index), driving T10's widgets and the tour header in the actions widget; the `_canvas/tour` schema in `client/shared/acpExt.ts`.
+- [x] `client/client/widgets/tour.ts`: tour state (steps, index), driving T10's widgets and the tour header in the actions widget; the `_canvas/tour` schema in `client/shared/acpExt.ts`.
 - [x] `harness/tests/test_viewer_tools.py`: scripted model calls `focus`; the test client receives `_canvas/focus` with the right `sessionId` and IDs, after the preceding message chunk.
 - [x] `client/client/chat/viewerActions.ts` with target resolution and the busy queue as pure, tested functions (`chat/follow.ts`).
 - [ ] Hinting visibility check; the `InFrontOfTheCanvas` fallback only if needed.
@@ -154,7 +154,7 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 ## Tests
 
 - Harness: `test_viewer_tools.py` (above).
-- Browser: `client/client/chat/follow.test.ts` for the placement gate, the move skip rules, the busy queue and the chip labels.
+- Browser: `client/client/chat/follow.test.ts` for the placement gate, the move skip rules, the busy queue and the chip labels; `chat/viewerActions.test.ts` for the gate through the handlers.
 - Manual: the two-browser checks in criteria 1 and 2, recorded for T12.
 
 ## Risks

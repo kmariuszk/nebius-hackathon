@@ -17,9 +17,8 @@ from typing import Any
 import httpx
 
 from discovery.papers import Paper
-from discovery.sources import key
+from discovery.tokenfactory import chat_completion, first_json_object
 
-TOKEN_FACTORY_URL = "https://api.tokenfactory.nebius.com/v1/"
 SUPER_VL = "nvidia/Nemotron-3.5-Super-VL"
 MAX_CANDIDATES = 100
 # Characters of each abstract the model sees: enough for the method and the finding.
@@ -83,25 +82,15 @@ async def rerank(
     invents or repeats are dropped. If the reply is cut off or garbled, the
     complete entries in it are kept and `warnings` says so.
     """
-    base = os.environ.get("TF_BASE_URL", "").strip() or TOKEN_FACTORY_URL
-    headers = {"Authorization": f"Bearer {key('TF_API_KEY', 'Nebius Token Factory')}"}
-    body = {
-        "model": model_id(),
-        "messages": [
-            {"role": "system", "content": SYSTEM},
-            {"role": "user", "content": prompt(goal, seeds, candidates, k)},
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0,
-        "max_tokens": 16000,
-        **({} if thinking() else {"chat_template_kwargs": {"enable_thinking": False}}),
-    }
+    messages = [
+        {"role": "system", "content": SYSTEM},
+        {"role": "user", "content": prompt(goal, seeds, candidates, k)},
+    ]
     started = time.monotonic()
-    response = await client.post(
-        base.rstrip("/") + "/chat/completions", json=body, headers=headers, timeout=TIMEOUT
+    completion = await chat_completion(
+        client, model_id(), messages, max_tokens=16000, timeout=TIMEOUT, thinking=thinking()
     )
-    response.raise_for_status()
-    choice = response.json()["choices"][0]
+    choice = completion["choices"][0]
     entries, complete = parse(choice["message"].get("content") or "")
     warnings = []
     if choice.get("finish_reason") == "length":
@@ -140,15 +129,9 @@ def parse(content: str) -> tuple[list[dict[str, Any]], bool]:
     object parses (a reply cut off mid-list, say), each complete entry object
     is recovered on its own.
     """
-    decoder = json.JSONDecoder()
-    for start in (i for i, char in enumerate(content) if char == "{"):
-        try:
-            value, _ = decoder.raw_decode(content, start)
-        except ValueError:
-            continue
-        if isinstance(value, dict) and "ranked" in value:
-            ranked = value["ranked"] if isinstance(value["ranked"], list) else []
-            return [entry for entry in ranked if isinstance(entry, dict)], True
+    if (value := first_json_object(content, lambda value: "ranked" in value)) is not None:
+        ranked = value["ranked"] if isinstance(value["ranked"], list) else []
+        return [entry for entry in ranked if isinstance(entry, dict)], True
     entries = []
     for match in re.finditer(r"\{[^{}]*\}", content):
         try:

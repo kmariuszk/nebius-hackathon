@@ -26,7 +26,7 @@ os.environ.setdefault("TF_API_KEY", "test-key")
 @pytest.fixture(autouse=True)
 def default_models(monkeypatch: pytest.MonkeyPatch) -> None:
     """Ignore model overrides in the repo's `.env`, which `harness.settings` loads on import."""
-    for name in ("SUPER_VL_MODEL", "LIGHTNING_MODEL", "TF_BASE_URL"):
+    for name in ("SUPER_VL_MODEL", "LIGHTNING_MODEL", "TF_BASE_URL", "MODEL_TIMEOUT"):
         monkeypatch.delenv(name, raising=False)
 
 

@@ -45,6 +45,7 @@ class FakeApis:
     def __init__(self) -> None:
         self.vectors: dict[str, list[float]] = {}
         self.name: Callable[[list[str]], str | int] = topic_of
+        self.replies: dict[str, str | int] = {}  # a model's one reply to every cluster, instead of `name`
         self.chats: list[httpx.Request] = []
         self.delay = 0.0  # seconds Lightning takes
 
@@ -58,7 +59,7 @@ class FakeApis:
         if request.url.path.endswith("/chat/completions"):
             self.chats.append(request)
             await asyncio.sleep(self.delay)
-            reply = self.name(titles(request))
+            reply = self.replies[body["model"]] if body["model"] in self.replies else self.name(titles(request))
             if isinstance(reply, int):
                 return httpx.Response(reply)
             return httpx.Response(200, json={"choices": [{"message": {"role": "assistant", "content": reply}}]})
@@ -73,7 +74,7 @@ def titles(chat: httpx.Request) -> list[str]:
 @pytest.fixture
 def apis(monkeypatch):
     monkeypatch.setenv("TF_API_KEY", "test-key")
-    for name in ("EMBED_API_KEY", "EMBED_BASE_URL", "EMBED_MODEL", "LIGHTNING_MODEL", "TF_BASE_URL"):
+    for name in ("EMBED_API_KEY", "EMBED_BASE_URL", "EMBED_MODEL", "LIGHTNING_MODEL", "SUPER_VL_MODEL", "TF_BASE_URL"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setattr("discovery.embeddings.RETRY_WAITS", (0, 0))
     return FakeApis()
@@ -180,9 +181,37 @@ async def test_a_failed_or_empty_name_leaves_the_label_null_and_the_clusters_com
     labels = {tuple(sorted(cluster["paperIds"])): cluster["label"] for cluster in result["clusters"]}
     assert labels == {tuple(sorted(a)): "Tumour ecosystem", tuple(sorted(b)): None, tuple(sorted(c)): None}
     assert result["skipped"] == []
+    # Super VL is asked after Lightning, and fails the same way here
     warnings = sorted(r.getMessage() for r in caplog.records if r.levelname == "WARNING")
+    assert len(warnings) == 4
     assert warnings[0].startswith("Lightning couldn't name a cluster: HTTPStatusError: Server error '500")
     assert warnings[1] == "Lightning gave no name for a cluster"
+    assert warnings[2].startswith("Super VL couldn't name a cluster: HTTPStatusError: Server error '500")
+    assert warnings[3] == "Super VL gave no name for a cluster"
+
+
+@pytest.mark.parametrize("lightning", [500, "no JSON here", '{"label": 3}'])
+async def test_super_vl_names_the_clusters_lightning_couldnt(discovery, apis, lightning):
+    apis.replies[clusters.LIGHTNING] = lightning
+    a, b = groups(discovery, apis, 3, 3)
+
+    result = await cluster_papers(discovery, a + b)
+
+    assert sorted(cluster["label"] for cluster in result["clusters"]) == sorted(TOPICS[:2])
+    bodies = [json.loads(chat.content) for chat in apis.chats]
+    assert sorted(body["model"] for body in bodies) == sorted([clusters.LIGHTNING, "nvidia/Nemotron-3.5-Super-VL"] * 2)
+    assert all(body["chat_template_kwargs"] == {"enable_thinking": False} for body in bodies)
+
+
+async def test_a_programming_error_while_naming_is_not_hidden(discovery, apis, monkeypatch):
+    def broken(content: str) -> str | None:
+        return content.labels  # an AttributeError, as a typo would raise
+
+    monkeypatch.setattr(clusters, "parse_label", broken)
+    a, b = groups(discovery, apis, 3, 3)
+
+    with pytest.raises(AttributeError):
+        await cluster_papers(discovery, a + b)
 
 
 async def test_a_lightning_that_never_answers_leaves_the_labels_null_in_time(discovery, apis, monkeypatch):
@@ -209,8 +238,8 @@ async def test_each_cluster_is_named_by_one_lightning_request_from_up_to_8_title
     assert len(apis.chats) == 2
     chat = next(r for r in apis.chats if titles(r)[0].startswith("Tumour"))
     body = json.loads(chat.content)
-    assert (body["model"], body["response_format"], body["temperature"]) == (
-        "nvidia/lightning-test", {"type": "json_object"}, 0)
+    assert (body["model"], body["response_format"], body["temperature"], body["chat_template_kwargs"]) == (
+        "nvidia/lightning-test", {"type": "json_object"}, 0, {"enable_thinking": False})
     assert body["messages"][0]["content"].startswith(clusters.PROMPT)
     # The cluster's 8 most central papers, in its order.
     assert titles(chat) == [discovery.store.get(p).title for p in result["clusters"][0]["paperIds"][:8]]

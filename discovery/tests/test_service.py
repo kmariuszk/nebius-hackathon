@@ -374,3 +374,39 @@ async def test_rerank_asks_super_vl_not_to_reason_unless_told(discovery, monkeyp
     await discovery.rerank("T cell exhaustion", ["pmid:100", "pmid:200"], seed_ids=[seed.paper_id], k=2)
 
     assert [body.get("chat_template_kwargs") for body in bodies] == [expected]
+
+
+@pytest.mark.parametrize("thinking", ["", "1"])
+async def test_the_rerank_request_is_the_one_super_vl_has_always_had(monkeypatch, thinking):
+    monkeypatch.setenv("TF_API_KEY", "test-key")
+    monkeypatch.setenv("RERANK_THINKING", thinking)
+    for name in ("SUPER_VL_MODEL", "TF_BASE_URL"):
+        monkeypatch.delenv(name, raising=False)
+    seed = Paper(ids={"pmid": "1"}, title="Seed paper", abstract="What the seed found.", year=2021)
+    candidate = Paper(ids={"pmid": "2"}, title="Candidate paper", abstract="What it adds.", venue="J")
+    sent = []
+
+    def answer(request: httpx.Request) -> httpx.Response:
+        sent.append(request)
+        return httpx.Response(200, json={"choices": [{"message": {"content": '{"ranked": []}'}}]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(answer))
+    await rerank.rerank(client, "T cell exhaustion", [seed], [candidate], 1)
+
+    body = {
+        "model": "nvidia/Nemotron-3.5-Super-VL",
+        "messages": [
+            {"role": "system", "content": rerank.SYSTEM},
+            {"role": "user", "content": rerank.prompt("T cell exhaustion", [seed], [candidate], 1)},
+        ],
+        "response_format": {"type": "json_object"},
+        "temperature": 0,
+        "max_tokens": 16000,
+        **({} if thinking else {"chat_template_kwargs": {"enable_thinking": False}}),
+    }
+    (request,) = sent
+    url = "https://api.tokenfactory.nebius.com/v1/chat/completions"
+    assert (request.method, str(request.url)) == ("POST", url)
+    assert request.content == httpx.Request("POST", url, json=body).content  # byte for byte
+    assert request.headers["Authorization"] == "Bearer test-key"
+    assert request.extensions["timeout"]["read"] == rerank.TIMEOUT

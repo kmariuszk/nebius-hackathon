@@ -1,5 +1,6 @@
 """Figure image URLs from the PMC article page, and `get_figures` (no network)."""
 
+import time
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -8,7 +9,7 @@ import pytest
 from mcp import Client
 from test_service import FILLER, article, discovery, fake_apis  # noqa: F401 (discovery is a fixture)
 
-from discovery import figures
+from discovery import figures, service
 from discovery.fulltext import Figure, FullText, Section
 from discovery.server import build_server
 
@@ -98,9 +99,21 @@ async def test_a_block_page_three_times_gives_figures_without_urls_and_says_why(
     assert result["skipped"] == ["figure images: PMC's article page was a block page 3 times"]
     assert page.fetched == 3
 
-    # The reason is cached with the text: later reads don't try again.
+    # Within PAGE_RETRY_SECONDS the next read gives the same reason without fetching the page.
     again = await discovery.get_figures(f"pmcid:{PMCID}")
-    assert again["skipped"] == result["skipped"] and page.fetched == 3
+    assert again["skipped"] == result["skipped"] and page.fetched == figures.TRIES
+
+
+async def test_a_block_page_is_fetched_again_after_page_retry_seconds(discovery, page, monkeypatch):
+    page.answers = [BLOCK] * figures.TRIES + [PAGE]
+    assert (await discovery.get_figures(f"pmcid:{PMCID}"))["skipped"] and page.fetched == figures.TRIES
+
+    # A block page may pass: once the window is over, the next read tries again.
+    now = time.monotonic
+    monkeypatch.setattr(service.time, "monotonic", lambda: now() + service.PAGE_RETRY_SECONDS)
+    result = await discovery.get_figures(f"pmcid:{PMCID}")
+    assert [f["imageUrl"] for f in result["figures"]] == [F1, F2, None] and result["skipped"] == []
+    assert page.fetched == figures.TRIES + 1
 
 
 async def test_a_text_cached_before_image_urls_gets_them_once(discovery, page):

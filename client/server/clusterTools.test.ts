@@ -289,27 +289,63 @@ test('apply_clusters takes cluster_papers’ real result, and a second run with 
 	const frames = all(ctx).filter((r) => r.typeName === 'shape' && r.type === 'frame')
 	const again = await applyClusters(ctx, {})
 	assert.deepEqual(again.clusters.map((c) => c.clusterId), ['c-pmid_101', 'c-pmid_200', 'c-pmid_300'])
-	assert.deepEqual(all(ctx).filter((r) => r.typeName === 'shape' && r.type === 'frame').map((f) => f.id), frames.map((f) => f.id))
+	assert.deepEqual(all(ctx).filter((r) => r.typeName === 'shape' && r.type === 'frame').map((f) => f.id).sort(), frames.map((f) => f.id).sort())
 	assertNoOverlaps(ctx)
 })
 
-test(
-	'a second apply_clusters puts the one more paper into its cluster’s frame',
-	{ todo: 'it stays on the page: c-pmid_200 is full, another frame sits below it, and spotInFrame only grows a frame downwards' },
-	async () => {
-		const ctx = newCtx()
-		addPapers(ctx, { papers: REAL.clusters.flatMap((c) => c.paperIds).map((id) => paper(id)) })
-		clusters = REAL as ClusterResult
-		await applyClusters(ctx, {})
-		addPapers(ctx, { papers: [paper('pmid:250')] })
-		clusters = {
-			...REAL,
-			clusters: REAL.clusters.map((c) => (c.clusterId === 'c-pmid_200' ? { ...c, paperIds: [...c.paperIds, 'pmid:250'] } : c)),
-		} as ClusterResult
-		await applyClusters(ctx, {})
-		assert.equal(card(ctx, 'pmid:250').parentId, frame(ctx, 'c-pmid_200').id)
-	}
-)
+test('a second apply_clusters puts the one more paper into its full cluster’s frame, widened when another frame is below', async () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: REAL.clusters.flatMap((c) => c.paperIds).map((id) => paper(id)) })
+	clusters = REAL as ClusterResult
+	await applyClusters(ctx, {})
+	const before = frame(ctx, 'c-pmid_200')
+	addPapers(ctx, { papers: [paper('pmid:250')] })
+	clusters = {
+		...REAL,
+		clusters: REAL.clusters.map((c) => (c.clusterId === 'c-pmid_200' ? { ...c, paperIds: [...c.paperIds, 'pmid:250'] } : c)),
+	} as ClusterResult
+	const again = await applyClusters(ctx, {})
+	assert.equal(card(ctx, 'pmid:250').parentId, before.id)
+	assert.deepEqual(again.skipped, [])
+	// one card column wider, the same height, in the same place
+	const after = frame(ctx, 'c-pmid_200')
+	assert.deepEqual([after.x, after.y, after.props.h], [before.x, before.y, before.props.h])
+	assert.equal(after.props.w, before.props.w + CARD_SIZE.w + 2 * MARGIN)
+	assertNoOverlaps(ctx)
+})
+
+test('a full cluster with shapes below it and to its right skips the paper', async () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: REAL.clusters.flatMap((c) => c.paperIds).map((id) => paper(id)) })
+	clusters = REAL as ClusterResult
+	await applyClusters(ctx, {})
+	const full = frame(ctx, 'c-pmid_200')
+	// a person's frame just right of it, as tall as it
+	putShapes(ctx.boardId, [
+		{
+			id: 'shape:their-frame',
+			type: 'frame',
+			x: full.x + full.props.w + MARGIN,
+			y: full.y,
+			props: { w: 200, h: full.props.h, name: 'Mine', color: 'black' },
+			meta: { author: 'm_ben' },
+		},
+	])
+	const before = all(ctx)
+	addPapers(ctx, { papers: [paper('pmid:250')] })
+	clusters = {
+		...REAL,
+		clusters: REAL.clusters.map((c) => (c.clusterId === 'c-pmid_200' ? { ...c, paperIds: [...c.paperIds, 'pmid:250'] } : c)),
+	} as ClusterResult
+	const again = await applyClusters(ctx, {})
+	assert.deepEqual(again.skipped, [{ paperId: 'pmid:250', reason: 'no room left in its cluster' }])
+	assert.notEqual(card(ctx, 'pmid:250').parentId, full.id)
+	assert.deepEqual(frame(ctx, 'c-pmid_200'), full)
+	assert.deepEqual(
+		all(ctx).filter((r) => r.typeName === 'shape' && r.type === 'frame'),
+		before.filter((r) => r.typeName === 'shape' && r.type === 'frame')
+	)
+})
 
 test('apply_clusters writes nothing when the papers MCP fails, and needs two papers', async () => {
 	const ctx = newCtx()

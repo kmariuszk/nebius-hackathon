@@ -324,6 +324,13 @@ test('link_papers records where a citation comes from', () => {
 	)
 })
 
+test('link_papers records a similar link as the agent’s, even when given a source', () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: [paper('a'), paper('b', { near: 'a' })] })
+	linkPapers(ctx, { links: [{ from: 'a', to: 'b', kind: 'similar', source: 'openalex' }] })
+	assert.deepEqual(getBoard(ctx).links.map((l) => l.by), ['agent'])
+})
+
 test('mark_working turns the ring on and off', () => {
 	const ctx = newCtx()
 	addPapers(ctx, { papers: [paper('a'), paper('b')] })

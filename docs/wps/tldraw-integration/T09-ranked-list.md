@@ -8,7 +8,7 @@
 | Unblocks | T12 |
 | Milestone | M4; the Oct 20 refresh (filters) is W3 The team edits |
 | Priority | P2 (refresh) |
-| Status | Refresh built on branch `w3/filters` (Oct 21): per-viewer filters (`pinboard/filters.ts`, tested) narrow the ranked list, the red rank numbers and Catch me up together, from the Filter button in the bottom toolbar (`pinboard/FilterPanel.tsx`), and fade the rest on the board; discovery emits `citedBy` (OpenAlex, Semantic Scholar) and `add_papers` fills it. On top of the ranked list and "Looking for" merged with PR #21 (Oct 18). Left: criteria 1 to 6 checked by hand in a browser; the strings of filtered-out papers still draw at full strength (`pinboard/Strings.tsx`; the demo board fades them too) |
+| Status | Refresh built on branch `w3/filters` (Oct 21): per-viewer filters (`pinboard/filters.ts`, tested) narrow the ranked list, the red rank numbers and Catch me up together, from the Filter button in the bottom toolbar (`pinboard/FilterPanel.tsx`), and fade the rest on the board; discovery emits `citedBy` (OpenAlex, Semantic Scholar) and `add_papers` fills it. On top of the ranked list and "Looking for" merged with PR #21 (Oct 18). A string fades with a filtered-out card at either end (`pinboard/Strings.tsx`, through the cards' own `fadedByFilters`), as on the demo board. Left: criteria 1 to 6 checked by hand in a browser |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)

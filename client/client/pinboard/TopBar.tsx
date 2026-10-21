@@ -4,6 +4,7 @@ import { boardApi, type Board } from '../api'
 import { GOALS } from '../shapes/card'
 import { currentGoal } from '../viewerState'
 import { boardSteps, startCatchUp } from '../widgets/tour'
+import { BotIcon } from './BotIcon'
 
 // The v6 top bar (docs/mockups/flashcard-v6.html): back to your boards, the board's title (its
 // question on hover), what you're looking for, the Pinboard switch, who's here (the agent too,
@@ -113,27 +114,39 @@ function useBoardInfo(roomId: string, memberId: string) {
 	const [agentActive, setAgentActive] = useState(false)
 	useEffect(() => {
 		let live = true
+		let events: EventSource | null = null
+		let streamed = -1
 		const api = boardApi(roomId, memberId)
+		const presence = (active: boolean) => (e: MessageEvent) => {
+			streamed = Number(e.lastEventId)
+			setAgentActive(active)
+		}
+		const open = (after?: number) => {
+			if (events || !live) return
+			const query = after === undefined ? '' : `?after=${after}`
+			events = new EventSource(`/api/v1/boards/${encodeURIComponent(roomId)}/events${query}`)
+			events.addEventListener('agent.active', presence(true))
+			events.addEventListener('agent.idle', presence(false))
+		}
 		const load = () =>
 			api.get().then(
 				(b) => {
 					if (!live) return
 					setBoard(b)
-					setAgentActive(b.agentActive)
+					if (b.lastSeq >= streamed) setAgentActive(b.agentActive)
+					open(b.lastSeq)
 				},
-				(e) => console.warn(`Couldn't read board ${roomId}:`, e)
+				(e) => {
+					console.warn(`Couldn't read board ${roomId}:`, e)
+					open()
+				}
 			)
 		void load()
 		window.addEventListener('focus', load)
-		const events = new EventSource(`/api/v1/boards/${encodeURIComponent(roomId)}/events`)
-		const active = () => setAgentActive(true)
-		const idle = () => setAgentActive(false)
-		events.addEventListener('agent.active', active)
-		events.addEventListener('agent.idle', idle)
 		return () => {
 			live = false
 			window.removeEventListener('focus', load)
-			events.close()
+			events?.close()
 		}
 	}, [roomId, memberId])
 	return { board, agentActive }
@@ -160,12 +173,7 @@ function Avatars({ editor, agent }: { editor: Editor; agent: boolean }) {
 			{/* only while an agent's harness is connected to this board */}
 			{agent && (
 				<div className="pb-av bot" title="The agent is working on this board">
-					<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-						<rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" strokeWidth="1.5" />
-						<circle cx="6" cy="9" r="1.2" fill="#fff" />
-						<circle cx="10" cy="9" r="1.2" fill="#fff" />
-						<path d="M8 4.5V2" stroke="#fff" strokeWidth="1.5" />
-					</svg>
+					<BotIcon />
 				</div>
 			)}
 		</div>

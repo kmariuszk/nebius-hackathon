@@ -150,6 +150,16 @@ async def test_papers_are_asked_for_as_shapes_with_their_paper_ids():
     ]
 
 
+async def test_a_placeholder_paper_id_asks_for_nothing():
+    browser = Browser(snapshot())
+    llm, _ = await chat(browser, [call("look_at_board", target="papers", paper_ids=["null"]), say("…")], [[text_block("Look")]])
+    assert browser.asked == []
+    assert tool_result(llm.requests[1], "look_at_board") == {
+        "ok": False,
+        "error": 'Give paper_ids to look at with target "papers".',
+    }
+
+
 async def test_a_hidden_tab_is_reported_and_nothing_is_attached():
     browser = Browser(RequestError(-32000, HIDDEN))
     llm, sent = await chat(browser, [call("look_at_board", target="viewport"), say("I couldn't see the board.")], [[text_block("What am I looking at?")]])
@@ -227,18 +237,38 @@ async def test_look_at_figure_attaches_the_figure_by_its_url(papers_mcp, get_fig
 async def test_look_at_figure_without_a_figure_says_so(papers_mcp, get_figures):
     llm, _ = await chat(
         Browser(),
-        [call("look_at_figure", paper_id="pmid:9"), call("look_at_figure", paper_id="pmid:1", label="Figure 1"), say("…")],
+        [
+            call("look_at_figure", paper_id="pmid:9"),
+            call("look_at_figure", paper_id="pmid:1", label="Figure 1"),
+            call("look_at_figure", paper_id="pmid:1", label="Extended Data Fig. 3"),
+            say("…"),
+        ],
         [[text_block("What does the figure show?")]],
     )
     assert tool_result(llm.requests[1], "look_at_figure") == {"ok": False, "error": "This paper has no figure on the board."}
     # Figure 1 has no picture, so the first one that does is shown, and the result says so
     result = tool_result(llm.requests[2], "look_at_figure")
     assert result["image"] == "Figure 2 of pmid:1" and result["note"].startswith("Figure 1 has no picture")
+    result = tool_result(llm.requests[3], "look_at_figure")
+    assert result["image"] == "Figure 2 of pmid:1" and result["note"].startswith("Extended Data Fig. 3 has no picture")
+
+
+def test_figure_keys_tell_series_and_number():
+    assert viewer.figure_key("Figure 2B") == ("main", 2)
+    assert viewer.figure_key("Extended Data Fig. 3") == ("extended", 3)
+    assert viewer.figure_key("Figure 1—figure supplement 2") == ("supplement", 2)
+    assert viewer.figure_key("Fig. S3") == ("supplement", 3)
+    assert viewer.figure_key("fig 3") == viewer.figure_key("F3") == ("main", 3)
+    assert viewer.figure_key("") is None
 
 
 def test_pick_figure_matches_labels_loosely():
+    extended = {"figureId": "F9", "label": "Extended Data Fig. 3", "caption": "", "imageUrl": URL.replace("f3", "f9")}
     assert viewer.pick_figure(FIGURES, "fig 3") is FIGURES[2]
     assert viewer.pick_figure(FIGURES, "F3") is FIGURES[2]
+    assert viewer.pick_figure(FIGURES, "Figure 2B") is FIGURES[1]
+    assert viewer.pick_figure([extended, *FIGURES], "Fig. 3") is FIGURES[2]
+    assert viewer.pick_figure([*FIGURES, extended], "Extended Data Fig. 3") is extended
     assert viewer.pick_figure(FIGURES) is FIGURES[1]
     assert viewer.pick_figure([FIGURES[0]]) is None
     assert viewer.pick_figure(None) is None

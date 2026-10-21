@@ -11,6 +11,7 @@ import asyncio
 import logging
 import os
 import re
+import time
 import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Awaitable, Callable, Iterable
@@ -48,7 +49,10 @@ SINCE_FORMAT = "since must be YYYY, YYYY-MM or YYYY-MM-DD"
 
 
 # Seconds scoring waits for warm-ups in flight before embedding what's left itself.
+# A deliberate cap below an embedding batch's worst case (sum(embeddings.TIMEOUTS)): after it, scoring sends the texts itself rather than wait.
 WARM_WAIT = 60.0
+
+PAGE_RETRY_SECONDS = 600.0
 
 
 class Discovery:
@@ -58,6 +62,7 @@ class Discovery:
         self.vectors = vectors
         self._warm_tasks: set[asyncio.Task[None]] = set()
         self._warming: dict[str, asyncio.Task[None]] = {}
+        self._page_failed: dict[str, tuple[float, str]] = {}
 
     async def search(
         self,
@@ -72,7 +77,7 @@ class Discovery:
             "openalex": lambda: openalex.search(self.client, query, limit, since),
             "web": lambda: self._web_search(query, limit, since),
         }
-        found, skipped = await _run({name: jobs[name]() for name in dict.fromkeys(sources)})
+        found, skipped = await run_jobs({name: jobs[name]() for name in dict.fromkeys(sources)})
         papers = list(self._save_all(_round_robin(found)).values())[:limit]
         self._warm([paper for paper, _ in papers])
         return {
@@ -91,7 +96,8 @@ class Discovery:
         query: str | None = None,
     ) -> dict[str, Any]:
         since = _since(since)
-        seeds, skipped = await self._papers(seed_ids, "seed")
+        loaded, skipped = await self.load_papers(seed_ids, "seed")
+        seeds = list(loaded.values())
         excluded = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
 
         jobs: dict[str, Awaitable[list[Paper]]] = {}
@@ -111,7 +117,7 @@ class Discovery:
                 jobs[strategy] = semantic_scholar.recommend(
                     self.client, [s.paper_id for s in seeds], negative, limit
                 )
-        found, failed = await _run(jobs)
+        found, failed = await run_jobs(jobs)
         papers = self._save_all(_round_robin(found))
         candidates = [
             (paper, by) for paper, by in papers.values() if not excluded & set(paper.aliases())
@@ -140,7 +146,8 @@ class Discovery:
             raise ValueError(
                 f"Unknown rerank backend {backend!r} (RERANK_BACKEND): use one of {', '.join(RERANK_BACKENDS)}"
             )
-        seeds, skipped = await self._papers(seed_ids or [], "seed")
+        loaded, skipped = await self.load_papers(seed_ids or [], "seed")
+        seeds = list(loaded.values())
         # Seeds and excluded papers are never ranked, under any of their IDs.
         seen = {alias for seed in seeds for alias in seed.aliases()} | self._aliases(exclude_ids or [])
         # Cap before loading: each ID missing from the store costs scholarly API calls.
@@ -151,11 +158,11 @@ class Discovery:
                 f"{listwise.MAX_CANDIDATES} were not ranked"
             )
             wanted = wanted[: listwise.MAX_CANDIDATES]
-        candidates, failed = await self._papers(wanted, "candidate")
+        loaded, failed = await self.load_papers(wanted, "candidate")
         skipped += failed
         # The same paper under two IDs is ranked once.
         unique = []
-        for paper in candidates:
+        for paper in loaded.values():
             if not seen & set(paper.aliases()):
                 seen |= set(paper.aliases())
                 unique.append(paper)
@@ -195,13 +202,14 @@ class Discovery:
         the question or every candidate can't be.
         """
         embedder = Embedder.from_env(self.client)
-        seeds, skipped = await self._papers(seed_ids or [], "seed")
-        candidates, failed = await self._papers(candidate_ids, "candidate")
+        loaded, skipped = await self.load_papers(seed_ids or [], "seed")
+        seeds = list(loaded.values())
+        loaded, failed = await self.load_papers(candidate_ids, "candidate")
         skipped += failed
         # Seeds are never scored, and a paper under two IDs is scored once.
         seen = {seed.paper_id for seed in seeds}
         unique = []
-        for paper in candidates:
+        for paper in loaded.values():
             if paper.paper_id not in seen:
                 seen.add(paper.paper_id)
                 unique.append(paper)
@@ -210,7 +218,7 @@ class Discovery:
             return {"top": [], "scored": 0, "skipped": skipped}
 
         await self._warmed(seeds + candidates)
-        vectors, failures = await self._paper_vectors(embedder, seeds + candidates)
+        vectors, failures = await self.paper_vectors(embedder, seeds + candidates)
         for role, papers, what in (("candidates", candidates, "scored"), ("seeds", seeds, "used")):
             reasons = Counter(failures[paper.paper_id] for paper in papers if paper.paper_id in failures)
             skipped += [f"{n} {role} weren't {what}: {reason}" for reason, n in reasons.items()]
@@ -287,7 +295,7 @@ class Discovery:
 
     async def get_fulltext(self, paper_id: str, max_chars: int = fulltext.DEFAULT_MAX_CHARS) -> dict[str, Any]:
         paper = await self.get_paper(paper_id)
-        text, skipped = await self._fulltext(paper)
+        text, skipped, _ = await self._fulltext(paper)
         return {
             "paperId": paper.paper_id,
             "title": paper.title,
@@ -301,11 +309,11 @@ class Discovery:
     async def get_figures(self, paper_id: str) -> dict[str, Any]:
         """The paper's PMC figures with their image URLs, from the same cached full text as `get_fulltext`."""
         paper = await self.get_paper(paper_id)
-        text, skipped = await self._fulltext(paper)
+        text, skipped, images = await self._fulltext(paper)
         if text.source != "pmc":
             skipped.append("figures come from PMC only, and there is no PMC full text for this paper")
-        elif text.imagesSkipped:
-            skipped.append(text.imagesSkipped)
+        elif reason := text.imagesSkipped or images:
+            skipped.append(reason)
         return {
             "paperId": paper.paper_id,
             "source": text.source,
@@ -315,7 +323,7 @@ class Discovery:
 
     async def check_quotes(self, paper_id: str, quotes: list[str]) -> dict[str, Any]:
         paper = await self.get_paper(paper_id)
-        text, _ = await self._fulltext(paper)
+        text, _, _ = await self._fulltext(paper)
         checked = []
         for passage in quotes:
             section = text.find(passage)
@@ -329,13 +337,15 @@ class Discovery:
             )
         return {"paperId": paper.paper_id, "source": text.source, "quotes": checked}
 
-    async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str]]:
-        """The paper's full text from the first source that has it, and why the others didn't."""
+    async def _fulltext(self, paper: Paper) -> tuple[FullText, list[str], str | None]:
+        """The paper's full text from the first source that has it, why the others didn't, and why
+        its figures got no image URLs when PMC's article page couldn't be read (None otherwise)."""
         if cached := self.store.get_fulltext(paper.paper_id):
-            if figures.lacks_image_urls(cached):  # saved before figures had image URLs
-                await figures.add_image_urls(self.client, cached)
+            images = None
+            if figures.lacks_image_urls(cached):  # saved before figures had image URLs, or PMC's page failed
+                images = await self._add_image_urls(cached)
                 self.store.save_fulltext(paper.paper_id, cached)
-            return cached, []
+            return cached, [], images
         if "pmcid" not in paper.ids and "pmid" in paper.ids:
             # OpenAlex and Semantic Scholar records often lack the PMCID that PubMed's has.
             try:
@@ -358,35 +368,44 @@ class Discovery:
         for name, attempt in attempts:
             try:
                 if found := await attempt():
+                    images = await self._add_image_urls(found)
                     self.store.save_fulltext(paper.paper_id, found)
-                    return found, skipped
+                    return found, skipped, images
                 skipped.append(f"{name}: no full text there")
             except (Skipped, httpx.HTTPError, ET.ParseError) as error:
                 skipped.append(f"{name}: {error}")
-        return fulltext.from_abstract(paper.abstract, url), skipped
+        return fulltext.from_abstract(paper.abstract, url), skipped, None
+
+    async def _add_image_urls(self, text: FullText) -> str | None:
+        """`figures.add_image_urls`, remembering a failed PMC article page in this process: one
+        that failed less than `PAGE_RETRY_SECONDS` ago isn't fetched again, and gives the same reason."""
+        pmcid = ids_from_url(text.url or "").get("pmcid", "")
+        if (failed := self._page_failed.get(pmcid)) and time.monotonic() - failed[0] < PAGE_RETRY_SECONDS:
+            return failed[1]
+        if reason := await figures.add_image_urls(self.client, text):
+            self._page_failed[pmcid] = (time.monotonic(), reason)
+        return reason
 
     async def _pmc(self, pmcid: str, url: str, abstract: str | None) -> FullText | None:
-        text = fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
-        if text:
-            await figures.add_image_urls(self.client, text)
-        return text
+        return fulltext.from_jats(await pubmed.pmc_article(self.client, pmcid), url, abstract)
 
     async def _web(self, url: str) -> FullText | None:
         markdown = await tavily.extract(self.client, url)
         return fulltext.from_markdown(markdown, url) if markdown else None
 
-    async def _papers(self, paper_ids: list[str], role: str) -> tuple[list[Paper], list[str]]:
-        """The records for `paper_ids`, loaded concurrently, and a note for each that failed."""
+    async def load_papers(self, paper_ids: list[str], role: str) -> tuple[dict[str, Paper], list[str]]:
+        """The records for `paper_ids`, loaded concurrently. Returns each paper under the ID it was
+        given as (each given ID once, in order), and a note, named by `role`, for each that failed."""
         unique = list(dict.fromkeys(paper_ids))
         results = await asyncio.gather(*map(self.get_paper, unique), return_exceptions=True)
-        papers, skipped = [], []
+        papers, skipped = {}, []
         for paper_id, result in zip(unique, results):
             if isinstance(result, (ValueError, Skipped, httpx.HTTPError)):
                 skipped.append(f"{role} {paper_id}: {result}")
             elif isinstance(result, BaseException):
                 raise result
             else:
-                papers.append(result)
+                papers[paper_id] = result
         return papers, skipped
 
     def _aliases(self, paper_ids: list[str]) -> set[str]:
@@ -413,7 +432,7 @@ class Discovery:
         return _in_order(await pubmed.efetch(self.client, pmids), "pmid", pmids)
 
     async def _keyword(self, query: str, limit: int, since: str | None) -> list[Paper]:
-        found, _ = await _run(
+        found, _ = await run_jobs(
             {
                 "pubmed": self._pubmed_search(query, limit, since),
                 "openalex": openalex.search(self.client, query, limit, since),
@@ -482,7 +501,7 @@ class Discovery:
             raise Skipped("no seed found in OpenAlex")
         return await openalex.citing(self.client, work_ids, limit, since)
 
-    async def _paper_vectors(
+    async def paper_vectors(
         self, embedder: Embedder, papers: list[Paper]
     ) -> tuple[dict[str, np.ndarray], dict[str, str]]:
         """Unit vectors for the papers, embedding only those not stored for their current
@@ -515,7 +534,7 @@ class Discovery:
 
         async def warm() -> None:
             try:
-                _, failures = await self._paper_vectors(embedder, fresh)
+                _, failures = await self.paper_vectors(embedder, fresh)
                 if failures:
                     reasons = "; ".join(sorted(set(failures.values())))
                     log.warning("Warm-up left %d papers unembedded: %s", len(failures), reasons)
@@ -552,8 +571,8 @@ class Discovery:
         return papers
 
 
-async def _run(jobs: dict[str, Awaitable[list[Any]]]) -> tuple[dict[str, list[Any]], list[str]]:
-    """Run the jobs concurrently; returns their results and a note for each that failed."""
+async def run_jobs(jobs: dict[str, Awaitable[list[Any]]]) -> tuple[dict[str, list[Any]], list[str]]:
+    """Run the jobs concurrently. Returns each job's result by name, and a note for each that failed."""
     results = await asyncio.gather(*jobs.values(), return_exceptions=True)
     found, skipped = {}, []
     for name, result in zip(jobs, results):

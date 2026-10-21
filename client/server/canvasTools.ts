@@ -307,7 +307,8 @@ export function findClusterFrame(txn: Txn, clusterId: string): TLFrameShape | un
 /**
  * A free spot for a box of `size` inside `frame`, in the frame's own coordinates, nearest the
  * anchor (page space). If the frame is full and is the agent's, untouched by people, it grows
- * downwards when the space below it is free. Null if there is no room.
+ * downwards when the space below it is free, else one card column to the right when that is free.
+ * Null if there is no room.
  */
 export function spotInFrame(txn: Txn, frameId: TLShapeId, size: { w: number; h: number }, anchor: Vec | null) {
 	const frame = txn.get(frameId) as TLFrameShape
@@ -318,16 +319,28 @@ export function spotInFrame(txn: Txn, frameId: TLShapeId, size: { w: number; h: 
 	if (at) return local(at)
 	if (propsLocked(frame)) return null
 	const room = footprint({ x: 0, y: 0, ...size })
-	const grow = Math.max(room.w, room.h) + 2 * MARGIN
+	const down = Math.max(room.w, room.h) + 2 * MARGIN
+	const across = room.w + 2 * MARGIN
 	const inFrame = new Set<string>([frame.id])
 	for (const r of records) if (isShape(r) && inFrame.has(r.parentId)) inFrame.add(r.id)
 	const outside = [...shapeBoxes(records)].filter(([id]) => !inFrame.has(id)).map(([, b]) => b)
-	if (!isFree(outside, { x: box.x, y: box.y + box.h, w: box.w, h: grow })) return null
-	const grown = { ...frame, props: { ...frame.props, h: frame.props.h + grow } }
-	const below = placeInside(records.map((r) => (r.id === frame.id ? grown : r)), size, anchor, frame.id)
-	if (!below) return null
-	writer(txn).patchShape({ id: frame.id, props: { h: grown.props.h } })
-	return local(below)
+	if (isFree(outside, { x: box.x, y: box.y + box.h, w: box.w, h: down })) {
+		const grown = { ...frame, props: { ...frame.props, h: frame.props.h + down } }
+		const below = placeInside(records.map((r) => (r.id === frame.id ? grown : r)), size, anchor, frame.id)
+		if (below) {
+			writer(txn).patchShape({ id: frame.id, props: { h: grown.props.h } })
+			return local(below)
+		}
+	}
+	const column = { x: box.x + box.w, y: box.y, w: across, h: box.h }
+	if (box.h < room.h + 2 * MARGIN || !isFree(outside, column)) return null
+	const top = box.y + MARGIN + room.h / 2
+	const y = Math.min(Math.max((anchor ?? centre(box)).y, top), box.y + box.h - MARGIN - room.h / 2)
+	const spot = { x: Math.round(column.x + across / 2 - size.w / 2), y: Math.round(y - size.h / 2) }
+	const others = [...shapeBoxes(records)].filter(([id]) => id !== frame.id).map(([, b]) => b)
+	if (!isFree(others, footprint({ ...spot, ...size }))) return null
+	writer(txn).patchShape({ id: frame.id, props: { w: frame.props.w + across } })
+	return local(spot)
 }
 
 // A new card goes beside its `near` card, inside that card's cluster frame while it has room;
@@ -682,7 +695,7 @@ export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<type
 					...(kind === 'similar' ? { dash: 'dashed', arrowheadEnd: 'none' } : {}),
 				},
 				// who says they're linked: the citation's source, else PubMed for a citation and the agent for similarity
-				meta: agentMeta(ctx, { kind, label: '', by: source ?? (kind === 'cites' ? 'pubmed' : 'agent'), hiddenByHuman: false }),
+				meta: agentMeta(ctx, { kind, label: '', by: kind === 'cites' ? (source ?? 'pubmed') : 'agent', hiddenByHuman: false }),
 			})
 			for (const [terminal, card] of [['start', a], ['end', b]] as const) {
 				w.createBinding({
@@ -866,8 +879,8 @@ export const canvasTools = [
 		'Link pairs of papers on the board with an arrow; at most 100 links per call, and both papers need cards. ' +
 			'kind: cites (a citation: `from` cites `to`) or similar (your judgement that the two are closely ' +
 			'related; direction doesn\'t matter). source (optional): where a citation comes from, pubmed (the ' +
-			'default for cites) or openalex; the arrow records it, and records a similar link without one as the ' +
-			'agent\'s. Linking a pair again is a no-op. Skipped with a reason: a paper linked to itself, a missing ' +
+			'default for cites) or openalex; the arrow records it, and records every similar link as the agent\'s. ' +
+			'Linking a pair again is a no-op. Skipped with a reason: a paper linked to itself, a missing ' +
 			'card, a similar link between papers a citation already joins, and links a person removed or hid; ' +
 			'never try to recreate those. Links can\'t be labelled or removed through this server. Returns ' +
 			'{linked, skipped}.',

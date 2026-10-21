@@ -31,8 +31,7 @@ import {
 	type NoteItem,
 } from './parts.tsx'
 import { COL, GAP, focusCamera, focusZoom, layoutWidgets, type Column, type Item, type Layout } from './placement.ts'
-import { runTour, tourPaperId } from './tour.ts'
-import type { Vote } from './votes.ts'
+import { closePaper as close, runTour, tourOnGone, tourOnOpen, tourOnVote, tourPaperId } from './tour.ts'
 import './widgets.css'
 
 // The v5 widgets around an opened paper (T10): siblings of <Tldraw> over `.Board-canvas`, so
@@ -42,23 +41,6 @@ import './widgets.css'
 const ORDER = ['title', 'why', 'linked', 'glance', 'figure', 'actions', 'notes', 'evidence']
 /** The open-paper ring the node draws around itself (PaperCardShapeUtil), in page units. */
 const RING = 6
-
-const close = () => {
-	openPaperId.set(null)
-	paperMoreOpen.set(false)
-}
-
-// after a saved vote the tour moves on; outside it, Discard closes the paper if it's still open
-const voted = (paperId: string, decision: Vote) => {
-	if (tour.get()) runTour({ type: 'voted', paperId, decision })
-	else if (decision === 'discard' && openPaperId.get() === paperId) close()
-}
-
-// a paper that left the board closes, or during the tour leaves it
-const gone = (paperId: string) => {
-	if (tour.get()?.steps.some((s) => s.paperId === paperId)) runTour({ type: 'gone', paperId })
-	else close()
-}
 
 const isTyping = (target: EventTarget | null) =>
 	target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
@@ -78,8 +60,7 @@ export function PaperWidgets({ editor, boardId, memberId }: { editor: Editor; bo
 		shown.current = paperId
 		paperMoreOpen.set(false)
 		// opening a paper the tour isn't on, or closing (×, Escape, the canvas), ends the tour
-		const t = tour.get()
-		if (t && tourPaperId(t) !== paperId) tour.set(null)
+		tourOnOpen(paperId)
 		if (paperId && !was) {
 			const { x, y, z } = editor.getCamera()
 			camera.current = { x, y, z }
@@ -117,11 +98,12 @@ function OpenPaper({ paperId, ...props }: OpenProps & { paperId: string }) {
 	)
 	const hidden = useValue('open paper hidden', () => editor.isShapeHidden(shapeId), [editor, shapeId])
 
-	// a paper that goes away (deleted, or discarded and hidden) closes; one not synced yet just waits
+	// a paper that goes away (deleted, or discarded and hidden) closes, and so does one that opens
+	// hidden or a tour step that's missing; any other paper not synced yet just waits
 	const seen = useRef(false)
 	useEffect(() => {
 		if (shape && !hidden) seen.current = true
-		else if (seen.current) gone(paperId)
+		else if (seen.current || shape || tourPaperId(tour.get()) === paperId) tourOnGone(paperId)
 	}, [shape, hidden, paperId])
 
 	if (!shape || hidden) return null
@@ -386,7 +368,7 @@ function Opened({ editor, boardId, memberId, onToast, shape }: OpenProps & { sha
 				}}
 			>
 				{slot('title', <TitleWidget />)}
-				{slot('actions', <ActionsWidget tour={touring} onVoted={(decision) => voted(p.paperId, decision)} />)}
+				{slot('actions', <ActionsWidget touring={touring} onVoted={(decision) => tourOnVote(p.paperId, decision)} />)}
 				{column('left', layout.columns.left)}
 				{column('right', layout.columns.right)}
 			</Anchored>

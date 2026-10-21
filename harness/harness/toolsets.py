@@ -10,7 +10,9 @@ Naming no tools gives the agent everything that server offers.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Sequence
+from typing import Any
 
 from google.adk.tools.mcp_tool import McpToolset
 from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPConnectionParams
@@ -61,3 +63,33 @@ def http_toolset(url: str, tool_names: Sequence[str], headers: dict[str, str]) -
         ),
         tool_filter=list(tool_names) or None,
     )
+
+
+def structured(response: Any) -> dict[str, Any]:
+    """An MCP tool result as a dict: its structured content, or its text parsed as JSON."""
+    if not isinstance(response, dict):
+        return {}
+    if isinstance(response.get("structuredContent"), dict):
+        return response["structuredContent"]
+    for block in response.get("content") or []:
+        try:
+            value = json.loads(block.get("text", ""))
+        except (AttributeError, ValueError):
+            continue
+        if isinstance(value, dict):
+            return value
+    return {}
+
+
+def failed(result: Any) -> bool:
+    return not isinstance(result, dict) or bool(result.get("isError")) or "error" in result
+
+
+def error_text(result: Any) -> str:
+    if isinstance(result, dict):
+        if "error" in result:
+            return str(result["error"])
+        texts = [c.get("text", "") for c in result.get("content") or [] if isinstance(c, dict)]
+        if any(texts):
+            return " ".join(texts)
+    return json.dumps(result, default=str)[:300]

@@ -1,4 +1,5 @@
 import { atom } from 'tldraw'
+import type { TourParams } from '../shared/acpExt.ts'
 import { getLocalStorageItem } from './localStorage.ts'
 
 // Per-viewer state (decision D19): tldraw atoms that live in this browser only and are never
@@ -34,11 +35,7 @@ export const paperMoreOpen = atom<boolean>('paperMoreOpen', false)
 /** Papers lit up on this screen only: hovering "three of your seeds", or `_canvas/highlight` (T06). */
 export const litPaperIds = atom<string[]>('litPaperIds', [])
 
-export interface TourStep {
-	paperId: string
-	/** Shown in the tour bar under the paper's node. */
-	line: string
-}
+export type TourStep = TourParams['steps'][number]
 
 export interface Tour {
 	title: string

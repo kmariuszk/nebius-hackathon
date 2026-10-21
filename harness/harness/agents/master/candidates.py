@@ -16,7 +16,6 @@ the ones the tools returned. `pool_for_rerank` is what `rank_papers` ranks.
 
 from __future__ import annotations
 
-import json
 import logging
 from collections.abc import Callable
 from functools import partial
@@ -26,6 +25,8 @@ from google.adk.agents import LlmAgent
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.base_tool import BaseTool
 from google.adk.tools.tool_context import ToolContext
+
+from harness.toolsets import structured
 
 log = logging.getLogger(__name__)
 
@@ -40,7 +41,8 @@ QUESTION = "question"
 # What add_papers takes from the tools' paper records; the model gives paperId, near and kind.
 CARD_FIELDS = ("title", "authors", "year", "venue", "url", "type", "citedBy", "foundBy")
 FROM_SEEDS = "expanded from the seeds"
-# Most papers `rank_papers` reranks per goal: the placed suggestions, then the next scored.
+
+
 class FreshAgentTool(AgentTool):
     """An agent as a tool, built fresh for every call.
 
@@ -146,22 +148,6 @@ def details(tool_name: str, response: Any) -> list[dict[str, Any]]:
                 fields["authors"] = [a for a in fields["authors"] if a != "et al."]
             out.append({"paperId": paper["paperId"], **fields})
     return out
-
-
-def structured(response: Any) -> dict[str, Any]:
-    """An MCP tool result as a dict: its structured content, or its text parsed as JSON."""
-    if not isinstance(response, dict):
-        return {}
-    if isinstance(response.get("structuredContent"), dict):
-        return response["structuredContent"]
-    for block in response.get("content") or []:
-        try:
-            value = json.loads(block.get("text", ""))
-        except (AttributeError, ValueError):
-            continue
-        if isinstance(value, dict):
-            return value
-    return {}
 
 
 def pool(state: dict[str, Any]) -> list[str]:

@@ -3,11 +3,10 @@
 The master used to rerank once for the question and write one `set_scores`
 per paper itself, guessing the `methods` fit from that one ranking (decision
 DH1 in docs/wps/agent-harness/README.md). `rank_papers` takes no arguments:
-it reads what `candidates.note` kept in the session state (the placed
-suggestions, the latest scored order, the question, and the goals and seeds
-from the last `get_board`), reranks the pool once per goal in parallel, and
-writes every placed suggestion's score for every goal. It never places a
-paper: one the rerank likes that isn't on the board stays off it this turn.
+it reads what `candidates.note` kept in the session state (the suggestions
+placed in this chat, the question, and the goals and seeds from the last
+`get_board`), reranks those suggestions once per goal in parallel, and writes
+each one's score for every goal. It never places a paper.
 Its calls run in a model-free `Step`, so they carry the turn's run ID and the
 researcher's bearer.
 """
@@ -51,16 +50,14 @@ class RankPapers(BaseToolset):
     async def rank_papers(self, tool_context: ToolContext) -> dict[str, Any]:
         """Rank the papers you placed in this chat for every board goal and write their fit on their cards.
 
-        It reranks your placed suggestions, with the next best scored candidates, once per board
-        goal, and writes each card's score, fit and one-line why for every goal. It places
-        nothing. Returns `goals`: per goal ID the placed papers it ranked, best first, each with
-        paperId, title, year and reason; `scored`: how many cards it wrote; and `skipped`.
+        It reranks the suggestions you placed in this chat, once per board goal, and writes each
+        card's score, fit and one-line why for every goal. It places nothing. Returns `goals`:
+        per goal ID the placed papers it ranked, best first, each with paperId, title, year and
+        reason; `scored`: how many cards it wrote; and `skipped`.
         """
         state = tool_context.state.to_dict()
         pool = candidates.pool_for_rerank(state)
-        cards = candidates.placed(state)
-        placed = [paper_id for paper_id in pool if paper_id in cards]
-        if not placed:
+        if not pool:
             return {"goals": {}, "scored": 0, "skipped": ["No papers placed in this chat to rank; place them first."]}
         board = candidates.last_board(state)
         goals = board.get("goals") or list(DEFAULT_GOALS)
@@ -99,7 +96,7 @@ class RankPapers(BaseToolset):
         async def action(call: Calls) -> None:
             await asyncio.gather(*(rerank(call, goal) for goal in goals))
             if ranked:
-                await asyncio.gather(*(score(call, paper_id) for paper_id in placed))
+                await asyncio.gather(*(score(call, paper_id) for paper_id in pool))
 
         board_tools = self.background.board
         step = Step(name="rank_papers", tools=[board_tools.papers("rerank"), board_tools.canvas("set_scores")],
@@ -113,7 +110,7 @@ class RankPapers(BaseToolset):
                  len(pool), ", ".join(g for g in goals if g in ranked) or "no goal", len(written), len(skipped))
         known = candidates.known(state)
         return {
-            "goals": {goal: answer(ranked[goal], placed, known) for goal in goals if goal in ranked},
+            "goals": {goal: answer(ranked[goal], pool, known) for goal in goals if goal in ranked},
             "scored": len(written),
             "skipped": skipped,
         }
