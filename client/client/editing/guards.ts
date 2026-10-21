@@ -68,12 +68,23 @@ export function registerGuards(editor: Editor, toast: (text: string) => void): (
 		if (!keep.length) return
 		// a paper inside a deleted cluster stays on the board where it is
 		const inDeleted = keep.filter((id) => editor.findShapeAncestor(id, (a) => deleting.has(a.id)))
-		if (inDeleted.length) {
+		// and a note pinned to a paper that stays goes with the paper, not the frame
+		const staying = new Set(inDeleted)
+		const pinnedNotes = ids.filter((id) => {
+			const shape = editor.getShape(id)
+			return (
+				shape?.type === 'note' &&
+				editor.findShapeAncestor(id, (a) => deleting.has(a.id)) &&
+				editor.getBindingsFromShape(id, 'note-pin').some((b) => staying.has(b.toId))
+			)
+		})
+		const toReparent = [...inDeleted, ...pinnedNotes]
+		if (toReparent.length) {
 			reparenting = true
-			editor.reparentShapes(inDeleted, editor.getCurrentPageId())
+			editor.reparentShapes(toReparent, editor.getCurrentPageId())
 		}
 		// set after the reparenting, whose own operation would clear them
-		refused = new Set(keep)
+		refused = new Set([...keep, ...pinnedNotes])
 		gone = new Set(ids.filter((id) => !refused.has(id)))
 		const asked = keep.filter((id) => !inDeleted.includes(id)).map((id) => deleteRefusal(editor.getShape(id)!)!)
 		if (asked.length) toast(asked.includes(PAPER_REFUSED) ? PAPER_REFUSED : CITES_REFUSED)

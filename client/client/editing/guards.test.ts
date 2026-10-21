@@ -111,7 +111,11 @@ test('Delete on a paper is refused with its links and pinned note kept; the next
 test('deleting a cluster leaves its papers where they were, unpinned, and records no move', () => {
 	const frame = { id: 'shape:cluster-c1', type: 'frame', x: 400, y: 300, props: { name: 'Spatial methods', w: 600, h: 400 }, meta: { clusterId: 'c1', createdBy: 'agent' } }
 	const inside = [card('shape:paper-a', 'pmid:10', { x: 40, y: 60, parentId: frame.id }), card('shape:paper-b', 'pmid:11', { x: 300, y: 60, parentId: frame.id })]
-	const { editor, fake, shapes } = fakeEditor([frame, ...inside])
+	// a note pinned to a kept paper goes with it; a loose one goes with the frame
+	const pinned = { id: 'shape:note-pinned', type: 'note', x: 500, y: 20, parentId: frame.id, props: { text: 'mine' } }
+	const loose = { id: 'shape:note-loose', type: 'note', x: 100, y: 200, parentId: frame.id }
+	const { editor, fake, shapes, bindings } = fakeEditor([frame, ...inside, pinned, loose])
+	bindings.set('binding:pin', { id: 'binding:pin', type: 'note-pin', fromId: pinned.id, toId: 'shape:paper-a', props: {}, meta: {} })
 	const off = registerBoardSideEffects(editor, 'm_me', 'b_cluster')
 	try {
 		fake.deleteShapes([frame.id])
@@ -121,14 +125,24 @@ test('deleting a cluster leaves its papers where they were, unpinned, and record
 		assert.deepEqual([a.parentId, a.x, a.y], ['page:1', 440, 360])
 		assert.deepEqual([b.parentId, b.x, b.y], ['page:1', 700, 360])
 		assert.deepEqual([a.meta, b.meta], [{ createdBy: 'agent' }, { createdBy: 'agent' }])
-		assert.deepEqual(changes.get('b_cluster').entries, [])
+
+		// the pinned note stayed beside its paper, still bound; the loose one went with the frame
+		const note = shapes.get(pinned.id)!
+		assert.deepEqual([note.parentId, note.x, note.y], ['page:1', 900, 320])
+		assert.deepEqual([...bindings.keys()], ['binding:pin'])
+		assert.ok(!shapes.has(loose.id))
+		// the loose note's removal is a change; the rescue of the papers and the pinned note is not
+		assert.deepEqual(
+			changes.get('b_cluster').entries.map((e) => e.change),
+			[{ type: 'note_removed', noteId: loose.id, text: '' }]
+		)
 
 		// a paper the person moves afterwards is theirs again
 		fake.updateShape({ id: a.id, x: 480 })
 		assert.equal(shapes.get(a.id)!.meta.pinnedByHuman, true)
 		assert.deepEqual(
 			changes.get('b_cluster').entries.map((e) => e.change),
-			[{ type: 'moved', paperId: 'pmid:10' }]
+			[{ type: 'note_removed', noteId: loose.id, text: '' }, { type: 'moved', paperId: 'pmid:10' }]
 		)
 	} finally {
 		off()
