@@ -48,7 +48,7 @@ Repeated changes to the same thing collapse (moving a paper three times is one `
 
 **Update suggestions** calls `chatBus.ask({ text: "Update suggestions", resources: [{ uri: "tldraw://<boardId>/changes", mimeType: "application/json", text: <the JSON> }] })` (T05 refresh) and clears the changes. When that turn ends with `end_turn`, a toast says "Done. The agent caught up with your changes." with **See what it did**, which opens the chat scrolled to that turn.
 
-**What the master does with it** is already in its instruction ("<board-changes>: call `get_board` first…"); with [H04](../agent-harness/H04-first-run-in-90-seconds.md) the re-rank is `rank_papers`. A scripted harness test pins it down: an Update suggestions prompt with a `moved` and a `voted` change leads to `get_board`, then `rank_papers`, and no `add_papers` for the moved paper.
+**What the master does with it** is already in its instruction ("<board-changes>: call `get_board` first…"); with [H04](../agent-harness/H04-first-run-in-90-seconds.md) the re-rank is `rank_papers`. A scripted harness test guards the parts that are code, not the model's choice: an Update suggestions prompt with a `moved` and a `voted` change reaches the model as `<board-changes>`, and `rank_papers` leaves out the paper discarded since the last ranking. Whether the model calls `get_board` first and places nothing again is the live check's to see.
 
 **Help** (`client/client/pinboard/Help.tsx`, a **?** at the bottom right): the v6 key, explaining the cards (In your collection, Suggested · fit, the red rank number), the corner badges (New, Split vote, Reading…, ✓ Kept, Discarded), the three kinds of string (red cites, dotted similar, blue yours), notes and clusters.
 

@@ -148,7 +148,7 @@ Each run writes `tests/live/reports/<UTC time>.json` (gitignored; format in the 
 
 A run takes about 10 minutes on today's pipeline and makes a few dozen Token Factory calls (the master, three search agents, the reader and context agent per card), plus the papers MCP's own scoring and rerank calls. Run one at a time, never in CI; use `LIVE_MODEL=cheap` while iterating and the default models for the gate.
 
-After a turn that placed papers, four model-free steps follow ([group README](../docs/wps/agent-harness/README.md#shared-contracts)): citation links (`citation_links`, then `link_papers` kind `cites`), near links (each new paper to the paper it was placed near), the reading, and, at the end of the turn, clusters: once per board with 6 papers or more and no cluster yet, `apply_clusters` groups the board with the papers MCP's `cluster_papers`.
+After a turn that placed papers, four steps follow, three of them model-free (the reading runs the reader and context agents) ([group README](../docs/wps/agent-harness/README.md#shared-contracts)): citation links (`citation_links`, then `link_papers` kind `cites`), near links (each new paper to the paper it was placed near), the reading, and, at the end of the turn, clusters: once per board with 6 papers or more and no cluster yet, `apply_clusters` groups the board with the papers MCP's `cluster_papers`.
 
 ## Not built yet
 

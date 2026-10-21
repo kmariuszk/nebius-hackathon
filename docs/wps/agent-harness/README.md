@@ -46,7 +46,7 @@ flowchart LR
 
 Fixed here so the groups can build against each other. A WP that changes one updates this section in the same pull request.
 
-**After-placement steps.** Model-free steps that run in `ProcessPapers` (`harness/harness/agents/master/background.py`) once the master has placed papers, in this order, each through a `Step` so its writes carry the turn's run ID and the researcher's bearer:
+**After-placement steps.** Once the master has placed papers, four steps follow, three of them model-free (the reading runs the reader and context agents). They run in `ProcessPapers` (`harness/harness/agents/master/background.py`) in this order, each through a `Step` so its writes carry the turn's run ID and the researcher's bearer:
 
 | Order | Step | When | WP | Writes |
 | --- | --- | --- | --- | --- |
