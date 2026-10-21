@@ -1,5 +1,6 @@
 """Step 1 of the after-placement steps: the board's citations as `cites` links, without the model (D03)."""
 
+import asyncio
 from typing import Any
 
 import test_master_board as board_tests
@@ -66,6 +67,38 @@ async def test_a_turn_that_places_papers_links_their_citations_once_without_the_
     assert [c["args"]["links"][0]["kind"] for c in of(canvas_mcp, "link_papers")] == ["cites", "similar", "similar"]
     for paper_id in ("pmid:1", "pmid:3"):
         assert of(canvas_mcp, "mark_working", paper_id)[-1]["args"]["on"] is False
+
+
+async def test_a_paper_placed_after_the_turns_citation_step_gets_its_citations_that_turn(canvas_mcp, papers_mcp):
+    offer_citation_links(papers_mcp, [{"from": "pmid:1", "to": "pmid:9", "source": "pubmed"}])
+    on_board(canvas_mcp, "pmid:1")
+    canvas_mcp.server.remove_tool("add_papers")
+
+    @canvas_mcp.server.tool()
+    async def add_papers(papers: list[dict[str, Any]], near: str | None = None) -> dict[str, Any]:
+        """Add paper cards; pmid:3 reaches the board only once the turn's first citation step has read it."""
+        if any(p["paperId"] == "pmid:3" for p in papers):
+            while not any(name == "citation_links" for name, _ in papers_mcp.calls):
+                await asyncio.sleep(0.01)
+            on_board(canvas_mcp, "pmid:3")
+        return {"added": [p["paperId"] for p in papers], "updated": [], "skipped": []}
+
+    passes = unread("pmid:1", "pmid:3")
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = ScriptedLlm(turns=[
+        calls(*[("get_paper", {"paper_id": p}) for p in ("pmid:1", "pmid:3")]),
+        call("add_papers", papers=[{"paperId": "pmid:1", "title": "A", "near": "pmid:9"}]),
+        call("process_papers", paper_ids=["pmid:1"]),
+        call("add_papers", papers=[{"paperId": "pmid:3", "title": "B", "near": "pmid:9"}]),
+        call("process_papers", paper_ids=["pmid:3"]),
+        say("I placed them."),
+    ])
+
+    await turn(agent, "Place pmid:1, then pmid:3")
+
+    assert [args for name, args in papers_mcp.calls if name == "citation_links"] == [
+        {"paper_ids": ["pmid:9", "pmid:1"]}, {"paper_ids": ["pmid:9", "pmid:1", "pmid:3"]}]
+    assert [c["runId"] for c in cites(canvas_mcp)] == [RUN_ID, RUN_ID]
 
 
 async def test_citations_go_100_links_a_call_and_again_in_the_next_turn(canvas_mcp, papers_mcp, monkeypatch):
