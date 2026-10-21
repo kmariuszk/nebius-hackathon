@@ -3,6 +3,7 @@ import { useValue, type Editor, type TLShape } from 'tldraw'
 import { nodeLabel } from '../../shared/display'
 import type { PaperCardShape } from '../../shared/shapes'
 import { boardApi } from '../api'
+import { changes } from '../pinboard/changes'
 import { linkedCards } from '../pinboard/Strings'
 import { linkEditorAt } from './linkState'
 import {
@@ -62,6 +63,8 @@ interface OpenProps extends Props {
 function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenProps) {
 	const kind = kindOf(arrow.meta)
 	const options = linkOptions(kind)
+	// for Update suggestions (T13)
+	const link = { from: from.props.paperId, to: to.props.paperId, kind }
 	const was = typeof arrow.meta.label === 'string' ? arrow.meta.label : ''
 	const [draft, setDraft] = useState(was)
 	const ref = useRef<HTMLDivElement>(null)
@@ -85,6 +88,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		if (next === was) return
 		editor.markHistoryStoppingPoint('name a link')
 		editor.updateShape({ id: arrow.id, type: arrow.type, meta: labelledMeta(arrow.meta, next, memberId) })
+		changes.record(boardId, { type: 'link_renamed', ...link, label: next })
 	}
 	// a click anywhere else keeps what was typed, as on the v6 board
 	const latest = useRef(() => commit(draft))
@@ -102,9 +106,13 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		close()
 		editor.markHistoryStoppingPoint('hide a link')
 		editor.updateShape({ id: arrow.id, type: arrow.type, meta: hiddenMeta(arrow.meta) })
+		const unrecord = changes.record(boardId, { type: 'link_hidden', ...link })
 		toast({
 			text: hiddenToast(kind),
-			action: undoAction(() => editor.updateShape({ id: arrow.id, type: arrow.type, meta: before })),
+			action: undoAction(() => {
+				editor.updateShape({ id: arrow.id, type: arrow.type, meta: before })
+				unrecord()
+			}),
 		})
 	}
 
@@ -115,6 +123,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		close()
 		editor.markHistoryStoppingPoint('delete a link')
 		editor.deleteShapes([arrow.id])
+		const unrecord = changes.record(boardId, { type: 'link_removed', ...link })
 		let undone = false
 		if (options.recordRemoved) {
 			setTimeout(() => {
@@ -132,6 +141,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 					editor.createShape(shape)
 					editor.createBindings(bindings)
 				})
+				unrecord()
 			}),
 		})
 	}

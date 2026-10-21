@@ -2,6 +2,7 @@ import { useState, type PointerEvent } from 'react'
 import { createShapeId, useEditor, useValue, type Editor, type TLShape, type TLShapeId } from 'tldraw'
 import { linkShapeId } from '../../shared/ids'
 import type { PaperCardShape } from '../../shared/shapes'
+import { recordEdit } from '../pinboard/changes'
 import { linkedCards } from '../pinboard/Strings'
 import { openPaperId } from '../viewerState'
 import { openLinkEditor } from './linkState'
@@ -103,6 +104,7 @@ function dropLink(editor: Editor, fromId: TLShapeId, clientX: number, clientY: n
 	}
 	const { id, existed } = linkCards(editor, from, target)
 	if (existed) toast('These papers are already linked. You can name that link.')
+	else recordEdit(editor, { type: 'link_added', from: from.props.paperId, to: target.props.paperId, kind: 'user' })
 	openLinkEditor(id, at)
 }
 

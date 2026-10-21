@@ -11,7 +11,8 @@ import {
 import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
 import { nodeLabel } from '../../shared/display.ts'
 import { CARD_SIZE, type PaperCardShape } from '../../shared/shapes.ts'
-import { NOTE_SCALE } from '../widgets/notes.ts'
+import { boardOf, changes, recordEdit } from '../pinboard/changes.ts'
+import { NOTE_SCALE, plainText } from '../widgets/notes.ts'
 import { toast } from './toast.ts'
 
 // Pinning notes on the canvas (T14): a note a person puts down with its centre on a paper's card
@@ -185,8 +186,8 @@ export function registerPinNotes(editor: Editor): () => void {
 
 function settle(editor: Editor, id: TLShapeId, why: Why) {
 	const note = editor.getShape(id)
-	const bounds = note?.type === 'note' ? editor.getShapePageBounds(note) : undefined
-	if (!note || !bounds) return
+	const bounds = note ? editor.getShapePageBounds(note) : undefined
+	if (note?.type !== 'note' || !bounds) return
 	const pin = editor.getBindingsFromShape(note, NOTE_PIN_TYPE)[0]
 	const cards = new Map<string, PaperCardShape>()
 	const nodes: CardNode[] = []
@@ -197,15 +198,28 @@ function settle(editor: Editor, id: TLShapeId, why: Why) {
 		nodes.push({ id: s.id, x: at.x, y: at.y, w: s.props.w, h: s.props.h })
 	}
 	const place = placeNote({ x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h }, pin?.toId ?? null, nodes)
+	let pinnedTo = pin ? editor.getShape(pin.toId) : undefined
 	if (place && 'pin' in place) {
 		const card = cards.get(place.pin)!
 		pinTo(editor, note, card, pin)
 		if (pin?.toId !== card.id) toast(`Note pinned to ${cardLabel(card)}. It moves with the paper.`)
+		pinnedTo = card
 	} else if (place && pin) {
 		editor.deleteBinding(pin.id)
 		toast('Note unpinned.')
+		pinnedTo = undefined
 	} else if (!pin && (why === 'tool' || why === 'dropped')) {
 		toast('Note added. Drop it on a paper to pin it there.')
+	}
+
+	// for Update suggestions (T13): a new note, or an old one pinned or unpinned
+	const text = plainText(note.props.richText)
+	const paperId = isCard(pinnedTo) ? pinnedTo.props.paperId : null
+	if (why !== 'moved') recordEdit(editor, { type: 'note_added', noteId: note.id, text, ...(paperId ? { paperId } : {}) })
+	else if (paperId && pinnedTo?.id !== pin?.toId) recordEdit(editor, { type: 'note_pinned', noteId: note.id, text, paperId })
+	else if (!paperId && pin) {
+		const boardId = boardOf(editor)
+		if (boardId) changes.noteUnpinned(boardId, note.id)
 	}
 }
 

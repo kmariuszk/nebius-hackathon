@@ -11,6 +11,7 @@ import { LinkHandle } from '../editing/LinkHandle'
 import { getBookmarkPreview } from '../getBookmarkPreview'
 import { getDisplayName, getMemberId } from '../identity'
 import { multiplayerAssetStore } from '../multiplayerAssetStore'
+import { Help } from '../pinboard/Help'
 import { PinboardDefs, Strings } from '../pinboard/Strings'
 import { RankedList } from '../pinboard/RankedList'
 import { PinboardToolbar } from '../pinboard/Toolbar'
@@ -145,6 +146,7 @@ export function Room() {
 		<div className="RoomWrapper">
 			<TopBar
 				roomId={roomId}
+				memberId={memberId}
 				editor={editor}
 				wall={wall}
 				onWall={changeWall}
@@ -168,7 +170,7 @@ export function Room() {
 							onMount={(editor) => {
 								// when the editor is ready, we need to register our bookmark unfurling service
 								editor.registerExternalAssetHandler('url', getBookmarkPreview)
-								const unregister = registerBoardSideEffects(editor, memberId)
+								const unregister = registerBoardSideEffects(editor, memberId, roomId)
 								setEditor(editor)
 								return () => {
 									unregister()
@@ -178,9 +180,10 @@ export function Room() {
 						/>
 						{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
 						{editor && <PaperWidgets editor={editor} boardId={roomId} memberId={memberId} />}
-						{editor && <PinboardToolbar editor={editor} />}
+						{editor && <PinboardToolbar editor={editor} boardId={roomId} />}
 						{editor && <LinkEditor editor={editor} boardId={roomId} memberId={memberId} />}
 						<BoardToast />
+						<Help />
 					</div>
 					<ChatPanel boardId={roomId} memberId={memberId} editor={editor} open={chatOpen} onOpenChange={setChatOpen} />
 				</div>
