@@ -1,12 +1,12 @@
 import { react, type Editor } from 'tldraw'
-import { createdMeta, nextMeta } from './boardRules'
-import { registerGuards, userLinkMeta } from './editing/guards'
-import { registerPinNotes } from './editing/pinNotes'
-import { toast } from './editing/toast'
-import { getDisplayName, setDisplayName } from './identity'
-import { changes, shapeEdit, watchBoard } from './pinboard/changes'
-import { noteArrival } from './shapes/arrivals'
-import { plainText } from './widgets/notes'
+import { createdMeta, nextMeta } from './boardRules.ts'
+import { isGuardReparent, registerGuards, userLinkMeta } from './editing/guards.ts'
+import { registerPinNotes } from './editing/pinNotes.ts'
+import { toast } from './editing/toast.ts'
+import { getDisplayName, setDisplayName } from './identity.ts'
+import { changes, shapeEdit, watchBoard } from './pinboard/changes.ts'
+import { noteArrival } from './shapes/arrivals.ts'
+import { plainText } from './widgets/notes.ts'
 
 // Attribution and human-touched flags (T01), registered once when the editor mounts; the rules
 // themselves are in boardRules.ts. Also what people may not delete, notes pinning to the paper
@@ -23,6 +23,7 @@ export function registerBoardSideEffects(editor: Editor, memberId: string, board
 			return meta === shape.meta ? shape : { ...shape, meta }
 		}),
 		editor.sideEffects.registerBeforeChangeHandler('shape', (prev, next, source) => {
+			if (isGuardReparent()) return next
 			const meta = nextMeta(prev, next, source)
 			return meta === next.meta ? next : { ...next, meta }
 		}),
@@ -35,15 +36,23 @@ export function registerBoardSideEffects(editor: Editor, memberId: string, board
 		registerPinNotes(editor),
 		// papers moved, clusters renamed, and the text of notes added since the last update
 		editor.sideEffects.registerAfterChangeHandler('shape', (prev, next, source) => {
-			if (source !== 'user') return
+			if (source !== 'user' || isGuardReparent()) return
+			if (next.type === 'arrow' && prev.meta.hiddenByHuman === true && next.meta.hiddenByHuman !== true) {
+				changes.linkShapeBack(boardId, next.id)
+			}
 			const edit = shapeEdit(prev, next)
 			if (edit) changes.record(boardId, edit)
 			else if (next.type === 'note' && prev.type === 'note' && prev.props.richText !== next.props.richText) {
 				changes.noteText(boardId, next.id, plainText(next.props.richText))
 			}
 		}),
+		editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
+			if (source === 'user' && shape.type === 'arrow') changes.linkShapeBack(boardId, shape.id)
+		}),
 		editor.sideEffects.registerAfterDeleteHandler('shape', (shape, source) => {
-			if (source === 'user' && shape.type === 'note') changes.noteDeleted(boardId, shape.id)
+			if (source !== 'user') return
+			if (shape.type === 'note') changes.noteDeleted(boardId, shape.id)
+			if (shape.type === 'arrow') changes.linkShapeGone(boardId, shape.id)
 		}),
 		// a name set in tldraw's people menu is kept for the next visit
 		react('display name', () => {

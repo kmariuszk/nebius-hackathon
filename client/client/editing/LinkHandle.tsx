@@ -103,7 +103,7 @@ function dropLink(editor: Editor, fromId: TLShapeId, clientX: number, clientY: n
 	}
 	const { id, existed } = linkCards(editor, from, target)
 	if (existed) toast('These papers are already linked. You can name that link.')
-	else recordEdit(editor, { type: 'link_added', from: from.props.paperId, to: target.props.paperId, kind: 'user' })
+	else recordEdit(editor, { type: 'link_added', from: from.props.paperId, to: target.props.paperId, kind: 'user' }, id)
 	openLinkEditor(id, at)
 }
 

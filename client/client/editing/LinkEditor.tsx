@@ -88,7 +88,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		if (next === was) return
 		editor.markHistoryStoppingPoint('name a link')
 		editor.updateShape({ id: arrow.id, type: arrow.type, meta: labelledMeta(arrow.meta, next, memberId) })
-		changes.record(boardId, { type: 'link_renamed', ...link, label: next })
+		changes.record(boardId, { type: 'link_renamed', ...link, label: next }, arrow.id)
 	}
 	// a click anywhere else keeps what was typed, as on the v6 board
 	useDismiss(ref, true, () => commit(draft), { capture: true, escape: false })
@@ -98,7 +98,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		close()
 		editor.markHistoryStoppingPoint('hide a link')
 		editor.updateShape({ id: arrow.id, type: arrow.type, meta: hiddenMeta(arrow.meta) })
-		const unrecord = changes.record(boardId, { type: 'link_hidden', ...link })
+		const unrecord = changes.record(boardId, { type: 'link_hidden', ...link }, arrow.id)
 		toast({
 			text: hiddenToast(kind),
 			action: undoAction(() => {
@@ -114,12 +114,12 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 		if (!shape) return
 		close()
 		editor.markHistoryStoppingPoint('delete a link')
+		const unrecord = changes.record(boardId, { type: 'link_removed', ...link }, arrow.id)
 		editor.deleteShapes([arrow.id])
-		const unrecord = changes.record(boardId, { type: 'link_removed', ...link })
 		let undone = false
 		if (options.recordRemoved) {
 			setTimeout(() => {
-				if (undone) return
+				if (undone || editor.getShape(arrow.id)) return
 				boardApi(boardId, memberId)
 					.removeLink(from.props.paperId, to.props.paperId, kind)
 					.catch((e) => console.warn(`Couldn't record the removed link on ${boardId}:`, e))

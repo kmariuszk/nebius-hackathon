@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { createTurnBus, endedTurns, type AskRequest } from '../chat/chatBus.ts'
+import { fakeEditor } from '../editing/fixtures/fakeEditor.ts'
+import { registerBoardSideEffects } from '../sideEffects.ts'
 import { castVote } from '../widgets/votes.ts'
 import {
 	addChange,
@@ -9,6 +11,8 @@ import {
 	createChanges,
 	createUpdater,
 	describeChange,
+	linkShapeBack,
+	linkShapeGone,
 	noteDeleted,
 	noteText,
 	noteUnpinned,
@@ -120,6 +124,72 @@ test('the JSON is {since, changes: [{…, at}]}, the <board-changes> contract', 
 			{ type: 'link_hidden', from: 'pmid:2', to: 'pmid:1', kind: 'cites', at: at(4) },
 		],
 	})
+})
+
+test('a link change keeps its arrow’s shape ID in the browser; the JSON leaves it out', () => {
+	const entries = addChange([], { type: 'link_removed', ...liuCites }, at(1), 'shape:link-x')
+	assert.equal(entries[0].shapeId, 'shape:link-x')
+	const json = changesJson({ since: T0, entries })
+	assert.deepEqual(JSON.parse(json).changes, [{ type: 'link_removed', from: 'pmid:2', to: 'pmid:1', kind: 'cites', at: at(1) }])
+	assert.ok(!json.includes('shape:link-x'))
+	// naming a link you drew keeps the drawing's shape ID
+	const named = addChange(addChange([], { type: 'link_added', ...mine }, at(1), 'shape:link-y'), { type: 'link_renamed', ...mine, label: 'x' }, at(2), 'shape:link-y')
+	assert.deepEqual(named.map((e) => [e.change.type, e.shapeId]), [['link_added', 'shape:link-y']])
+})
+
+test('an arrow back on the board takes back its deletion or hiding; one gone takes back its drawing', () => {
+	const removed = addChange([], { type: 'link_removed', ...liuCites }, at(1), 'shape:link-x')
+	assert.deepEqual(linkShapeBack(removed, 'shape:link-x'), [])
+	assert.equal(linkShapeBack(removed, 'shape:other'), removed) // nothing to drop: the same list
+	assert.equal(linkShapeGone(removed, 'shape:link-x'), removed)
+	const hidden = addChange([], { type: 'link_hidden', ...liuCites }, at(1), 'shape:link-x')
+	assert.deepEqual(linkShapeBack(hidden, 'shape:link-x'), [])
+	const drawn = run({ type: 'moved', paperId: 'pmid:1' })
+	const withLink = addChange(drawn, { type: 'link_added', ...mine }, at(2), 'shape:link-y')
+	assert.deepEqual(linkShapeGone(withLink, 'shape:link-y'), drawn)
+	assert.equal(linkShapeBack(withLink, 'shape:link-y'), withLink)
+	// an entry recorded without a shape ID is never matched
+	const old = run({ type: 'link_removed', ...liuCites })
+	assert.equal(linkShapeBack(old, 'shape:link-x'), old)
+})
+
+test('⌘Z and ⇧⌘Z on a link keep the changes list in step with the board', () => {
+	const paper = (id: string, paperId: string) => ({ id, type: 'paper-card', props: { paperId }, meta: {} })
+	const similar = { id: 'shape:link-s', type: 'arrow', props: {}, meta: { kind: 'similar', label: '', hiddenByHuman: false } }
+	const { editor, fake, shapes } = fakeEditor([paper('shape:paper-a', 'pmid:2'), paper('shape:paper-b', 'pmid:1'), similar])
+	const off = registerBoardSideEffects(editor, 'm_me', 'b_undo')
+	const now = () => changes.get('b_undo').entries.map((e) => e.change.type)
+	try {
+		// hidden, then ⌘Z shows it again
+		changes.record('b_undo', { type: 'link_hidden', ...liuCites }, similar.id)
+		fake.updateShape({ id: similar.id, meta: { hiddenByHuman: true } })
+		assert.deepEqual(now(), ['link_hidden'])
+		fake.updateShape({ id: similar.id, meta: { hiddenByHuman: false } })
+		assert.deepEqual(now(), [])
+
+		// deleted (recorded before the delete, as the link editor does), then ⌘Z brings it back
+		changes.record('b_undo', { type: 'link_removed', ...liuCites }, similar.id)
+		fake.deleteShapes([similar.id])
+		assert.deepEqual(now(), ['link_removed'])
+		fake.createShape(similar)
+		assert.deepEqual(now(), [])
+
+		// drawn with the + handle, then ⌘Z takes it away
+		fake.createShape({ id: 'shape:link-mine', type: 'arrow' })
+		changes.record('b_undo', { type: 'link_added', ...mine }, 'shape:link-mine')
+		assert.equal(shapes.get('shape:link-mine')!.meta.kind, 'user')
+		fake.deleteShapes(['shape:link-mine'])
+		assert.deepEqual(now(), [])
+
+		// a link drawn and deleted in this session is nothing, before and after the delete runs
+		fake.createShape({ id: 'shape:link-mine', type: 'arrow' })
+		changes.record('b_undo', { type: 'link_added', ...mine }, 'shape:link-mine')
+		changes.record('b_undo', { type: 'link_removed', ...mine }, 'shape:link-mine')
+		fake.deleteShapes(['shape:link-mine'])
+		assert.deepEqual(now(), [])
+	} finally {
+		off()
+	}
 })
 
 test('each change in plain words', () => {

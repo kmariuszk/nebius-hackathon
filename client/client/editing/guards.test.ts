@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { CITES_REFUSED, deleteRefusal, keepsBinding, PAPER_REFUSED, userLinkMeta } from './guards.ts'
+import { defaultPaperCardProps } from '../../shared/shapes.ts'
+import { changes } from '../pinboard/changes.ts'
+import { registerBoardSideEffects } from '../sideEffects.ts'
+import { fakeEditor } from './fixtures/fakeEditor.ts'
+import { CITES_REFUSED, deleteRefusal, keepsBinding, PAPER_REFUSED, registerGuards, userLinkMeta } from './guards.ts'
 
 test('papers can’t be deleted: people Discard them', () => {
 	assert.equal(deleteRefusal({ type: 'paper-card', meta: { createdBy: 'agent' } }), PAPER_REFUSED)
@@ -47,4 +51,86 @@ test('an arrow a person draws is theirs: kind user, empty label, by them', () =>
 	// a link that already has a kind (the agent's, or a pasted one) keeps it, as the same object
 	const cites = { kind: 'cites', label: '', by: 'pubmed', hiddenByHuman: false }
 	assert.equal(userLinkMeta(cites, 'm_ana'), cites)
+})
+
+const card = (id: string, paperId: string, at: Partial<{ x: number; y: number; parentId: string }> = {}) => ({
+	id,
+	type: 'paper-card',
+	x: 0,
+	y: 0,
+	props: defaultPaperCardProps(paperId, { w: 48, h: 48 }),
+	meta: { createdBy: 'agent' },
+	...at,
+})
+
+test('Delete on a paper is refused with its links and pinned note kept; the next delete is judged afresh', () => {
+	const liu = card('shape:paper-liu', 'pmid:2', { x: 100, y: 100 })
+	const tirosh = card('shape:paper-tirosh', 'pmid:1', { x: 500, y: 100 })
+	const arrow = (id: string, kind: string) => ({ id, type: 'arrow', props: { start: 'bound', end: 'bound' }, meta: { kind } })
+	const { editor, fake, shapes, bindings } = fakeEditor([
+		liu,
+		tirosh,
+		arrow('shape:link-cites', 'cites'),
+		arrow('shape:link-similar', 'similar'),
+		{ id: 'shape:note', type: 'note', x: 230, y: 136 },
+	])
+	const bind = (fromId: string, toId: string, type = 'arrow', terminal = 'end') =>
+		bindings.set(`binding:${fromId}-${toId}`, { id: `binding:${fromId}-${toId}`, type, fromId, toId, props: { terminal }, meta: {} })
+	bind('shape:link-cites', tirosh.id, 'arrow', 'start')
+	bind('shape:link-cites', liu.id)
+	bind('shape:link-similar', tirosh.id, 'arrow', 'start')
+	bind('shape:link-similar', liu.id)
+	bind('shape:note', liu.id, 'note-pin')
+	const before = [...bindings.keys()]
+	const toasts: string[] = []
+	const off = registerGuards(editor, (text) => toasts.push(text))
+	try {
+		fake.deleteShapes([liu.id])
+		assert.ok(shapes.has(liu.id))
+		assert.deepEqual([...bindings.keys()], before)
+		// the arrows still end on the paper rather than coming loose
+		assert.deepEqual(shapes.get('shape:link-cites')!.props, { start: 'bound', end: 'bound' })
+		assert.deepEqual(toasts, [PAPER_REFUSED])
+
+		// nothing refused is left over: unpinning the note now takes its pin away
+		fake.deleteBinding(`binding:shape:note-${liu.id}`)
+		assert.ok(!bindings.has(`binding:shape:note-${liu.id}`))
+		// and deleting the similar link takes its ends with it
+		fake.deleteShapes(['shape:link-similar'])
+		assert.ok(!shapes.has('shape:link-similar'))
+		assert.deepEqual(
+			[...bindings.values()].filter((b) => b.fromId === 'shape:link-similar'),
+			[]
+		)
+		assert.deepEqual(toasts, [PAPER_REFUSED])
+	} finally {
+		off()
+	}
+})
+
+test('deleting a cluster leaves its papers where they were, unpinned, and records no move', () => {
+	const frame = { id: 'shape:cluster-c1', type: 'frame', x: 400, y: 300, props: { name: 'Spatial methods', w: 600, h: 400 }, meta: { clusterId: 'c1', createdBy: 'agent' } }
+	const inside = [card('shape:paper-a', 'pmid:10', { x: 40, y: 60, parentId: frame.id }), card('shape:paper-b', 'pmid:11', { x: 300, y: 60, parentId: frame.id })]
+	const { editor, fake, shapes } = fakeEditor([frame, ...inside])
+	const off = registerBoardSideEffects(editor, 'm_me', 'b_cluster')
+	try {
+		fake.deleteShapes([frame.id])
+		assert.ok(!shapes.has(frame.id))
+		const a = shapes.get('shape:paper-a')!
+		const b = shapes.get('shape:paper-b')!
+		assert.deepEqual([a.parentId, a.x, a.y], ['page:1', 440, 360])
+		assert.deepEqual([b.parentId, b.x, b.y], ['page:1', 700, 360])
+		assert.deepEqual([a.meta, b.meta], [{ createdBy: 'agent' }, { createdBy: 'agent' }])
+		assert.deepEqual(changes.get('b_cluster').entries, [])
+
+		// a paper the person moves afterwards is theirs again
+		fake.updateShape({ id: a.id, x: 480 })
+		assert.equal(shapes.get(a.id)!.meta.pinnedByHuman, true)
+		assert.deepEqual(
+			changes.get('b_cluster').entries.map((e) => e.change),
+			[{ type: 'moved', paperId: 'pmid:10' }]
+		)
+	} finally {
+		off()
+	}
 })

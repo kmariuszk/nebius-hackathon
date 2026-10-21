@@ -24,6 +24,8 @@ export interface Entry {
 	key: string
 	change: Change
 	at: string
+	/** The arrow a link change was made on, so undo and redo can take the change back; never sent to the agent. */
+	shapeId?: string
 }
 
 export interface ChangesState {
@@ -51,7 +53,7 @@ const same = (a: Change, b: Change) => JSON.stringify(a) === JSON.stringify(b)
 // the target entry with a new change; the same array when nothing changes, so nothing is saved
 function put(entries: readonly Entry[], target: Entry, change: Change, at: string): Entry[] {
 	if (same(target.change, change)) return entries as Entry[]
-	return entries.map((e) => (e === target ? { key: target.key, change, at } : e))
+	return entries.map((e) => (e === target ? { ...target, change, at } : e))
 }
 
 /**
@@ -59,15 +61,16 @@ function put(entries: readonly Entry[], target: Entry, change: Change, at: strin
  * wins; naming a link you drew names that one change; a link you drew and deleted, or a note you
  * added and then pinned, is one change or none.
  */
-export function addChange(entries: readonly Entry[], change: Change, at: string): Entry[] {
+export function addChange(entries: readonly Entry[], change: Change, at: string, shapeId?: string): Entry[] {
 	const key = subjectOf(change)
+	const entry: Entry = shapeId ? { key, change, at, shapeId } : { key, change, at }
 	const earlier = entries.filter((e) => e.key === key)
 	const added = earlier.find((e) => e.change.type === 'link_added' || e.change.type === 'note_added')
 	switch (change.type) {
 		case 'link_removed':
 			// drawn and deleted since the last update: nothing for the agent to catch up on
 			if (added) return entries.filter((e) => e.key !== key)
-			return [...entries.filter((e) => e.key !== key), { key, change, at }]
+			return [...entries.filter((e) => e.key !== key), entry]
 		case 'link_renamed':
 			if (added) return put(entries, added, { ...added.change, label: change.label } as Change, at)
 			break
@@ -77,7 +80,20 @@ export function addChange(entries: readonly Entry[], change: Change, at: string)
 	}
 	const prev = earlier.find((e) => e.change.type === change.type)
 	if (prev) return put(entries, prev, change, at)
-	return [...entries, { key, change, at }]
+	return [...entries, entry]
+}
+
+const without = (entries: readonly Entry[], drop: (e: Entry) => boolean): Entry[] =>
+	entries.some(drop) ? entries.filter((e) => !drop(e)) : (entries as Entry[])
+
+/** A link's arrow is on the board and showing again (undo, redo, or un-hidden): deleting or hiding it is no longer a change. */
+export function linkShapeBack(entries: readonly Entry[], shapeId: string): Entry[] {
+	return without(entries, (e) => e.shapeId === shapeId && (e.change.type === 'link_removed' || e.change.type === 'link_hidden'))
+}
+
+/** A link's arrow left the board (undo of drawing it): drawing it is no longer a change. */
+export function linkShapeGone(entries: readonly Entry[], shapeId: string): Entry[] {
+	return without(entries, (e) => e.shapeId === shapeId && e.change.type === 'link_added')
 }
 
 interface ShapeLike {
@@ -214,15 +230,17 @@ export function createChanges(storage: StorageLike | null, now = () => new Date(
 		/** Reactive, for useValue. */
 		get: (boardId: string) => of(boardId).get(),
 		/** Records a change; the function it returns puts the changes about that thing back as they were (Undo). */
-		record(boardId: string, change: Change): () => void {
+		record(boardId: string, change: Change, shapeId?: string): () => void {
 			const key = subjectOf(change)
 			const before = of(boardId).get().entries.filter((e) => e.key === key)
-			edit(boardId, (entries) => addChange(entries, change, now()))
+			edit(boardId, (entries) => addChange(entries, change, now(), shapeId))
 			return () => edit(boardId, (entries) => [...entries.filter((e) => e.key !== key), ...before])
 		},
 		noteText: (boardId: string, noteId: string, text: string) => edit(boardId, (e) => noteText(e, noteId, text)),
 		noteUnpinned: (boardId: string, noteId: string) => edit(boardId, (e) => noteUnpinned(e, noteId)),
 		noteDeleted: (boardId: string, noteId: string) => edit(boardId, (e) => noteDeleted(e, noteId)),
+		linkShapeBack: (boardId: string, shapeId: string) => edit(boardId, (e) => linkShapeBack(e, shapeId)),
+		linkShapeGone: (boardId: string, shapeId: string) => edit(boardId, (e) => linkShapeGone(e, shapeId)),
 		/** The changes as <board-changes> JSON, and a fresh start for the next Update suggestions. */
 		take(boardId: string): string {
 			const json = changesJson(of(boardId).get())
@@ -294,7 +312,7 @@ export function watchBoard(editor: object, boardId: string): () => void {
 /** The board an editor's edits are recorded for, if any. */
 export const boardOf = (editor: object) => boards.get(editor) ?? null
 
-export function recordEdit(editor: object, change: Change): () => void {
+export function recordEdit(editor: object, change: Change, shapeId?: string): () => void {
 	const boardId = boards.get(editor)
-	return boardId ? changes.record(boardId, change) : () => {}
+	return boardId ? changes.record(boardId, change, shapeId) : () => {}
 }

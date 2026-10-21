@@ -42,6 +42,11 @@ export function keepsBinding(
 	return (refused.has(fromId) || refused.has(toId)) && !gone.has(fromId) && !gone.has(toId)
 }
 
+let reparenting = false
+
+/** True from the guard moving a deleted cluster's papers onto the page until that operation completes: nobody moved them. */
+export const isGuardReparent = () => reparenting
+
 /**
  * Refuses a person's Delete (or Cut, or eraser) on papers and citations, with a toast. tldraw
  * removes a shape's bindings before asking the delete handlers, so while a refused delete runs
@@ -63,7 +68,10 @@ export function registerGuards(editor: Editor, toast: (text: string) => void): (
 		if (!keep.length) return
 		// a paper inside a deleted cluster stays on the board where it is
 		const inDeleted = keep.filter((id) => editor.findShapeAncestor(id, (a) => deleting.has(a.id)))
-		if (inDeleted.length) editor.reparentShapes(inDeleted, editor.getCurrentPageId())
+		if (inDeleted.length) {
+			reparenting = true
+			editor.reparentShapes(inDeleted, editor.getCurrentPageId())
+		}
 		// set after the reparenting, whose own operation would clear them
 		refused = new Set(keep)
 		gone = new Set(ids.filter((id) => !refused.has(id)))
@@ -91,6 +99,7 @@ export function registerGuards(editor: Editor, toast: (text: string) => void): (
 				: next
 		),
 		editor.sideEffects.registerOperationCompleteHandler(() => {
+			reparenting = false
 			if (!refused.size) return
 			refused = new Set()
 			gone = new Set()

@@ -5,6 +5,8 @@ import { CARD_SIZE } from '../../../shared/shapes.ts'
 // boardDerived needs: shapes and bindings in maps, the side-effect handlers the code registers,
 // and writes that call them as tldraw's store does. Every write is the person's ('user'); the
 // after-handlers, then the operation-complete handlers, run when the outermost operation ends.
+// Deleting a shape first loosens the arrows bound to it and removes its bindings, as tldraw's own
+// delete handler does, and only then asks the shape's delete handlers.
 
 export interface FakeShape {
 	id: string
@@ -31,6 +33,9 @@ type Rec = FakeShape | FakeBinding
 type Handler = (...args: any[]) => any
 type Ref = string | { id: string }
 
+// registerBoardSideEffects reads the display name from localStorage (identity.ts), which Node lacks
+globalThis.localStorage ??= { getItem: () => null, setItem() {}, removeItem() {} } as unknown as Storage
+
 const PAGE = 'page:1'
 const idOf = (s: Ref) => (typeof s === 'string' ? s : s.id)
 
@@ -52,8 +57,9 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 	}
 	const call = (name: string, ...args: unknown[]) => (handlers.get(name) ?? []).map((h) => h(...args))
 
+	// an operation completes even when it wrote nothing (a delete that was refused)
 	const flush = () => {
-		while (pending.size) {
+		do {
 			const events = pending
 			pending = new Map()
 			for (const { kind, before, after } of events.values()) {
@@ -62,7 +68,7 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 				else if (after) call(`afterCreate ${kind}`, after, 'user')
 			}
 			if (!pending.size) call('operationComplete', 'user')
-		}
+		} while (pending.size)
 	}
 	// writes inside an operation, or inside the handlers it runs, join it
 	const run = <T>(fn: () => T): T => {
@@ -102,6 +108,28 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 	const bindingsOf = (s: Ref, side: 'fromId' | 'toId', type?: string) =>
 		[...bindings.values()].filter((b) => b[side] === idOf(s) && (!type || b.type === type))
 
+	const removeBinding = (id: string) =>
+		run(() => {
+			const binding = bindings.get(id)
+			if (!binding || call('beforeDelete binding', binding, 'user').includes(false)) return
+			bindings.delete(id)
+			writes.push(`delete binding ${binding.type}`)
+			touch('binding', id, binding, undefined)
+		})
+	const removeShape = (id: string) => {
+		const shape = shapes.get(id)
+		if (!shape) return
+		const involved = [...bindingsOf(id, 'fromId'), ...bindingsOf(id, 'toId')]
+		for (const b of involved) {
+			if (b.type === 'arrow' && b.toId === id) editor.updateShape({ id: b.fromId, props: { [b.props.terminal]: 'loose' } })
+		}
+		involved.forEach((b) => removeBinding(b.id))
+		if (call('beforeDelete shape', shape, 'user').includes(false)) return
+		shapes.delete(id)
+		writes.push(`delete shape ${shape.type}`)
+		touch('shape', id, shape, undefined)
+	}
+
 	const editor = {
 		user: { getName: () => '', updateUserPreferences() {} },
 		sideEffects: {
@@ -114,6 +142,8 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 			registerOperationCompleteHandler: (fn: Handler) => on('operationComplete', fn),
 		},
 		run,
+		on: (event: string, fn: Handler) => on(`event ${event}`, fn),
+		off: (event: string, fn: Handler) => void handlers.set(`event ${event}`, (handlers.get(`event ${event}`) ?? []).filter((h) => h !== fn)),
 		getContainer: () => ({ addEventListener() {}, removeEventListener() {} }),
 		markHistoryStoppingPoint: () => 'mark',
 		markEventAsHandled() {},
@@ -125,6 +155,10 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 		getCurrentPageId: () => PAGE,
 		getCurrentPageShapes: () => [...shapes.values()],
 		getShape: (s: Ref) => shapes.get(idOf(s)),
+		findShapeAncestor: (s: Ref, match: (parent: FakeShape) => boolean) => {
+			for (let p = shapes.get(shapes.get(idOf(s))?.parentId ?? ''); p; p = shapes.get(p.parentId)) if (match(p)) return p
+			return undefined
+		},
 		isShapeHidden: () => false,
 		getShapePageTransform: (s: Ref) => ({ point: () => pagePoint(s) }),
 		getPointInParentSpace: (s: Ref, point: { x: number; y: number }) => {
@@ -147,6 +181,21 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 			const prev = shapes.get(partial.id)
 			if (prev) put('shape', { ...prev, ...partial, props: { ...prev.props, ...partial.props }, meta: { ...prev.meta, ...partial.meta } })
 		},
+		// with everything inside them, named before anything goes, as tldraw does
+		deleteShapes: (ids: Ref[]) => {
+			const all = new Set(ids.map(idOf))
+			for (const id of all) for (const s of shapes.values()) if (s.parentId === id) all.add(s.id)
+			call('event deleted-shapes', [...all])
+			run(() => all.forEach(removeShape))
+		},
+		reparentShapes: (ids: Ref[], parentId: string) =>
+			run(() => {
+				const p = shapes.has(parentId) ? pagePoint(parentId) : { x: 0, y: 0 }
+				for (const id of ids.map(idOf)) {
+					const at = pagePoint(id)
+					editor.updateShape({ id, parentId, x: at.x - p.x, y: at.y - p.y })
+				}
+			}),
 		getBindingsFromShape: (s: Ref, type?: string) => bindingsOf(s, 'fromId', type),
 		getBindingsToShape: (s: Ref, type?: string) => bindingsOf(s, 'toId', type),
 		createBinding: (partial: Partial<FakeBinding> & { type: string; fromId: string; toId: string }) =>
@@ -155,7 +204,9 @@ export function fakeEditor(initial: (Partial<FakeShape> & { id: string; type: st
 			const prev = bindings.get(partial.id)
 			if (prev) put('binding', { ...prev, ...partial, props: { ...prev.props, ...partial.props } })
 		},
+		deleteBinding: (id: string) => removeBinding(id),
 	}
 	for (const shape of initial) shapes.set(shape.id, { x: 0, y: 0, rotation: 0, parentId: PAGE, props: {}, meta: {}, ...shape })
-	return { editor: editor as unknown as Editor, shapes, bindings, writes }
+	// `editor` for the code under test; `fake` for the test's own edits, with plain string IDs
+	return { editor: editor as unknown as Editor, fake: editor, shapes, bindings, writes }
 }
