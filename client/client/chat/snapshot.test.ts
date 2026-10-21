@@ -127,6 +127,26 @@ test('link arrows show only while a snapshot draws, also when the drawing fails'
 	assert.equal(exportingSnapshot.get(), 0)
 })
 
+test('a drawing takeSnapshot gave up on gives the arrows back at once, and only once', async () => {
+	const off = setSnapshotRenderer((_, signal) => withLinkArrows(() => new Promise(() => {}), signal))
+	try {
+		await assert.rejects(takeSnapshot({ target: 'board' }, { timeoutMs: 30 }), /took longer than/)
+		assert.equal(exportingSnapshot.get(), 0)
+	} finally {
+		off()
+	}
+	// a drawing that finishes after all doesn't take the count below zero
+	let finish = () => {}
+	const giveUp = new AbortController()
+	const drawing = withLinkArrows(() => new Promise<void>((resolve) => (finish = resolve)), giveUp.signal)
+	assert.equal(exportingSnapshot.get(), 1)
+	giveUp.abort()
+	assert.equal(exportingSnapshot.get(), 0)
+	finish()
+	await drawing
+	assert.equal(exportingSnapshot.get(), 0)
+})
+
 test('base64 matches Node for a picture bigger than one chunk', () => {
 	const bytes = Uint8Array.from({ length: 70_000 }, (_, i) => (i * 7) % 256)
 	assert.equal(toBase64(bytes), Buffer.from(bytes).toString('base64'))
@@ -143,7 +163,7 @@ test('takeSnapshot: the renderer answers, or a reason comes back fast', async ()
 	await assert.rejects(takeSnapshot({ target: 'board' }, { visible: () => false }), /tab is in the background/)
 	assert.ok(Date.now() - started < 50)
 
-	// a drawing that hangs fails at the timeout (10 s in the browser)
+	// a drawing that hangs fails at the timeout (8 s in the browser)
 	const off = setSnapshotRenderer(() => new Promise(() => {}))
 	started = Date.now()
 	await assert.rejects(takeSnapshot({ target: 'board' }, { timeoutMs: 60 }), { message: 'Drawing the board took longer than 0.06 seconds.' })

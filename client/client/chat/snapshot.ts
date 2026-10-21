@@ -1,4 +1,4 @@
-import { atom, Box, type Editor, type TLShape, type TLShapeId } from 'tldraw'
+import { atom, Box, react, type Editor, type TLShape, type TLShapeId } from 'tldraw'
 import type { SnapshotParams, SnapshotResult } from '../../shared/acpExt.ts'
 import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
 import { cardLabel } from '../../shared/display.ts'
@@ -15,7 +15,8 @@ export type SnapshotRequest = Omit<SnapshotParams, 'sessionId'>
 
 /** Long side of a snapshot in pixels; about 1,400 prompt tokens on Super VL. */
 export const MAX_SIDE = 1600
-export const SNAPSHOT_TIMEOUT_MS = 10_000
+// below the harness's SNAPSHOT_SECONDS (10 s, harness/harness/board/viewer.py), so the agent hears the browser's reason
+export const SNAPSHOT_TIMEOUT_MS = 8_000
 // a few cards shouldn't be blown up to 1,600 px
 const MAX_UPSCALE = 2
 const MARGIN = 48
@@ -27,13 +28,38 @@ const MARGIN = 48
  */
 export const exportingSnapshot = atom('exportingSnapshot', 0)
 
-export async function withLinkArrows<T>(draw: () => Promise<T>): Promise<T> {
+export async function withLinkArrows<T>(draw: () => Promise<T>, signal?: AbortSignal): Promise<T> {
 	exportingSnapshot.update((n) => n + 1)
+	// once: when the drawing ends, or when takeSnapshot gives up on one that hangs
+	let shown = true
+	const release = () => {
+		if (!shown) return
+		shown = false
+		exportingSnapshot.update((n) => n - 1)
+	}
+	signal?.addEventListener('abort', release)
 	try {
 		return await draw()
 	} finally {
-		exportingSnapshot.update((n) => n - 1)
+		signal?.removeEventListener('abort', release)
+		release()
 	}
+}
+
+const EXPORTING = 'pb-exporting'
+
+/**
+ * While a snapshot draws, the live canvas gets EXPORTING, whose CSS (pinboard.css) keeps the arrows
+ * off this screen. Not editor.getContainer(): tldraw renders the export inside the container,
+ * beside the canvas.
+ */
+function hideArrowsOnScreen(editor: Editor) {
+	return react('link arrows off screen while exporting', () => {
+		const canvas = editor.getContainer().querySelector('.tl-canvas')
+		if (exportingSnapshot.get() > 0) canvas?.classList.add(EXPORTING)
+		// tldraw hides the arrows again on its next render, so the class goes the frame after that
+		else requestAnimationFrame(() => requestAnimationFrame(() => exportingSnapshot.get() || canvas?.classList.remove(EXPORTING)))
+	})
 }
 
 /** The export scale that keeps the long side within `maxSide`, and never above 1,600 px. */
@@ -152,7 +178,7 @@ export function toBase64(bytes: Uint8Array) {
 }
 
 // The export itself; it needs a real browser, so tests fake the renderer instead.
-async function drawSnapshot(editor: Editor, request: SnapshotRequest): Promise<SnapshotResult> {
+async function drawSnapshot(editor: Editor, request: SnapshotRequest, signal?: AbortSignal): Promise<SnapshotResult> {
 	// planned with the arrows shown, so a `shapes` picture includes the links
 	return withLinkArrows(async () => {
 		const { ids, bounds, caption } = planSnapshot(editor, request)
@@ -165,15 +191,21 @@ async function drawSnapshot(editor: Editor, request: SnapshotRequest): Promise<S
 			height: Math.round(image.height),
 			caption,
 		}
-	})
+	}, signal)
 }
 
-type Renderer = (request: SnapshotRequest) => Promise<SnapshotResult>
+/** `signal` aborts when takeSnapshot stops waiting for the picture. */
+type Renderer = (request: SnapshotRequest, signal?: AbortSignal) => Promise<SnapshotResult>
 let renderer: Renderer | null = null
 
 /** Lets snapshots draw this editor's page (the chat panel registers it); returns the unregister function. */
 export function registerSnapshots(editor: Editor) {
-	return setSnapshotRenderer((request) => drawSnapshot(editor, request))
+	const off = setSnapshotRenderer((request, signal) => drawSnapshot(editor, request, signal))
+	const stop = hideArrowsOnScreen(editor)
+	return () => {
+		off()
+		stop()
+	}
 }
 
 /** Swaps what draws the pictures (tests pass a fake); returns the function that removes it. */
@@ -201,11 +233,15 @@ export async function takeSnapshot(
 	// a hidden tab can't be relied on to finish drawing
 	if (!visible()) throw new Error("The researcher's tab is in the background, so the board can't be drawn right now.")
 	let timer: ReturnType<typeof setTimeout> | undefined
+	const giveUp = new AbortController()
 	const late = new Promise<never>((_, reject) => {
-		timer = setTimeout(() => reject(new Error(`Drawing the board took longer than ${timeoutMs / 1000} seconds.`)), timeoutMs)
+		timer = setTimeout(() => {
+			giveUp.abort()
+			reject(new Error(`Drawing the board took longer than ${timeoutMs / 1000} seconds.`))
+		}, timeoutMs)
 	})
 	try {
-		return await Promise.race([renderer(request), late])
+		return await Promise.race([renderer(request, giveUp.signal), late])
 	} finally {
 		clearTimeout(timer)
 	}

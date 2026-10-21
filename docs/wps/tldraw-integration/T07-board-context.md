@@ -17,7 +17,7 @@
 | --- | --- | --- |
 | Context tags in the user's message (`<selected-shape>`, `<viewport>`, `<board-changes>`, `<board-context>`, images) | Built on the harness side | `harness/harness/acp/mapping.py`, `harness/harness/board/prompts.py` (`BOARD_CONTEXT`) |
 | The chat panel sending selected shapes, the viewport and its image | Built on `w3/looks` (Oct 21): Send adds the selection (up to 20), the open paper, the view summary and, with "Include my view" on, the view's picture | `client/client/chat/context.ts`, `ChatPanel.tsx` |
-| `_canvas/snapshot` | Built on `w3/looks`: `viewport`, `board` and `shapes`, at most 1,600 px, link arrows shown while it draws, an error at once for a hidden tab and after 10 s otherwise | `client/client/chat/snapshot.ts`, `connection.ts`, `client/client/shapes/index.ts` |
+| `_canvas/snapshot` | Built on `w3/looks`: `viewport`, `board` and `shapes`, at most 1,600 px, link arrows shown while it draws, an error at once for a hidden tab and after 8 s otherwise (inside the harness's 10 s) | `client/client/chat/snapshot.ts`, `connection.ts`, `client/client/shapes/index.ts` |
 | `look_at_board`, `look_at_figure` and the image plugin | Built on `w3/looks` | `harness/harness/board/viewer.py`, `harness/harness/acp/images.py` (registered in `worker.py`), `harness/tests/test_look_tools.py` |
 | PDF reader (for `paper_page`) | Not built and out of scope (T10's Phase B); `paper_page` is dropped (D25) | — |
 
@@ -34,7 +34,7 @@ Everything in the Design below still stands, with these changes for v6 and for w
 **Tasks** (the original Tasks below, minus `paper_page`, plus):
 
 - [x] `look_at_figure` in `viewer.py`, through the same image plugin. `get_board` doesn't carry the card's figure, so it reads `get_figures`: the figure named by an optional `label` (the selection's `figure` gives the card's), else the first one with a picture.
-- [x] Arrows visible during export: `exportingSnapshot` in `chat/snapshot.ts`, read by `getShapeVisibility`, is on while a snapshot draws (the screen shows the arrows for that moment too).
+- [x] Arrows visible during export: `exportingSnapshot` in `chat/snapshot.ts`, read by `getShapeVisibility`, is on while a snapshot draws, or until `takeSnapshot` gives up on it; a `pb-exporting` class on the live `.tl-canvas` keeps the arrows off the screen meanwhile (tldraw draws the export beside that element, so the picture keeps them).
 - [x] `connection.test.ts`: the snapshot test answers with a PNG instead of an error.
 
 **Built on `w3/looks` beyond the plan:** `ImagesPlugin` also leaves earlier prompts' pictures out of later turns (a note in their place), and drops a picture left over from a cancelled turn. Keyless tests: `client/client/chat/snapshot.test.ts`, `context.test.ts`, `connection.test.ts`, `harness/tests/test_look_tools.py` (criteria 5's error path, 6 and 7).

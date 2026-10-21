@@ -326,6 +326,10 @@
 	pointer-events: stroke;
 	cursor: pointer;
 }
+/* a snapshot shows the link arrows in its picture (chat/snapshot.ts), not on this screen */
+.tl-canvas.pb-exporting .tl-shape[data-shape-type='arrow'] {
+	visibility: hidden;
+}
 
 /* ---------- editing the board (T14): the + handle, the link editor, the board's toast ---------- */
 .pb-handle {
