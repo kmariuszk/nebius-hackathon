@@ -11,7 +11,6 @@ Lightning names each cluster from its titles, one request per cluster (DD4).
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import math
 import os
@@ -22,9 +21,10 @@ import httpx
 import numpy as np
 
 from discovery.embeddings import Embedder
-from discovery.rerank import TOKEN_FACTORY_URL
+from discovery.rerank import model_id as super_vl_model
 from discovery.service import Discovery
-from discovery.sources import Skipped, key
+from discovery.sources import Skipped
+from discovery.tokenfactory import chat_completion, first_json_object
 
 log = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ async def cluster_papers(discovery: Discovery, paper_ids: list[str], k: int | No
         raise ValueError("k must be at least 1, or left out")
     embedder = Embedder.from_env(discovery.client)
     papers, skipped = await discovery.load_papers(unique, "paper")
-    stored, failures = await discovery._paper_vectors(embedder, list(papers.values()))
+    stored, failures = await discovery.paper_vectors(embedder, list(papers.values()))
     ids = []
     for paper_id, paper in papers.items():
         if paper.paper_id in stored:
@@ -202,42 +202,31 @@ def lightning_model() -> str:
 
 
 async def label(client: httpx.AsyncClient, titles: list[str]) -> str | None:
-    """Lightning's 2-to-4-word name for papers with these titles; None if the call fails or names nothing."""
-    try:
-        base = os.environ.get("TF_BASE_URL", "").strip() or TOKEN_FACTORY_URL
-        headers = {"Authorization": f"Bearer {key('TF_API_KEY', 'Nebius Token Factory')}"}
-        body = {
-            "model": lightning_model(),
-            "messages": [{"role": "user", "content": PROMPT + "\n\n" + "\n".join(f"- {t}" for t in titles)}],
-            "response_format": {"type": "json_object"},
-            "temperature": 0,
-            "max_tokens": 2000,
-        }
-        post = client.post(base.rstrip("/") + "/chat/completions", json=body, headers=headers, timeout=LABEL_TIMEOUT)
-        response = await asyncio.wait_for(post, LABEL_TIMEOUT)  # in all, not only between bytes
-        response.raise_for_status()
-        name = parse_label(response.json()["choices"][0]["message"].get("content") or "")
-    except (Skipped, httpx.HTTPError, TimeoutError, ValueError, KeyError, IndexError, TypeError,
-            AttributeError) as error:
-        log.warning("Lightning couldn't name a cluster: %s: %s", type(error).__name__, error)
-        return None
-    if name is None:
-        log.warning("Lightning gave no name for a cluster")
-    return name
+    """A 2-to-4-word name for papers with these titles: Lightning's, else Super VL's when Lightning
+    fails or names nothing, both without reasoning; None if neither names them."""
+    messages = [{"role": "user", "content": PROMPT + "\n\n" + "\n".join(f"- {t}" for t in titles)}]
+    for who, model in (("Lightning", lightning_model()), ("Super VL", super_vl_model())):
+        try:
+            completion = await asyncio.wait_for(  # in all, not only between bytes
+                chat_completion(client, model, messages, max_tokens=2000, timeout=LABEL_TIMEOUT), LABEL_TIMEOUT
+            )
+            name = parse_label(completion["choices"][0]["message"].get("content") or "")
+        except (Skipped, httpx.HTTPError, TimeoutError, ValueError, KeyError, IndexError) as error:
+            log.warning("%s couldn't name a cluster: %s: %s", who, type(error).__name__, error)
+            continue
+        if name is not None:
+            return name
+        log.warning("%s gave no name for a cluster", who)
+    return None
 
 
 def parse_label(content: str) -> str | None:
     """The `label` in the reply, also inside a code fence or prose; None when there is none."""
-    decoder = json.JSONDecoder()
-    for start in (i for i, char in enumerate(content) if char == "{"):
-        try:
-            value, _ = decoder.raw_decode(content, start)
-        except ValueError:
-            continue
-        if isinstance(value, dict) and isinstance(value.get("label"), str):
-            name = " ".join(value["label"].split()).strip("\"'.")
-            return name[:LABEL_CHARS].strip() or None
-    return None
+    value = first_json_object(content, lambda value: isinstance(value.get("label"), str))
+    if value is None:
+        return None
+    name = " ".join(value["label"].split()).strip("\"'.")
+    return name[:LABEL_CHARS].strip() or None
 
 
 def _unit(vector: np.ndarray) -> np.ndarray:

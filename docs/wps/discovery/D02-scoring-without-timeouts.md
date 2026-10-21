@@ -40,14 +40,14 @@
 
 `documents(texts)` returns `list[list[float] | None]`: `None` for a text whose batch failed after the retries, with the reason kept for the caller (a small `EmbedResult(vectors, failures: dict[index, reason])`).
 
-**Scoring** (`service.py`): `_paper_vectors` stores what was embedded and returns the vectors it has plus the failures. `score_candidates` scores every candidate with a vector and adds `"{n} candidates weren't scored: {reason}"` to `skipped`. When the question itself can't be embedded, or no candidate could, it raises `ValueError` with the reason, which the MCP server turns into a tool error with that text (not "Error executing tool").
+**Scoring** (`service.py`): `paper_vectors` stores what was embedded and returns the vectors it has plus the failures. `score_candidates` scores every candidate with a vector and adds `"{n} candidates weren't scored: {reason}"` to `skipped`. When the question itself can't be embedded, or no candidate could, it raises `ValueError` with the reason, which the MCP server turns into a tool error with that text (not "Error executing tool").
 
 **Warm-up.** After `search` and `find_candidates` save their papers, `Discovery` schedules `self._warm(papers)`: an `asyncio` task (kept in a set so it isn't garbage collected, at most one in flight per paper ID) that embeds the papers without a stored vector. It uses the same semaphore, so it never takes more than its share; its errors are logged at WARNING and never reach a tool. `score_candidates` doesn't wait for it: whatever the warm-up stored is a cache hit, the rest is embedded as above.
 
 ## Tasks
 
 - [x] `embeddings.py`: `BATCH`, the semaphore, timeout, retries, `EmbedResult`.
-- [x] `service.py`: partial `_paper_vectors`, `score_candidates`' `skipped` and errors, `_warm` after `search` and `find_candidates`.
+- [x] `service.py`: partial `paper_vectors`, `score_candidates`' `skipped` and errors, `_warm` after `search` and `find_candidates`.
 - [x] `.env.example` and `discovery/README.md`: `EMBED_CONCURRENCY`, the new behaviour.
 - [x] Tests in `discovery/tests/test_scoring.py`.
 

@@ -218,7 +218,7 @@ class Discovery:
             return {"top": [], "scored": 0, "skipped": skipped}
 
         await self._warmed(seeds + candidates)
-        vectors, failures = await self._paper_vectors(embedder, seeds + candidates)
+        vectors, failures = await self.paper_vectors(embedder, seeds + candidates)
         for role, papers, what in (("candidates", candidates, "scored"), ("seeds", seeds, "used")):
             reasons = Counter(failures[paper.paper_id] for paper in papers if paper.paper_id in failures)
             skipped += [f"{n} {role} weren't {what}: {reason}" for reason, n in reasons.items()]
@@ -501,7 +501,7 @@ class Discovery:
             raise Skipped("no seed found in OpenAlex")
         return await openalex.citing(self.client, work_ids, limit, since)
 
-    async def _paper_vectors(
+    async def paper_vectors(
         self, embedder: Embedder, papers: list[Paper]
     ) -> tuple[dict[str, np.ndarray], dict[str, str]]:
         """Unit vectors for the papers, embedding only those not stored for their current
@@ -534,7 +534,7 @@ class Discovery:
 
         async def warm() -> None:
             try:
-                _, failures = await self._paper_vectors(embedder, fresh)
+                _, failures = await self.paper_vectors(embedder, fresh)
                 if failures:
                     reasons = "; ".join(sorted(set(failures.values())))
                     log.warning("Warm-up left %d papers unembedded: %s", len(failures), reasons)
