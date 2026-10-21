@@ -3,7 +3,7 @@ import { Fragment, useCallback, useEffect, useLayoutEffect, useReducer, useRef, 
 import type { Editor } from 'tldraw'
 import { AgentMessage } from './AgentMessage'
 import './chat.css'
-import { chatBus, promptBlocks, type AskRequest } from './chatBus'
+import { chatBus, chatTurns, endedTurns, promptBlocks, type AskRequest } from './chatBus'
 import { chatReducer, initialChatState, type Turn } from './chatState'
 import { openAgentConnection, type AgentConnection } from './connection'
 import { addBoardContext } from './context'
@@ -203,6 +203,7 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 	useLayoutEffect(() => {
 		if (atBottom.current && body.current) body.current.scrollTop = body.current.scrollHeight
 	}, [state, status, open])
+	useTurnEvents(state.turns, body, setOpen)
 
 	const usage = state.usage
 	const tokens = usage?.used ?? lastTurn?.usage?.totalTokens
@@ -333,7 +334,7 @@ function TurnView({ turn, onAnswer }: { turn: Turn; onAnswer: (requestId: string
 	const streaming = turn.running && last?.kind === 'message'
 	const stopText = stopReasonText(turn.stopReason)
 	return (
-		<div className="ChatTurn">
+		<div className="ChatTurn" data-turn={turn.key}>
 			{turn.prompt !== null && <div className="ChatMsg-user">{turn.prompt}</div>}
 			{turn.plan && <PlanList entries={turn.plan} />}
 			{turn.items.map((item) => {
@@ -361,6 +362,34 @@ function TurnView({ turn, onAnswer }: { turn: Turn; onAnswer: (requestId: string
 
 function stopPropagation(e: SyntheticEvent) {
 	e.stopPropagation()
+}
+
+// T13's "See what it did": tells the rest of the app when a turn ends (chatTurns), and opens the
+// chat scrolled to a turn when asked
+function useTurnEvents(turns: Turn[], body: { current: HTMLDivElement | null }, setOpen: (open: boolean) => void) {
+	const before = useRef(turns)
+	useEffect(() => {
+		const ended = endedTurns(before.current, turns)
+		before.current = turns
+		for (const end of ended) chatTurns.ended(end)
+	}, [turns])
+	const [target, setTarget] = useState<string | null>(null)
+	useEffect(
+		() =>
+			chatTurns.onShow((key) => {
+				setOpen(true)
+				setTarget(key)
+			}),
+		[setOpen]
+	)
+	// once the panel is open and the turn is drawn
+	useLayoutEffect(() => {
+		const list = body.current
+		const turn = target ? list?.querySelector(`[data-turn="${target}"]`) : null
+		if (!list || !turn) return
+		list.scrollTop += turn.getBoundingClientRect().top - list.getBoundingClientRect().top
+		setTarget(null)
+	})
 }
 
 function ChatIcon() {

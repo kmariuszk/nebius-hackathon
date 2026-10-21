@@ -8,7 +8,7 @@
 | Unblocks | T13 (the changes counter), T12 |
 | Milestone | M4; the Oct 20 refresh is W3 The team edits |
 | Priority | P1 (refresh) |
-| Status | Not started. Refresh (Oct 20): see What's left; depends on [T15](T15-graph-layout-and-strings.md) (card size and strings) |
+| Status | Refresh built on branch `w3/editing` (Oct 21); the two-browser look at the + handle, the link editor and note pinning (criteria 1, 3 and 5) is still to do. Changes reach the [T13 refresh](T13-board-chrome.md)'s counter from its commit on the same branch |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -35,11 +35,18 @@ The design below stands, adapted to v6, where links are strings drawn over hidde
 
 **Tasks** (replacing the Tasks below for v6):
 
-- [ ] `Strings.tsx` and `pinboard.css`: hit paths, hover pill.
-- [ ] `client/client/editing/LinkHandle.tsx`, `LinkEditor.tsx`, `pinNotes.ts`, `guards.ts`; registration in `Room.tsx` and `sideEffects.ts`.
-- [ ] `client/client/api.ts`: `removeLink(from, to, kind)`.
-- [ ] `client/client/pinboard/Toolbar.tsx`: drag the Note.
-- [ ] Tests: pure parts in `editing/pinNotes.test.ts` (inside a card's drawn box or not, unpin distance) and `editing/guards.test.ts`.
+- [x] `Strings.tsx` and `pinboard.css`: hit paths, hover pill.
+- [x] `client/client/editing/LinkHandle.tsx`, `LinkEditor.tsx`, `pinNotes.ts`, `guards.ts`; registration in `Room.tsx` and `sideEffects.ts`.
+- [x] `client/client/api.ts`: `removeLink(from, to, kind)`.
+- [x] `client/client/pinboard/Toolbar.tsx`: drag the Note.
+- [x] Tests: pure parts in `editing/pinNotes.test.ts` (inside a card's drawn box or not, unpin distance) and `editing/guards.test.ts`.
+
+**As built (Oct 21):**
+
+- A pinned note is moved beside its paper (20 px right of the card, a little below its middle, each further note a step lower, as the v6 board and `seedDemo.ts` place it), so it never covers the card; `dx`, `dy` are then taken from the card's node, as `add_note` does. "More than a card's width" is the gap between the note and the card. A note dropped on empty board says "Note added. Drop it on a paper to pin it there."; one dragged loose, "Note unpinned."
+- tldraw removes a shape's bindings before it asks the delete handlers, so `guards.ts` also keeps the bindings and arrow ends of a refused paper or citation while that delete runs (from tldraw's `deleted-shapes` event). A paper inside a deleted cluster stays on the board, silently. Arrows a person makes get `kind: "user"`, `by` and an empty label in `sideEffects.ts`.
+- The link editor offers Hide and Delete on similar and user links, Hide only on citations, with Undo in the toast; `PUT /removed-links` goes once Undo is no longer offered (7 s), and until then `get_board` reads the room's tombstone. Labels are `meta.label` (the arrows are hidden), with `labelBy` and `editedByHuman`.
+- The board's toasts are `editing/toast.ts` and `BoardToast.tsx` (the widgets' look); the widgets keep their own. Dropping the toolbar's Note on an open paper's widget isn't handled (clicking a widget with the Note tool still works).
 
 **Acceptance criteria (refresh):** criteria 1 to 6 below, on the v6 board: the **+** handle on a card's edge, clicking a string to edit it, and a note placed or dropped on a card pinning to it (demo-script step 7).
 

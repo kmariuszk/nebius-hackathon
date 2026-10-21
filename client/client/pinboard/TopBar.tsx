@@ -1,16 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useValue, type Editor } from 'tldraw'
+import { boardApi, type Board } from '../api'
 import { GOALS } from '../shapes/card'
 import { currentGoal } from '../viewerState'
 import { boardSteps, startCatchUp } from '../widgets/tour'
 
-// The v6 top bar (docs/mockups/flashcard-v6.html): back to your boards, the board, what you're
-// looking for, the Pinboard switch, who's here, Catch me up and Chat.
+// The v6 top bar (docs/mockups/flashcard-v6.html): back to your boards, the board's title (its
+// question on hover), what you're looking for, the Pinboard switch, who's here (the agent too,
+// while it works on the board), Catch me up and Chat.
 
 export type Wall = 'paper' | 'cork'
 
 interface TopBarProps {
 	roomId: string
+	memberId: string
 	editor: Editor | null
 	wall: Wall
 	onWall: (wall: Wall) => void
@@ -18,7 +21,8 @@ interface TopBarProps {
 	onChat: () => void
 }
 
-export function TopBar({ roomId, editor, wall, onWall, chatOpen, onChat }: TopBarProps) {
+export function TopBar({ roomId, memberId, editor, wall, onWall, chatOpen, onChat }: TopBarProps) {
+	const { board, agentActive } = useBoardInfo(roomId, memberId)
 	return (
 		<header className="pb-topbar">
 			<a className="pb-back" href="/landing/home.html" title="Back to your boards">
@@ -34,7 +38,10 @@ export function TopBar({ roomId, editor, wall, onWall, chatOpen, onChat }: TopBa
 					<path d="M7 7 L10 9.5" stroke="#fff" strokeWidth="1.5" />
 				</svg>
 			</div>
-			<div className="pb-board">{roomId}</div>
+			{/* the room ID only until the board service answers */}
+			<div className="pb-board" title={board?.question || undefined}>
+				{board ? board.title || board.question || roomId : roomId}
+			</div>
 			<LookingFor />
 			<div className="pb-grow" />
 			<label className="pb-toggle" title="Switch the background between paper and a cork pinboard">
@@ -42,7 +49,7 @@ export function TopBar({ roomId, editor, wall, onWall, chatOpen, onChat }: TopBa
 				<input type="checkbox" checked={wall === 'cork'} onChange={(e) => onWall(e.target.checked ? 'cork' : 'paper')} />
 				<i />
 			</label>
-			{editor && <Avatars editor={editor} />}
+			{editor && <Avatars editor={editor} agent={agentActive} />}
 			{editor && <CatchMeUp editor={editor} />}
 			<button type="button" className="pb-btn" aria-pressed={chatOpen} onClick={onChat} title="Chat with the agent">
 				<svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
@@ -96,7 +103,43 @@ function LookingFor() {
 	)
 }
 
-function Avatars({ editor }: { editor: Editor }) {
+/**
+ * The board's title and question (GET /boards/:id) and whether an agent is working on it: read on
+ * load and when the window comes back into focus, and kept current from the board's event stream
+ * (T08's agent.active and agent.idle).
+ */
+function useBoardInfo(roomId: string, memberId: string) {
+	const [board, setBoard] = useState<Board | null>(null)
+	const [agentActive, setAgentActive] = useState(false)
+	useEffect(() => {
+		let live = true
+		const api = boardApi(roomId, memberId)
+		const load = () =>
+			api.get().then(
+				(b) => {
+					if (!live) return
+					setBoard(b)
+					setAgentActive(b.agentActive)
+				},
+				(e) => console.warn(`Couldn't read board ${roomId}:`, e)
+			)
+		void load()
+		window.addEventListener('focus', load)
+		const events = new EventSource(`/api/v1/boards/${encodeURIComponent(roomId)}/events`)
+		const active = () => setAgentActive(true)
+		const idle = () => setAgentActive(false)
+		events.addEventListener('agent.active', active)
+		events.addEventListener('agent.idle', idle)
+		return () => {
+			live = false
+			window.removeEventListener('focus', load)
+			events.close()
+		}
+	}, [roomId, memberId])
+	return { board, agentActive }
+}
+
+function Avatars({ editor, agent }: { editor: Editor; agent: boolean }) {
 	const people = useValue(
 		'people',
 		() => [
@@ -114,14 +157,17 @@ function Avatars({ editor }: { editor: Editor }) {
 					{(p.name || (p.id === 'me' ? 'You' : '?')).trim().charAt(0).toUpperCase()}
 				</div>
 			))}
-			<div className="pb-av bot" title="The agent">
-				<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-					<rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" strokeWidth="1.5" />
-					<circle cx="6" cy="9" r="1.2" fill="#fff" />
-					<circle cx="10" cy="9" r="1.2" fill="#fff" />
-					<path d="M8 4.5V2" stroke="#fff" strokeWidth="1.5" />
-				</svg>
-			</div>
+			{/* only while an agent's harness is connected to this board */}
+			{agent && (
+				<div className="pb-av bot" title="The agent is working on this board">
+					<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
+						<rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" strokeWidth="1.5" />
+						<circle cx="6" cy="9" r="1.2" fill="#fff" />
+						<circle cx="10" cy="9" r="1.2" fill="#fff" />
+						<path d="M8 4.5V2" stroke="#fff" strokeWidth="1.5" />
+					</svg>
+				</div>
+			)}
 		</div>
 	)
 }
