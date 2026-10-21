@@ -66,7 +66,7 @@ Built when the user presses Send:
 1. **Text block:** what they typed.
 2. **Selected shapes:** up to 20 from `editor.getSelectedShapes()`, each a `resource` block with `uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json` and compact JSON: `{shapeId, type, paperId?, title?, year?, status?, fit?, why?, text?, pinnedTo?, author? | createdBy?}` (`fit` and `why` for the viewer's current goal). Note, text and geo shapes get `text` from `editor.getShapeUtil(shape).getText(shape)`; frames carry their label and the paper IDs inside. Over 20: the first 20 plus "and N more selected". The open paper (`openPaperId`, T10) is added the same way when it isn't selected, shown as a "Context: Liu 2022" chip with × to leave it out (v5, `shots-v5/9-narrow.png`).
 3. **Viewport summary:** a `resource` block `tldraw://<boardId>/viewport` with `{visiblePaperIds, visibleNoteCount, zoom}`.
-4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the researcher's current view of the board:", then an `image` block from the shared renderer (section 3, target `viewport`).
+4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the board: " followed by the snapshot's caption ("Picture of the board: The researcher's current view, with 12 cards, 2 clusters"; `PICTURE_LINE` in `context.ts`), then an `image` block from the shared renderer (section 3, target `viewport`).
 5. **From the PDF reader** (T10 Phase B): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
 6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last Update suggestions, as JSON: `{since, changes: [{type, …, at}]}`, where `type` is `moved`, `link_added`, `link_renamed`, `link_hidden`, `link_removed`, `note_added`, `note_pinned`, `note_unpinned`, `note_removed`, `voted` or `cluster_renamed` ([T13](T13-board-chrome.md) lists each one's fields). The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
 
@@ -83,7 +83,7 @@ Two more session-bound tools in `BoardTools.viewer()`, alongside T06's:
 | `look_at_board` | `look_at_board(target: "viewport" \| "board" \| "papers", paper_ids: list[str] = [])` | The researcher's current view, the whole board, or just the named papers' cards and their neighbours |
 | `look_at_paper` | `look_at_paper(paper_id: str, page: int = 1)` | One rendered page of the paper's PDF |
 
-Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canvas/snapshot`) with a target from the [shared contract](README.md#shared-contracts): `look_at_board("viewport")` and `look_at_board("board")` send those targets, `look_at_board("papers", paper_ids)` sends `target: "shapes"` with `paperIds`, and `look_at_paper` sends `target: "paper_page"`. It waits up to 10 seconds, and returns a short JSON result to the model: `{"ok": true, "image": "board view, 1600×980, 41 cards visible"}` or `{"ok": false, "reason": "…"}`. The docstrings say when looking helps: layout and cluster questions, "what am I looking at", anything about a figure, chart or drawing.
+Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canvas/snapshot`) with a target from the [shared contract](README.md#shared-contracts): `look_at_board("viewport")` and `look_at_board("board")` send those targets, `look_at_board("papers", paper_ids)` sends `target: "shapes"` with `paperIds`, and `look_at_paper` sends `target: "paper_page"`. It waits up to 10 seconds, and returns a short JSON result to the model: `{"ok": true, "image": "board view, 1600×980, 41 cards visible"}` or `{"ok": false, "error": "…"}`. The docstrings say when looking helps: layout and cluster questions, "what am I looking at", anything about a figure, chart or drawing.
 
 **Getting the image in front of the model.** Token Factory's tool messages carry text only ([function calling](https://docs.tokenfactory.nebius.com/ai-models-inference/function-calling)), so the picture can't be the tool's result. Instead:
 
@@ -135,13 +135,13 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 
 ## Tests
 
-- **Keyless** (`harness/tests/test_board_vision.py`): the scripted model calls `look_at_board`; a fake ACP client answers `_canvas/snapshot` with `docs/mockups/shots/canvas.png`; assert the next `LlmRequest` has exactly one user `Content` with the caption and the PNG as `inline_data`, and the request after that has none.
-- **Live on Super VL** (`harness/tests/live/test_vision_live.py`, run with `uv run pytest -m live`, skipped without `TF_API_KEY`):
+- **Keyless** (`harness/tests/test_look_tools.py`): the scripted model calls `look_at_board`; a fake ACP client answers `_canvas/snapshot` with a PNG; the next `LlmRequest` has exactly one user `Content` with the caption and the PNG as `inline_data`, and the request after that has none. It also covers a hidden tab, the timeout, `look_at_figure`, and the request over the ACP wire.
+- **Live on Super VL** (to write: `harness/tests/live/test_vision_live.py`, run with `uv run pytest -m live`, skipped without `TF_API_KEY`):
   - Board screenshot: `canvas.png` as a prompt image; the answer mentions at least three of Tirosh, Smalley, Sade-Feldman, Lindqvist, Chen, Park, Ibrahim, and at least one cluster name.
   - Figure: `card-full.png`; the answer mentions UMAP or the tissue section.
   - Agent-initiated look: `board_assistant` on Super VL, asked "how is the board organised?", calls `look_at_board`; the fake client answers with `canvas.png`; the answer names a cluster ("Tumour ecosystem", "Checkpoint response" or "CD8 / CD4 T-cell states").
   - Thoughts separated: in every live answer, the final text contains no thought parts, and thought parts exist.
-- **Browser** (`client/client/canvas/snapshot.test.ts`): the size cap and bounds selection as pure functions; `context.test.ts` for `toContextShape` and the 20-shape cap.
+- **Browser** (`client/client/chat/snapshot.test.ts`): the size cap, bounds and captions, the link arrows' count and the timeout; `client/client/chat/context.test.ts` for `toContextShape`, the 20-shape cap, the prompt's order and Stop before the prompt is sent; `client/client/chat/connection.test.ts` for the `_canvas/snapshot` round trip through the fake harness.
 
 ## Risks
 

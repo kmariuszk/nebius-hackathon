@@ -80,7 +80,7 @@ Researchers shape the board by hand, the v4 way: drag papers, draw a link from a
 | `similar` (agent) | Renames it (your label) | Sets `hiddenByHuman` | Deletes it and records it in T08's `removed_links`, so the agent never draws it again |
 | `user` (yours or a teammate's) | Edits the label | Sets `hiddenByHuman` | Deletes it |
 
-Every edit sets `meta.editedByHuman` and `meta.labelBy` on the link, so the canvas MCP never relabels or unhides it (T02).
+Hiding a link sets `meta.hiddenByHuman` and `meta.editedByHuman`; naming it sets `meta.label`, `meta.labelBy` and `meta.editedByHuman`. Either way the canvas MCP never relabels or unhides it (T02).
 
 **Label visibility.** A label someone wrote is the arrow's own text label, so it's visible to everyone at all times. The kinds "cites" and "similar" are not stored as text: `LinkLabels.tsx` draws a small pill with the kind on the link under the pointer, on a focused link, and on every link of the open paper (T10).
 
