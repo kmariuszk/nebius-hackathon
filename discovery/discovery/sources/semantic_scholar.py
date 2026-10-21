@@ -12,7 +12,7 @@ from typing import Any
 import httpx
 
 from discovery.papers import Paper, parse_id
-from discovery.sources import Throttle
+from discovery.sources import Skipped, Throttle
 
 BASE = "https://api.semanticscholar.org"
 FIELDS = "title,year,venue,abstract,authors,externalIds,openAccessPdf,publicationTypes"
@@ -36,6 +36,9 @@ async def recommend(
         "positivePaperIds": [i for i in map(s2_id, positive) if i],
         "negativePaperIds": [i for i in map(s2_id, negative) if i],
     }
+    if not body["positivePaperIds"]:
+        # the API answers 400 "No positive paper examples given"
+        raise Skipped("no seed Semantic Scholar can look up")
     headers = {}
     if api_key := os.environ.get("SEMANTIC_SCHOLAR_API_KEY"):
         headers["x-api-key"] = api_key
