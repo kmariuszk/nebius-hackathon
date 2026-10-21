@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [T10 refresh](../tldraw-integration/T10-paper-card.md) (the widgets show these gaps) |
 | Milestone | W1 Nothing broken |
-| Status | Not started |
+| Status | Built on branch `w1/harness-bg` (Oct 20); the DH3 decision gate waits on the H01 live check |
 | Owner | TBD |
 
 ## Goal
@@ -52,12 +52,13 @@ The gaps go through the existing `finish`, which writes `gaps` with `set_card` a
 
 ## Tasks
 
-- [ ] `background.py`: the recorder, the retry, the gaps, explicit "new gaps" in `finish`, WARNING logs for failed background tool calls.
-- [ ] `context/agent.py`: two `set_card` calls in the instruction.
-- [ ] `candidates.py`: `FreshAgentTool`; `SearchTool` on top of it.
-- [ ] `master/agent.py`: the reader through `FreshAgentTool`.
-- [ ] `acp/scripted.py`: scripted models for `FreshAgentTool`.
-- [ ] Tests (below); the decision gate run; `harness/README.md` notes the new gaps.
+- [x] `background.py`: the recorder, the retry, the gaps, explicit "new gaps" in `finish`, WARNING logs for failed background tool calls.
+- [x] `context/agent.py`: two `set_card` calls in the instruction.
+- [x] `candidates.py`: `FreshAgentTool`; `SearchTool` on top of it.
+- [x] `master/agent.py`: the reader through `FreshAgentTool`.
+- [x] `acp/scripted.py`: scripted models for `FreshAgentTool`.
+- [x] Tests (below); `harness/README.md` notes the new gaps.
+- [ ] The decision gate run.
 
 ## Acceptance criteria
 

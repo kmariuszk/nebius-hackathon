@@ -11,6 +11,7 @@ from google.adk.runners import InMemoryRunner
 from google.genai import types
 
 from conftest import ScriptedLlm, call, say
+from harness.acp import scripted
 from harness.acp.adapter import build_agent
 from harness.agents.context import agent as context
 from harness.agents.master import agent as master
@@ -141,7 +142,8 @@ def of(canvas, tool: str, paper_id: str | None = None) -> list[dict]:
 
 @pytest.fixture(autouse=True)
 def no_pacing(monkeypatch):
-    monkeypatch.setattr(background, "PACE", background.Pace(1000))
+    # ProcessPapers took the shared PACE as its default when the module loaded.
+    monkeypatch.setattr(background.PACE, "per_minute", 1000)
 
 
 async def test_master_places_scored_papers_reads_them_in_the_background_and_ranks_them(canvas_mcp, papers_mcp):
@@ -226,9 +228,12 @@ async def test_master_places_scored_papers_reads_them_in_the_background_and_rank
         # The reader's artifacts are written under its model, the context agent's under its own.
         assert summary["model"] == "nvidia/Nemotron-3.5-Super-VL"
         assert card["args"]["glance"] == GLANCE and card["model"] == "nvidia/Nemotron-3_5-Lightning"
-        assert [link["args"]["links"] for link in of(canvas_mcp, "link_papers")
-                if link["args"]["links"][0]["from"] == paper_id] == [[{"from": paper_id, "to": "pmid:9",
-                                                                      "kind": "similar"}]]
+        assert [link["args"]["links"] for link in of(canvas_mcp, "link_papers") if link["model"] == card["model"]
+                and link["args"]["links"][0]["from"] == paper_id] == [[{"from": paper_id, "to": "pmid:9",
+                                                                        "kind": "similar"}]]
+    # Before that, the harness linked each paper to the one it was placed near.
+    assert of(canvas_mcp, "link_papers")[0]["args"]["links"] == [
+        {"from": "pmid:3", "to": "pmid:9", "kind": "similar"}, {"from": "pmid:1", "to": "pmid:9", "kind": "similar"}]
 
     # The context agent sees the card's quote IDs, the abstract and the reader's findings.
     contexts = [a for a in passes.built if a.name == "context"]
@@ -263,7 +268,86 @@ async def test_failed_passes_clear_the_badge_and_say_why(canvas_mcp, papers_mcp)
     assert unread["args"]["gaps"] == ["The agent couldn't read this paper: the reader's answer wasn't the JSON it should be"]
     summary, gaps = of(canvas_mcp, "set_card", "pmid:3")
     assert summary["args"]["summary"]  # the reader's part stays
-    assert gaps["args"]["gaps"][0].startswith("The agent couldn't relate this paper to the board:")
+    # The context run fails, and its retry too.
+    assert gaps["args"]["gaps"] == ["The agent couldn't write why this paper matters: list index out of range"]
+
+
+async def test_a_context_agent_that_saves_no_why_or_no_glance_leaves_a_gap(canvas_mcp, papers_mcp, caplog):
+    canvas_mcp.abstract = ABSTRACT
+    one_line = "Profiles the same exhausted T cells as your seed."
+    passes = Scripted(
+        readers={p: reader_turns(p) for p in ("pmid:1", "pmid:3")},
+        contexts={
+            "pmid:1": [say("This paper matters because it profiles exhausted T cells.")],  # no tool called
+            "pmid:3": [calls(("set_card", {"paperId": "pmid:3", "oneLine": one_line}),
+                             ("set_card", {"paperId": "pmid:3", "glance": "Samples: 12 melanomas"})),
+                       say("Done.")],
+        },
+    )
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = ScriptedLlm(turns=[
+        calls(("get_paper", {"paper_id": "pmid:1"}), ("get_paper", {"paper_id": "pmid:3"})),
+        call("add_papers", papers=[{"paperId": "pmid:1", "title": "A", "near": "pmid:9"},
+                                   {"paperId": "pmid:3", "title": "B", "near": "pmid:9"}]),
+        call("process_papers", paper_ids=[]),
+        say("Reading."),
+    ])
+
+    await turn(agent, "Place and read pmid:1 and pmid:3")
+
+    contexts = {p: [a for a in passes.built if a.name == "context" and p in text_of(a.model.requests[0])]
+                for p in ("pmid:1", "pmid:3")}
+    # No "why" from pmid:1's context agent: one retry, told what went wrong, then a gap.
+    first, retry = contexts["pmid:1"]
+    assert "didn't save" not in text_of(first.model.requests[0])
+    assert "Your last attempt didn't save. Errors: you called no tool." in text_of(retry.model.requests[0])
+    *_, gaps = of(canvas_mcp, "set_card", "pmid:1")
+    assert gaps["args"]["gaps"] == ["The agent couldn't write why this paper matters: it gave no answer"]
+    # pmid:3 has its "why" but a glance the canvas rejected: no retry, a gap, and a line in the log.
+    assert len(contexts["pmid:3"]) == 1
+    *_, why, gaps = of(canvas_mcp, "set_card", "pmid:3")
+    assert why["args"] == {"paperId": "pmid:3", "oneLine": one_line}
+    assert gaps["args"]["gaps"] == ["The agent couldn't draw the paper at a glance."]
+    assert [r for r in caplog.records if r.levelname == "WARNING"
+            and r.getMessage().startswith("background pmid:3 context set_card: Error executing tool set_card")]
+    for paper_id in ("pmid:1", "pmid:3"):
+        assert of(canvas_mcp, "mark_working", paper_id)[-1]["args"]["on"] is False
+
+
+async def test_a_context_agent_whose_first_card_write_fails_gets_a_second_try(canvas_mcp, papers_mcp):
+    canvas_mcp.abstract = ABSTRACT
+    one_line = "Profiles the same exhausted T cells as your seed."
+    claims = [{"text": "exhausted T cells", "evidence": ["q1"]}]
+    attempts = iter([
+        # claims as a bare phrase, which the canvas rejects; the model says it's done anyway
+        [call("set_card", paperId="pmid:1", oneLine=one_line, claims="exhausted T cells"), say("Done.")],
+        [call("set_card", paperId="pmid:1", oneLine=one_line),
+         call("set_card", paperId="pmid:1", claims=claims, glance=GLANCE), say("Saved.")],
+    ])
+    contexts: list[LlmAgent] = []
+
+    def context_agent(board: BoardTools) -> LlmAgent:
+        contexts.append(agent := context.build(board))
+        agent.model = ScriptedLlm(turns=next(attempts))
+        return agent
+
+    passes = Scripted(readers={"pmid:1": reader_turns("pmid:1")}, contexts={})
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=context_agent)
+    agent.model = ScriptedLlm(turns=[
+        call("get_paper", paper_id="pmid:1"),
+        call("add_papers", papers=[{"paperId": "pmid:1", "title": "A", "near": "pmid:9"}]),
+        call("process_papers", paper_ids=[]),
+        say("Reading."),
+    ])
+
+    await turn(agent, "Place and read pmid:1")
+
+    assert "Your last attempt didn't save. Errors: Error executing tool set_card" in text_of(
+        contexts[1].model.requests[0])
+    _, why, card = of(canvas_mcp, "set_card", "pmid:1")  # after the reader's summary
+    assert why["args"] == {"paperId": "pmid:1", "oneLine": one_line}
+    assert card["args"] == {"paperId": "pmid:1", "claims": claims, "glance": GLANCE}
+    assert of(canvas_mcp, "mark_working", "pmid:1")[-1]["args"]["on"] is False
 
 
 async def test_process_papers_reads_only_papers_placed_in_this_chat(canvas_mcp, papers_mcp):
@@ -286,6 +370,76 @@ async def test_process_papers_reads_only_papers_placed_in_this_chat(canvas_mcp, 
     assert [c["args"]["on"] for c in of(canvas_mcp, "mark_working", "pmid:1")] == [True, False]
 
 
+def place_near(*papers: tuple[str, str | None]) -> list[types.Content]:
+    """The master's turns: look the papers up, place each near its neighbour, answer; no process_papers."""
+    return [
+        calls(*[("get_paper", {"paper_id": paper_id}) for paper_id, _ in papers]),
+        call("add_papers", papers=[{"paperId": p, "title": "A", **({"near": n} if n else {})} for p, n in papers]),
+        say("I placed them."),
+    ]
+
+
+async def test_placed_papers_are_linked_to_their_neighbours_without_the_model(canvas_mcp, papers_mcp):
+    canvas_mcp.abstract = ABSTRACT
+    papers = [("pmid:1", "pmid:9"), ("pmid:3", "pmid:9"), ("pmid:4", "pmid:1"), ("pmid:5", None)]
+    passes = Scripted(readers={p: [say("Sorry, I couldn't read it.")] for p, _ in papers}, contexts={})
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = ScriptedLlm(turns=place_near(*papers))
+
+    events = await turn(agent, "Place these four papers")
+
+    # One call, three links: pmid:5 was placed near nothing.
+    [near] = of(canvas_mcp, "link_papers")
+    assert near["args"]["links"] == [{"from": "pmid:1", "to": "pmid:9", "kind": "similar"},
+                                     {"from": "pmid:3", "to": "pmid:9", "kind": "similar"},
+                                     {"from": "pmid:4", "to": "pmid:1", "kind": "similar"}]
+    assert (near["runId"], near["auth"], near["model"]) == (RUN_ID, "Bearer m_ana", None)
+    assert not [c for e in events for c in e.get_function_calls() if c.name == "link_papers"]
+    # After the badges go on, before the reading's own writes.
+    tools = canvas_mcp.tools_called()
+    assert tools.index("mark_working") < tools.index("link_papers") < tools.index("set_card")
+
+
+async def test_a_failed_near_link_step_is_logged_and_the_reading_still_runs(canvas_mcp, papers_mcp, caplog):
+    canvas_mcp.abstract = ABSTRACT
+    canvas_mcp.server.remove_tool("link_papers")
+    passes = Scripted(readers={"pmid:1": reader_turns("pmid:1")}, contexts={"pmid:1": [say("Nothing to add.")]})
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = ScriptedLlm(turns=place_near(("pmid:1", "pmid:9")))
+
+    await turn(agent, "Place pmid:1")
+
+    assert "could not link the papers to the ones they were placed near: link_papers: not offered by the MCP server" in [
+        r.getMessage() for r in caplog.records if r.levelname == "WARNING"]
+    summary, *_ = of(canvas_mcp, "set_card", "pmid:1")
+    assert summary["args"]["summary"]
+    assert of(canvas_mcp, "mark_working", "pmid:1")[-1]["args"]["on"] is False
+
+
+async def test_parallel_reader_calls_each_get_their_own_mcp_session(canvas_mcp, papers_mcp):
+    # "Read #1 and #2": the fast reader finishes and closes its MCP toolset while the slow one is
+    # still in get_fulltext, which must not cut the slow one off.
+    papers_mcp.fulltext_delay = 0.5
+    fast = [call("check_quotes", paper_id="pmid:3", quotes=[ABSTRACT]), say(json.dumps(reading("pmid:3")))]
+    passes = Scripted(readers={"pmid:1": reader_turns("pmid:1"), "pmid:3": fast}, contexts={})
+    agent = master.build(board_of(canvas_mcp), reader_agent=passes.reader, context_agent=passes.context)
+    agent.model = model = ScriptedLlm(turns=[
+        calls(("reader", {"request": "Paper ID: pmid:1"}), ("reader", {"request": "Paper ID: pmid:3"})),
+        say("Both read."),
+    ])
+
+    await turn(agent, "Read #1 and #2")
+
+    answers = [p.function_response.response["result"] for p in model.requests[1].contents[-1].parts]
+    assert sorted(json.loads(a)["paperId"] for a in answers) == ["pmid:1", "pmid:3"]
+    readers = [a for a in passes.built if a.name == "reader"][1:]  # the first is the tool's template
+    assert len({id(a.tools[0]) for a in readers}) == 2
+    tool_results = [p.function_response.response for a in readers for c in a.model.requests[-1].contents
+                    for p in c.parts or [] if p.function_response]
+    assert len(tool_results) == 3 and not [r for r in tool_results if r.get("isError")]
+    assert [name for name, _ in papers_mcp.calls].count("check_quotes") == 2
+
+
 async def test_pace_holds_back_calls_past_the_limit(monkeypatch):
     now = [0.0]
     slept: list[float] = []
@@ -304,10 +458,20 @@ async def test_pace_holds_back_calls_past_the_limit(monkeypatch):
 
 def test_without_a_board_the_master_is_unchanged():
     agent = master.build()
-    assert [type(t).__name__ for t in agent.tools] == ["SearchTool", "AgentTool", "McpToolset"]
+    assert [type(t).__name__ for t in agent.tools] == ["SearchTool", "FreshAgentTool", "McpToolset"]
     assert agent.tools[2].tool_filter == ["resolve_seed", "get_paper", "rerank"]
     assert agent.instruction == master.INSTRUCTION and agent.after_agent_callback is None
     assert agent.before_tool_callback is master.candidates.fill_rerank
+
+
+def test_a_scripted_run_gives_each_fresh_reader_the_script(tmp_path):
+    path = tmp_path / "script.json"
+    path.write_text(json.dumps({"reader": [{"text": "{}"}]}))
+    agent = master.build()
+    scripted.use_script(agent, str(path))
+    reader_tool = agent.tools[1]
+    assert isinstance(reader_tool, master.candidates.FreshAgentTool)
+    assert reader_tool._build().model is reader_tool.agent.model and reader_tool.agent.model.agent == "reader"
 
 
 def test_the_acp_adapter_builds_the_master_with_the_chats_board():
