@@ -6,9 +6,65 @@
 | Size | S |
 | Depends on | T04, T05 |
 | Unblocks | T09 (row click reuses focus), T12, the catch-me-up tour (harness owner) |
-| Milestone | M3 |
-| Status | Harness half done: the four tools send `_canvas/*`. Browser: `focus`, `highlight` and `open_paper` are handled; `_canvas/tour` arrives but only logs (no tour yet) |
+| Milestone | M3; the Oct 20 refresh (the tour) is W2 One clean run |
+| Priority | P1 (refresh) |
+| Status | Harness half done: the four tools send `_canvas/*`. Browser: `focus`, `highlight` and `open_paper` are handled; `_canvas/tour` arrives but only logs (no tour yet). Refresh (Oct 20) not started: see What's left |
 | Owner | TBD |
+
+## Where it stands (Oct 20)
+
+| Part | State | Where |
+| --- | --- | --- |
+| `focus`, `highlight`, `open_paper`, `tour` harness tools | Built and tested | `harness/harness/board/viewer.py`, `harness/tests/test_viewer_tools.py` |
+| Browser `focus`, `highlight`, `open_paper` | Built (files under `chat/`, not `canvas/` as planned) | `client/client/chat/viewerActions.ts`, `viewerBus.ts` |
+| `_canvas/tour` | Logged only: "the tour is not built yet" (F14) | `client/client/chat/viewerActions.ts` |
+| "Catch me up (N)" | Built in the top bar, but it only cycles `openPaperId` through the new papers: no tour bar, no agent line, no Prev/Next/Done/× (F14) | `client/client/pinboard/TopBar.tsx`, `CatchMeUp` |
+| Keep / Discard during Catch me up | Keep stays on the same paper; Discard closes the widgets (F15) | `client/client/widgets/parts.tsx`, `ActionsWidget` |
+| `?tour=1` from Home | Ignored | `client/client/pages/Room.tsx` |
+| Busy-user queue, "Follow the agent" | Not built | — |
+
+## What's left (v6)
+
+The spec is the v6 demo board (`client/public/landing/demo-board.html`, "Catch me up") and [`shots-v6/15-catchup.png`](../../mockups/shots-v6/15-catchup.png).
+
+**Decision D24: Catch me up is a local tour.** The top bar's button starts the tour in the browser from the board's own data, with no prompt to the agent; the agent can still start one with `_canvas/tour`. This replaces T13's "sends the prompt Catch me up": the button works with the chat closed, costs nothing, and the agent's lines already exist on the cards.
+
+**Tour state** (`client/client/viewerState.ts`): `tour = atom<{ title: string; steps: { paperId: string; line: string }[]; i: number } | null>('tour', null)`. A pure reducer in `client/client/widgets/tour.ts`:
+
+| Action | Effect |
+| --- | --- |
+| `start(steps, title)` | `i = 0`; opens the first paper (`openPaperId`), its widgets grow out of its node (T10) |
+| `next` / `prev` | Moves `i`, opens that paper |
+| `voted(paperId, decision)` | Keep: next step. Discard: the paper leaves the steps, the next one opens. After the last step: `end` |
+| `end` (Done, ×, Escape, last step voted) | `tour = null`, widgets close, the camera flies back to where it was; [T16](T16-start-and-home-pages.md) posts `/seen` |
+
+**Where steps come from:**
+
+| Source | Steps |
+| --- | --- |
+| "Catch me up (N)" (`TopBar.tsx`) | `boardDerived(editor).fresh` (new, not discarded, in the viewer's ranking order); each line is the card's `scores[currentGoal].why`, else its `oneLine`, else "New since your last visit" |
+| `?tour=1` (`Room.tsx`) | The same, once the room has synced and has at least one fresh paper; the parameter is removed from the URL |
+| `_canvas/tour` (`viewerActions.ts`) | The agent's `steps` and `title`, papers not on the board dropped |
+
+**The tour bar** sits in the actions widget under the node (T10's `ActionsWidget`): "CATCH-UP · i OF n", one dot per step, the line, ‹ Prev, Next › (Done on the last step) and ×; Keep and Discard stay beside it and move on.
+
+**Deferred** (not in the demo script): the busy-user queue and "Follow the agent" (acceptance criteria 4 and 5 above stay open).
+
+**Tasks:**
+
+- [ ] `client/client/viewerState.ts`: `tour`; `client/client/widgets/tour.ts`: the reducer and `stepsFromBoard(derived, goal)`.
+- [ ] `client/client/pinboard/TopBar.tsx`: `CatchMeUp` starts the tour.
+- [ ] `client/client/pages/Room.tsx`: `?tour=1`.
+- [ ] `client/client/chat/viewerActions.ts`: `_canvas/tour` starts the tour.
+- [ ] `client/client/widgets/parts.tsx`: the tour bar in `ActionsWidget`; Keep and Discard call `voted` (through the T10 refresh's `onVoted`).
+- [ ] `client/client/widgets/tour.test.ts`.
+
+**Acceptance criteria (refresh, replacing 6 above for v6):**
+
+1. On a board with three new papers, "Catch me up 3" opens the first in the viewer's ranking order with "CATCH-UP · 1 OF 3" and its why line under the node; Next and Prev move between them; × ends the tour and the camera returns.
+2. Keep records the vote for everyone and opens paper 2; Discard on paper 2 opens paper 3; voting on the last paper ends the tour (demo-script steps 4 and 5).
+3. Opening `/<board>?tour=1` starts the same tour once the board has loaded.
+4. An agent's `_canvas/tour` with two steps runs the same tour with the agent's lines; a teammate's view never moves.
 
 ## Goal
 

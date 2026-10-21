@@ -84,12 +84,13 @@ What the v5 board ([mockup](../../mockups/README.md)) needs from agents. Most of
 
 The board service is an MCP client of the papers MCP for paper details (T08) and quote checks (T02).
 
-| Tool | Status on `main` | We read | Used by |
+| Tool | Status on `main` (Oct 20) | We read | Used by |
 | --- | --- | --- | --- |
-| `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type`, and (wanted, [I9](#i9-discovery-data-the-v5-widgets-show)) `citedBy`, `peerReviewed`, `retracted` | T08 paper record, T02 `add_quote` check against the abstract, T10 widgets |
-| `get_fulltext(paper_id)` | Planned (Concept) | `sections[{title, text, page}]`, `source` | T02 `add_quote` check against full text, T10 |
-| `get_figures(paper_id)` | Planned | `[{figureId, caption, imageUrl, page, bbox}]` | The figure widget via `set_card` (T10) |
-| `cluster_papers(paper_ids)` | Planned (discovery owner, in progress Oct 18) | `clusters [{clusterId, paperIds, label}]`, `similarities [{a, b, similarity}]` (k nearest neighbours per paper) | T02 `apply_clusters`, which calls it itself, so clusters come from data rather than from the agent |
+| `get_paper(paper_id)` | Exists | `paperId`, `ids`, `title`, `authors`, `year`, `venue`, `url`, `abstract`, `openAccessPdf`, `type`, and (wanted, [I9](#i9-discovery-data-the-v5-widgets-show)) `citedBy` (planned in the [T09 refresh](T09-ranked-list.md)), `peerReviewed`, `retracted` | T08 paper record, T02 `add_quote` check against the abstract, T10 widgets |
+| `get_fulltext(paper_id)` | Exists (`sections[{title, text}]`, `source`, `figures[{figureId, label, caption}]`; no page numbers); figures gain `imageUrl` in [D05](../discovery/D05-real-figures.md) | `sections`, `source` | The reader agent; T02 `add_quote` still checks the abstract only |
+| `get_figures(paper_id)` | Planned in [D05](../discovery/D05-real-figures.md): `{paperId, source, figures: [{figureId, label, caption, imageUrl}], skipped}` (no `page` or `bbox`) | `figures` | The background's figure write via `set_card` (D05), the figure widget (T10), `look_at_figure` (T07 refresh) |
+| `cluster_papers(paper_ids)` | Planned in [D04](../discovery/D04-clusters-from-data.md), with this shape | `clusters [{clusterId, paperIds, label}]`, `similarities [{a, b, similarity}]` (k nearest neighbours per paper) | T02 `apply_clusters`, which calls it itself, so clusters come from data rather than from the agent |
+| `citation_links(paper_ids)` | Planned in [D03](../discovery/D03-citation-links.md) | `links [{from, to, source}]` (`from` cites `to`), `skipped` | The harness's citation step, which writes `link_papers` kind `cites` with `source` (D03) |
 
 Until a planned tool exists, the feature that needs it is hidden, not faked: `add_quote` checks only the abstract, the widgets show no figure, and `apply_clusters` and `label_cluster` aren't listed. The canvas MCP reads the papers MCP's tool list on each request, cached for 30 seconds, so the cluster tools appear without a board service restart once discovery serves `cluster_papers`.
 
@@ -121,6 +122,7 @@ Found while checking the model on Oct 18 (`uv run python -m harness.check` and s
 | **Reasoning can be turned off per call** with `chat_template_kwargs: {"enable_thinking": false}` | Faster, cheaper replies for simple steps | Expose it per slot in `models.py` (for example a `super_vl(thinking=False)` variant passing the extra body through `LiteLlm`), and use it where reasoning adds nothing |
 | **Rate limits start at 60 requests and 400,000 tokens a minute** and scale up with sustained use; over the limit gives HTTP 429 with `Retry-After` ([docs](https://docs.tokenfactory.nebius.com/ai-models-inference/rate-limits)) | Bulk scoring (hundreds of Lightning calls) will hit 429 | Concurrency limit and `Retry-After` handling in the discovery service's scoring; Token Factory also offers a Batch API with higher limits |
 | **Images are cheap**: about 1,400 prompt tokens for a 275 KB board screenshot | Visual context is affordable | The reader agent can look at page images and figures as well as Parse's text |
+| **Lightning writes placeholders for optional arguments** (Oct 19 live run): `since: "None"`, `sources: "None"`, `exclude_ids: "None"` as strings | The papers MCP accepted `since`, and every source returned nothing or HTTP 400; the search agent retried over a dozen times | The harness drops placeholder values from optional MCP arguments ([H02](../agent-harness/H02-clean-tool-arguments.md)) and the papers MCP treats them as unset ([D01](../discovery/D01-validate-optional-arguments.md)) |
 
 ## I9. Discovery data the v5 widgets show
 
@@ -130,11 +132,11 @@ v4's "What the UI needs from the backend" lists fields the discovery service sup
 | --- | --- | --- |
 | `scores` per goal | Node colour, ranked list, the fit line in "Why it matters to you" | `score_candidates` per board goal (Concept), written with `set_scores` |
 | `glance[]` | "The paper at a glance" | The agent (reader or context agent) extracts 3–4 steps from the abstract (samples, method, readout, finding), each with a label, a short text, the ID of the quote it comes from, and `same`, `adds` or `other` against the seeds; written with `set_card`. The app draws the diagram, so no image model is involved |
-| `citedBy` | Under More ("What supports this"), quality filter | Semantic Scholar counts (v4 used them), on the paper record and in `add_papers` |
+| `citedBy` | Under More ("What supports this"), quality filter | Semantic Scholar counts (v4 used them), on the paper record and in `add_papers`; not emitted yet, planned in the [T09 refresh](T09-ranked-list.md) (OpenAlex `cited_by_count`, Semantic Scholar `citationCount`) |
 | `foundBy` | Under More, how the paper was found | Discovery's own account per candidate (for example `pubmed`, `cites 3 seeds`), in `add_papers` |
 | `type`, `peerReviewed` | Preprint or Review flag on the title, ranked list status, type and quality filters | As discovery emits it today (`article`, `review`, `preprint`, or OpenAlex's raw `work.type`); T02 normalises to `article`, `review`, `preprint` or `other` (T01). Preprints mean not peer reviewed; `peerReviewed` is null when unknown |
 | `retracted` | Never shown | PubMed marks retractions; `add_papers` skips them |
-| `figures[]` with the figure picked per goal | Figure widget, ranked list thumbnail | PMC figures (v4: `efetch db=pmc` captions, images from the article page); written with `set_card` |
+| `figures[]` with the figure picked per goal | Figure widget, ranked list thumbnail | PMC figures (v4: `efetch db=pmc` captions, images from the article page); written with `set_card`. Planned in [D05](../discovery/D05-real-figures.md): one figure per paper, the reader's pick by caption; a figure per goal stays later work |
 | Model and time per step | Chat steps only | The trace plugin (T04); the widgets carry a plain "AI" tag, and the `X-Model` header (T02) fills each field's `provenance` |
 
 v4's notes from building the mockup also apply: OpenAlex's shared keyless budget runs out at a venue (use a key, or PubMed's `elink` citations); PMC figure pages sometimes return a block page (retry slowly); remove seeds before ranking; show all-capital titles in sentence case (T01 does this on display).

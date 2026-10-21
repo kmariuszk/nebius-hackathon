@@ -3,12 +3,41 @@
 | Field | Value |
 | --- | --- |
 | Lane | Browser + Harness (board half) |
-| Size | M |
+| Size | M as planned; L for the Oct 20 refresh (nothing is built yet, plus `look_at_figure` and the export with strings) |
 | Depends on | T04, T05 (T10 for paper pages) |
 | Unblocks | T12 |
-| Milestone | M3 (board), M4 (paper pages) |
-| Status | Not started |
+| Milestone | M3 (board), M4 (paper pages); the Oct 20 refresh is W3 The team edits |
+| Priority | P2 (refresh) |
+| Status | Not started, apart from the prompt mapping in the harness. Refresh (Oct 20): see What's left; depends on the [T05 refresh](T05-chat-panel.md) and, for `look_at_figure`, [D05](../discovery/D05-real-figures.md) |
 | Owner | TBD |
+
+## Where it stands (Oct 20)
+
+| Part | State | Where |
+| --- | --- | --- |
+| Context tags in the user's message (`<selected-shape>`, `<viewport>`, `<board-changes>`, `<board-context>`, images) | Built on the harness side | `harness/harness/acp/mapping.py`, `harness/harness/board/prompts.py` (`BOARD_CONTEXT`) |
+| The chat panel sending selected shapes, the viewport and its image | Not built: the panel sends text only | `client/client/chat/ChatPanel.tsx` |
+| `_canvas/snapshot` | The browser answers with a "not supported yet" error (F22) | `client/client/chat/connection.ts`, `connection.test.ts` ("_canvas/snapshot gets a \"not supported yet\" error") |
+| `look_at_board`, `look_at_paper` and the image plugin | Not built | — |
+| PDF reader (for `paper_page`) | Not built and out of scope (T10's Phase B) | — |
+
+## What's left (v6)
+
+Everything in the Design below still stands, with these changes for v6 and for what exists now:
+
+**Decision D25: the agent looks at a figure through its image URL, not a PDF page.** There is no PDF reader, so the `paper_page` snapshot target is dropped. Instead, a harness tool `look_at_figure(paper_id)` reads the card's `figure.imageUrl` (set by [D05](../discovery/D05-real-figures.md); via `get_board`'s paper or `get_figures`) and adds the image to the next model call as a user message with an `image_url` part, the same way the plugin adds snapshots (Token Factory takes images by URL). No browser is involved. Without a figure it returns `{ok: false, error: "This paper has no figure on the board."}`.
+
+**The board in a snapshot.** v6 draws the links as strings in an overlay (`client/client/pinboard/Strings.tsx`), and `getShapeVisibility` hides the arrows, so `editor.toImage` would leave the strings out. The snapshot handler exports with the arrows visible (a per-export visibility override, or a temporary atom read by `getShapeVisibility`), so the picture shows the links as lines; papers render through `PaperCardShapeUtil.toSvg`.
+
+**Where it lives:** the snapshot handler in `client/client/chat/snapshot.ts` (not `canvas/snapshot.ts` as the Tasks below say), registered next to `viewerActions.ts`; the prompt blocks (selection, viewport, "Include my view") in `client/client/chat/context.ts` as planned, appended by `ChatPanel.tsx`'s `send` alongside the T05 refresh's resources; the harness tools in `harness/harness/board/viewer.py` (`look_at_board`, `look_at_figure` instead of `look_at_paper`) and the plugin in `harness/harness/acp/images.py`.
+
+**Tasks** (the original Tasks below, minus `paper_page`, plus):
+
+- [ ] `look_at_figure` in `viewer.py`, through the same image plugin.
+- [ ] Arrows visible during export.
+- [ ] `connection.test.ts`: the snapshot test answers with a PNG instead of an error.
+
+**Acceptance criteria (refresh):** criteria 1, 2, 3, 5, 6 and 7 below stand; criterion 4 becomes: "With a paper open that has a figure, 'what does this figure show?' makes the agent call `look_at_figure` (a tool card shows it) and describe the figure's panels, axes or drawing, not just its caption."
 
 ## Goal
 

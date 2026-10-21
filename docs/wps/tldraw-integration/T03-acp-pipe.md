@@ -7,7 +7,7 @@
 | Depends on | T00 (the upgrade handler's try/catch), T04 echo mode (or any stdio ACP agent) |
 | Unblocks | T05 |
 | Milestone | M1 |
-| Status | Not started |
+| Status | Done and merged ([PR #13](https://github.com/kmariuszk/nebius-hackathon/pull/13), Oct 18): `client/server/acpPipe.ts` and `acpPipe.test.ts`; a harness that exits first no longer crashes the pipe (PR #16). Checked Oct 20; nothing left in the finish plan |
 | Owner | TBD |
 
 ## Goal

@@ -7,7 +7,7 @@
 | Depends on | T02 to T07 (T08 to T11, T13 and T14 for their beats); the harness owner's `master` and the discovery pipeline for the full discovery run |
 | Unblocks | The demo video |
 | Milestone | M5 |
-| Status | Not started |
+| Status | Not started. Oct 20: the live discovery run moves to [H01](../agent-harness/H01-live-board-check.md) (the finish plan's gate, with relaxed timing targets); the keyless end-to-end test, the Docker smoke test and the memory measurement are deferred (out of the finish plan) |
 | Owner | TBD |
 
 ## Goal

@@ -6,9 +6,41 @@
 | Size | M |
 | Depends on | T01, T06 (focus), T08 (votes) |
 | Unblocks | T12 |
-| Milestone | M4 |
-| Status | Not started |
+| Milestone | M4; the Oct 20 refresh (filters) is W3 The team edits |
+| Priority | P2 (refresh) |
+| Status | Ranked list and "Looking for" built in the v6 look (merged with PR #21, Oct 18); filters not built. Refresh (Oct 20) not started: see What's left |
 | Owner | TBD |
+
+## Where it stands (Oct 20)
+
+| Part | State | Where |
+| --- | --- | --- |
+| Ranked list (toggle, rows in the agent's order for the goal, fit, New, Split vote, Preprint, Review, why line, thumbnail or "no figure", row click opens the paper) | Built (files under `pinboard/`, not `ranked/` as planned) | `client/client/pinboard/RankedList.tsx` |
+| "Looking for" re-ranks and recolours, per viewer | Built | `client/client/pinboard/TopBar.tsx` (`LookingFor`), `viewerState.ts` (`currentGoal`), `client/client/shapes/card.ts` (`boardDerived`) |
+| `filters` atom (fit, types, peer reviewed, minimum citations, year, show discarded) | Exists, with no UI (F21) | `client/client/viewerState.ts` |
+| Discarded papers hidden unless shown | Built through `getShapeVisibility`; nothing turns `showDiscarded` on | `client/client/shapes/index.ts` |
+| Ranking, card numbers and Catch me up following the filters | No: `boardDerived` reads the goal only | `client/client/shapes/card.ts` |
+| `citedBy`, `peerReviewed` on cards | Never set: discovery's paper records carry neither, and the harness's `CARD_FIELDS` leaves them out | `discovery/discovery/papers.py`, `harness/harness/agents/master/candidates.py` |
+
+## What's left (v6)
+
+The spec is the v6 demo board's **Filter** button in the bottom toolbar, next to **Note** (`client/public/landing/demo-board.html`), and the Filter section of the [mockups README](../../mockups/README.md).
+
+- **`client/client/pinboard/filters.ts`** (pure, tested): `passes(card, filters, goal)` for suggestions (seeds and kept papers always pass), `activeCount(filters)`, `DEFAULT_FILTERS`.
+- **`boardDerived` applies the filters** (`client/client/shapes/card.ts`): `ranked`, `ranks` and `fresh` only hold papers that pass, so the card's red rank number, the ranked list and Catch me up agree; the header says "Showing N of M · Clear" when a filter is on.
+- **`client/client/pinboard/FilterPanel.tsx`**: a "Filter" button in `PinboardToolbar` with the count of active filters; its popover has fit (high, medium, low for the current goal), type (article, review, preprint), "Peer reviewed only (hides preprints)", "Cited at least 10× / 50×", "From year", "Show discarded papers (N)", and Clear. Options whose data no card has (no `citedBy` anywhere, say) are hidden, not shown empty.
+- **Fade on the board:** suggestions that don't pass fade to 25 % for this viewer only (a class the card reads from the atom, like `lit`), never hidden.
+- **Citation counts:** discovery's `Paper` gains `cited_by` (OpenAlex `cited_by_count`, Semantic Scholar `citationCount`), emitted as `citedBy` in records and summaries; `CARD_FIELDS` in `harness/harness/agents/master/candidates.py` gains `citedBy`, so `add_papers` fills it. `peerReviewed` follows `type` (`preprint` → false) when the source doesn't say.
+
+**Tasks:**
+
+- [ ] `client/client/pinboard/filters.ts` and `filters.test.ts`.
+- [ ] `client/client/shapes/card.ts`: filters in `derive`.
+- [ ] `client/client/pinboard/FilterPanel.tsx`; the button in `Toolbar.tsx`; fade in `PaperCardShapeUtil.tsx` and `paperCard.css`.
+- [ ] `client/client/pinboard/RankedList.tsx`: "Showing N of M · Clear".
+- [ ] `discovery/discovery/papers.py`, `sources/openalex.py`, `sources/semantic_scholar.py`: `cited_by`; `harness/harness/agents/master/candidates.py`: `citedBy` in `CARD_FIELDS`.
+
+**Acceptance criteria (refresh):** criteria 1 to 6 below hold on the v6 board, with the Filter button in the bottom toolbar; and the red rank numbers on the cards always match the ranked list's order under the current filters.
 
 ## Goal
 

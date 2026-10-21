@@ -6,9 +6,52 @@
 | Size | L (Phase A, the widgets: M; Phase B, PDF reading: M) |
 | Depends on | T01, T08 (T06 for Catch me up and lighting up seeds; votes go through the editor until T08 exists) |
 | Unblocks | T12 |
-| Milestone | M4 |
-| Status | Not started |
+| Milestone | M4; the Oct 20 refresh is W2 One clean run |
+| Priority | P1 (refresh) |
+| Status | Phase A (the widgets) built and on `main` by Oct 18, in the v6 look since PR #21; Phase B (PDF reading) not started and out of the Oct 20 plan. Refresh (Oct 20) not started: see What's left |
 | Owner | TBD |
+
+## Where it stands (Oct 20)
+
+| Part | State | Where |
+| --- | --- | --- |
+| Widgets around the opened node: title, Why it matters to you, The paper at a glance, figure, actions, Team notes, What supports this (More), linked papers | Built | `client/client/widgets/PaperWidgets.tsx`, `parts.tsx`, `placement.ts` |
+| Fade to what's linked, peek "three of your seeds", claim and glance quotes on hover | Built | `widgets/fade.ts`, `claims.ts`, `parts.tsx` |
+| Keep, Discard, Undo through the vote route | Built; Keep doesn't move on during Catch me up (F15) | `widgets/votes.ts`, `parts.tsx` (`ActionsWidget`) |
+| Two columns with the list and chat open | Built | `widgets/placement.ts` |
+| Pinning a note by clicking a widget with the Note tool | Built | `PaperWidgets.tsx` (`Anchored`, `onNoteTool`), `widgets/boardWrites.ts` |
+| Empty states | Glance shows "Reading the paper…" and the figure "Finding the most relevant figure…" whenever they're empty, even after the reading ended or failed, and on every seed, which is never read (F20) | `parts.tsx` (`GlanceWidget`, `FigureWidget`) |
+| "Find more like this" | Dispatches `pdc:ask`; nobody listens (F18) | `parts.tsx` |
+| Real figures | The widget is built; no figure ever reaches a card ([D05](../discovery/D05-real-figures.md)) | `parts.tsx` (`FigureWidget`) |
+
+## What's left (v6)
+
+**Empty states that end** (F20), keyed on the card's `working` flag, its `gaps` and its `kind`:
+
+| Widget | While `working` | Not working, empty | Seed (never read) |
+| --- | --- | --- | --- |
+| Why it matters to you | The current "Still reading…" line | The card's gap that starts "The agent couldn't write why…" ([H03](../agent-harness/H03-background-never-silent.md)), else "The agent hasn't explained this paper yet." | "One of your seed papers." and its fit line hidden |
+| The paper at a glance | Spinner and skeleton, as now | The gap "The agent couldn't draw the paper at a glance.", else the widget is hidden | Hidden |
+| Figure | "Finding the most relevant figure…" | "No free figure for this paper." in small type | Hidden unless the card has a figure |
+
+**A hook for the tour:** `ActionsWidget` takes an `onVoted(decision)` callback from `PaperWidgets`, called after a vote succeeds, which the [T06 refresh](T06-viewer-actions.md)'s tour uses to move on; the tour bar renders inside the same widget.
+
+**Find more** goes through the [T05 refresh](T05-chat-panel.md)'s `chatBus.ask`.
+
+**Out of this plan:** Phase B (PDF reading, shared highlights, "Ask about this area"); criterion 9 below stays open.
+
+**Tasks:**
+
+- [ ] `client/client/widgets/parts.tsx`: the empty states; `onVoted`; Find more through `chatBus`.
+- [ ] `client/client/widgets/PaperWidgets.tsx`: pass `onVoted` and the tour state.
+- [ ] Tests: a pure `emptyState(card, widget)` helper in `widgets/emptyStates.ts` with `emptyStates.test.ts` (working, failed with a gap, seed, figure present).
+
+**Acceptance criteria (refresh):**
+
+1. Opening a seed shows "One of your seed papers." and no spinner anywhere.
+2. Opening a card whose context pass failed shows the gap text in "Why it matters to you" and no endless spinner.
+3. A paper without a figure shows "No free figure for this paper." once its reading has finished.
+4. During a tour, Keep and Discard move to the next paper (with the T06 refresh).
 
 ## Goal
 

@@ -7,7 +7,7 @@
 | Depends on | T02, T08 |
 | Unblocks | T12 (the "same board from Claude Code" demo beat) |
 | Milestone | M5 |
-| Status | Not started |
+| Status | Not started; deferred: out of the Oct 20 finish plan (see the [top-level README](../README.md#out-of-scope-for-the-finish-plan)). The canvas MCP already accepts a member bearer, so an external client can connect for a demo |
 | Owner | TBD |
 
 ## Goal
