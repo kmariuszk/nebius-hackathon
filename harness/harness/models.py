@@ -28,21 +28,33 @@ def super_vl() -> LiteLlm:
 
 
 def lightning() -> LiteLlm:
-    """The search and context agents: fast, high-volume tool calls."""
-    return token_factory(settings.get("LIGHTNING_MODEL", LIGHTNING), LIGHTNING_TIMEOUT)
+    """The search and context agents: fast, high-volume tool calls.
+
+    A call that fails twice goes to Super VL instead: on Oct 21 Lightning stopped answering for
+    minutes twice while Super VL kept answering in seconds.
+    """
+    return token_factory(
+        settings.get("LIGHTNING_MODEL", LIGHTNING), LIGHTNING_TIMEOUT, fallback=settings.get("SUPER_VL_MODEL", SUPER_VL)
+    )
 
 
-def token_factory(model_id: str, timeout: float = MODEL_TIMEOUT) -> LiteLlm:
+def token_factory(model_id: str, timeout: float = MODEL_TIMEOUT, fallback: str | None = None) -> LiteLlm:
     """Any Token Factory model, through LiteLLM's OpenAI-compatible provider.
 
     A failed call, such as a 429 or one that takes longer than `timeout` (or the
     `MODEL_TIMEOUT` setting), is retried twice (LiteLLM backs off exponentially on a 429),
-    since the limit is shared by the chat, the background and the papers MCP.
+    since the limit is shared by the chat, the background and the papers MCP. With a
+    `fallback` model it is retried once, then sent to that model. The OpenAI client's own
+    retries are off, so a stuck call costs `timeout` per try, not three times that.
     """
+    timeout = float(settings.get("MODEL_TIMEOUT", "") or timeout)
+    fallbacks = [{"model": f"openai/{fallback}", "timeout": max(timeout, MODEL_TIMEOUT)}] if fallback else None
     return LiteLlm(
         model=f"openai/{model_id}",
         api_base=settings.get("TF_BASE_URL", TOKEN_FACTORY_URL),
         api_key=settings.require("TF_API_KEY"),
-        num_retries=2,
-        timeout=float(settings.get("MODEL_TIMEOUT", "") or timeout),
+        num_retries=1 if fallback else 2,
+        max_retries=0,
+        timeout=timeout,
+        **({"fallbacks": fallbacks} if fallbacks else {}),
     )
