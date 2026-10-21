@@ -6,10 +6,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { clusterShapeId, paperShapeId } from '../shared/ids.ts'
-import type { PaperCardShape } from '../shared/shapes.ts'
+import { CARD_SIZE, type PaperCardShape } from '../shared/shapes.ts'
 import { addNote, addPapers, getBoard, ToolError, type ToolContext } from './canvasTools.ts'
 import { applyClusters, labelCluster } from './clusterTools.ts'
-import { centre, isFree, shapeBoxes } from './layout.ts'
+import { centre, isFree, MARGIN, shapeBoxes } from './layout.ts'
 import type { ClusterResult, PapersClient } from './papersClient.ts'
 import { closeAllRooms, patchShapes, putShapes, readRoom, setRoomsDir } from './rooms.ts'
 
@@ -136,6 +136,28 @@ test('apply_clusters puts the agent’s papers into named frames and leaves peop
 	assert.deepEqual(['a', 'b', 'c', 'd', 'e'].map((id) => card(ctx, id)), cards)
 })
 
+test('apply_clusters fits nine cards in a frame: none overlap as drawn and each is inside the frame’s inner box', async () => {
+	const ctx = newCtx()
+	const ids = Array.from({ length: 9 }, (_, i) => `p${i}`)
+	addPapers(ctx, { papers: ids.map((id) => paper(id)) })
+	clusters = { clusters: [{ clusterId: 'c9', paperIds: ids, label: 'Nine' }], similarities: [] }
+	await applyClusters(ctx, {})
+	const f = frame(ctx, 'c9')
+	const inner = { x: f.x + MARGIN, y: f.y + MARGIN, w: f.props.w - 2 * MARGIN, h: f.props.h - 2 * MARGIN }
+	// what the browser draws: a CARD_SIZE card centred on each node
+	const drawn = ids.map((id) => {
+		const c = card(ctx, id)
+		assert.equal(c.parentId, f.id)
+		const [x, y] = [f.x + c.x + c.props.w / 2 - CARD_SIZE.w / 2, f.y + c.y + c.props.h / 2 - CARD_SIZE.h / 2]
+		return { x, y, w: CARD_SIZE.w, h: CARD_SIZE.h }
+	})
+	for (const b of drawn) {
+		assert.ok(b.x >= inner.x && b.y >= inner.y && b.x + b.w <= inner.x + inner.w && b.y + b.h <= inner.y + inner.h)
+	}
+	drawn.forEach((b, i) => assert.ok(isFree(drawn.slice(0, i), b), `${ids[i]} overlaps another card`))
+	assertNoOverlaps(ctx)
+})
+
 test('add_papers near a clustered paper, or near a cluster, joins it; a full frame grows unless a person edited it', async () => {
 	const ctx = newCtx()
 	addPapers(ctx, { papers: [paper('a'), paper('b')] })
@@ -169,9 +191,11 @@ test('notes pinned to a clustered paper go beside it, outside the frame; a perso
 	addPapers(ctx, { papers: ['a', 'b', 'c'].map((id) => paper(id)) })
 	const { shapeId } = addNote(ctx, { text: 'Read the methods', paperId: 'a' })
 	const people = { ...card(ctx, 'c') }
+	// 24 px right of the drawn card
+	const dx = people.props.w / 2 + CARD_SIZE.w / 2 + 24
 	putShapes(ctx.boardId, [
-		{ id: 'shape:their-note', type: 'note', x: people.x + 80, y: people.y, props: get<TLShape>(ctx, shapeId).props, meta: { author: 'm_ben' } },
-		{ typeName: 'binding', id: 'binding:their-pin', type: 'note-pin', fromId: 'shape:their-note', toId: people.id, props: { dx: 80, dy: 0 }, meta: {} },
+		{ id: 'shape:their-note', type: 'note', x: people.x + dx, y: people.y, props: get<TLShape>(ctx, shapeId).props, meta: { author: 'm_ben' } },
+		{ typeName: 'binding', id: 'binding:their-pin', type: 'note-pin', fromId: 'shape:their-note', toId: people.id, props: { dx, dy: 0 }, meta: {} },
 	])
 	clusters = { clusters: [{ clusterId: 'c1', paperIds: ['a', 'b', 'c'], label: 'Methods' }], similarities: [] }
 
@@ -184,8 +208,11 @@ test('notes pinned to a clustered paper go beside it, outside the frame; a perso
 	const frameBox = boxes.get(clusterShapeId('c1'))!
 	assert.ok(isFree([frameBox], note), 'the note sits outside the frame')
 	const pin = all(ctx).find((r) => r.typeName === 'binding' && r.type === 'note-pin' && r.fromId === shapeId) as TLBinding<'note-pin'>
-	const cardBox = boxes.get(card(ctx, 'a').id)!
-	assert.deepEqual({ dx: note.x - cardBox.x, dy: note.y - cardBox.y }, pin.props)
+	// the pin's offset is from the node's page position, not from the card drawn around it
+	const a = card(ctx, 'a')
+	assert.equal(a.parentId, clusterShapeId('c1'))
+	assert.deepEqual({ dx: note.x - (frameBox.x + a.x), dy: note.y - (frameBox.y + a.y) }, pin.props)
+	const cardBox = boxes.get(a.id)!
 	const [n, c] = [centre(note), centre(cardBox)]
 	assert.ok(Math.hypot(n.x - c.x, n.y - c.y) < 400, 'the note stays beside its paper')
 	assertNoOverlaps(ctx)

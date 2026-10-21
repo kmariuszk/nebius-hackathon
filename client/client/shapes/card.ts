@@ -1,12 +1,13 @@
 import { computed, type Computed, type Editor, type TLShapeId } from 'tldraw'
-import type { PaperCardShape } from '../../shared/shapes'
-import { currentGoal } from '../viewerState'
+import { CARD_SIZE, type PaperCardShape } from '../../shared/shapes.ts'
+import { currentGoal } from '../viewerState.ts'
 
 // The v6 card (docs/mockups/flashcard-v6.html): every paper is a 172×70 card, centred where the
-// node's props.w × props.h box is, so the server's layout and the widgets keep working unchanged.
+// node's props.w × props.h box is, so the widgets keep working unchanged. The server's layout
+// keeps the same CARD_SIZE clear around every node.
 
-export const CARD_W = 172
-export const CARD_H = 70
+export const CARD_W = CARD_SIZE.w
+export const CARD_H = CARD_SIZE.h
 
 /** Where the card sits inside the shape's own space. */
 export const cardOffset = (shape: PaperCardShape) => ({
@@ -96,10 +97,8 @@ function derive(editor: Editor): BoardDerived {
 
 	const notes = new Map<string, string>()
 	const top = ranked.find((s) => s.props.status === 'new')
-	if (top) {
-		const n = seedLinks(editor, top.id)
-		if (n > 0) notes.set(top.props.paperId, `cites ${n} of your seed${n === 1 ? '' : 's'}`)
-	}
+	const note = top && seedNote(seedLinksOf(editor, top.id))
+	if (top && note) notes.set(top.props.paperId, note)
 	for (const s of cards) {
 		if (s === top || s.props.status !== 'new' || isSaved(s)) continue
 		if (s.props.type === 'preprint' || s.props.peerReviewed === false) notes.set(s.props.paperId, 'preprint, not peer reviewed')
@@ -108,15 +107,28 @@ function derive(editor: Editor): BoardDerived {
 	return { ranks, notes, fresh, ranked }
 }
 
-/** How many seed papers this card is linked to. */
-function seedLinks(editor: Editor, cardId: TLShapeId) {
-	const seeds = new Set<string>()
+/**
+ * Seeds this card cites (it starts a `cites` arrow that ends on the seed) and seeds a `similar`
+ * link joins it to. Other arrows, a seed citing this card among them, don't count.
+ */
+export function seedLinksOf(editor: Editor, cardId: TLShapeId) {
+	const cites = new Set<string>()
+	const close = new Set<string>()
 	for (const b of editor.getBindingsToShape(cardId, 'arrow')) {
+		const kind = editor.getShape(b.fromId)?.meta.kind
 		for (const other of editor.getBindingsFromShape(b.fromId, 'arrow')) {
 			if (other.toId === cardId) continue
 			const s = editor.getShape(other.toId)
-			if (s?.type === 'paper-card' && s.props.kind === 'seed') seeds.add(s.id)
+			if (s?.type !== 'paper-card' || s.props.kind !== 'seed') continue
+			if (kind === 'cites' && b.props.terminal === 'start') cites.add(s.id)
+			else if (kind === 'similar') close.add(s.id)
 		}
 	}
-	return seeds.size
+	return { cites: cites.size, close: close.size }
+}
+
+/** The agent's red note under the top new card: a citation says more than similarity. */
+export function seedNote({ cites, close }: { cites: number; close: number }): string | null {
+	if (cites) return `cites ${cites} of your seeds`
+	return close ? `close to ${close} of your seeds` : null
 }

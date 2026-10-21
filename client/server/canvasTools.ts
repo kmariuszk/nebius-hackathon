@@ -17,10 +17,10 @@ import { nodeLabel, normaliseType } from '../shared/display.ts'
 import { agentShapeId, clusterShapeId, linkShapeId, paperShapeId, slug, type LinkKind } from '../shared/ids.ts'
 import { isAgentShape, isHumanTouched } from '../shared/meta.ts'
 import type { PaperCardProps, PaperQuote } from '../shared/paperCard.ts'
-import { defaultPaperCardProps, NODE_SIZE, type PaperCardShape } from '../shared/shapes.ts'
+import { defaultPaperCardProps, type PaperCardShape } from '../shared/shapes.ts'
 import { boardInfo as readBoardInfo } from './boardDb.ts'
 import { recordEvent as recordFeedEvent } from './events.ts'
-import { centre, isFree, MARGIN, placeInside, placeNear, shapeBoxes, type Vec } from './layout.ts'
+import { centre, footprint, isFree, MARGIN, placeInside, placeNear, shapeBoxes, type Vec } from './layout.ts'
 import type { PapersClient } from './papersClient.ts'
 import { readRoom, writeRoom, writer, type Txn } from './rooms.ts'
 
@@ -279,15 +279,16 @@ function cardFields(p: z.infer<typeof paperInput>): Partial<PaperCardProps> {
 	return f
 }
 
-// The `near` card's centre; else the latest card from this run; else null (right of the content).
+// The `near` card's centre; else the first card from this run, so a run's papers ring around one
+// point instead of running off in a row; else null (right of the content).
 function anchorFor(records: TLRecord[], txn: Txn, near: string | null | undefined, runId: string | null): Vec | null {
 	const boxes = shapeBoxes(records)
 	const nearCard = near ? findCard(txn, near) : undefined
 	if (nearCard && boxes.has(nearCard.id)) return centre(boxes.get(nearCard.id)!)
 	if (!runId) return null
-	let latest: PaperCardShape | undefined
-	for (const r of records) if (isCard(r) && r.meta.runId === runId && (!latest || r.index > latest.index)) latest = r
-	return latest && boxes.has(latest.id) ? centre(boxes.get(latest.id)!) : null
+	let first: PaperCardShape | undefined
+	for (const r of records) if (isCard(r) && r.meta.runId === runId && (!first || r.index < first.index)) first = r
+	return first && boxes.has(first.id) ? centre(boxes.get(first.id)!) : null
 }
 
 // ---- cluster frames: built-in frames with meta.clusterId (apply_clusters and label_cluster are in clusterTools.ts)
@@ -316,7 +317,8 @@ export function spotInFrame(txn: Txn, frameId: TLShapeId, size: { w: number; h: 
 	const at = placeInside(records, size, anchor, frame.id)
 	if (at) return local(at)
 	if (propsLocked(frame)) return null
-	const grow = Math.max(size.w, size.h) + 2 * MARGIN
+	const room = footprint({ x: 0, y: 0, ...size })
+	const grow = Math.max(room.w, room.h) + 2 * MARGIN
 	const inFrame = new Set<string>([frame.id])
 	for (const r of records) if (isShape(r) && inFrame.has(r.parentId)) inFrame.add(r.id)
 	const outside = [...shapeBoxes(records)].filter(([id]) => !inFrame.has(id)).map(([, b]) => b)
@@ -615,27 +617,6 @@ const arrowEnd = (terminal: 'start' | 'end') => ({
 	snap: 'none' as const,
 })
 
-const LINK_STEP = 8
-
-// Nodes grow with their links: circles 40 to 72, squares 48 to 80, keeping their centre.
-function resizeByLinks(txn: Txn, cardIds: Set<string>) {
-	const links = new Map<string, number>()
-	for (const r of txn.values()) {
-		if (r.typeName === 'binding' && r.type === 'arrow') links.set(r.toId, (links.get(r.toId) ?? 0) + 1)
-	}
-	const w = writer(txn)
-	for (const id of cardIds) {
-		const card = txn.get(id)
-		if (!isCard(card) || !isAgentShape(card.meta) || isHumanTouched(card.meta)) continue
-		const range = card.props.kind === 'suggestion' ? NODE_SIZE.circle : NODE_SIZE.square
-		const size = Math.min(range.max, Math.max(range.min, range.min + LINK_STEP * (links.get(id) ?? 0)))
-		const { w: cw, h: ch } = card.props
-		if (size === cw && size === ch) continue
-		const [x, y] = [card.x - (size - cw) / 2, card.y - (size - ch) / 2]
-		w.patchShape({ id: card.id, x, y, props: { w: size, h: size } })
-	}
-}
-
 export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<typeof linkPapersInput>>) {
 	const { removedLinks } = boardInfo(ctx.boardId)
 	const result = writeRoom(ctx.boardId, (txn) => {
@@ -656,6 +637,12 @@ export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<type
 			const b = findCard(txn, to)
 			if (!a || !b) {
 				skip(`no card for ${!a ? from : to}`)
+				continue
+			}
+			// a citation either way already joins them, and says more
+			const cited = [linkShapeId(from, to, 'cites'), linkShapeId(to, from, 'cites')]
+			if (kind === 'similar' && cited.some((id) => isShape(txn.get(id as TLShapeId)))) {
+				skip('already linked by a citation')
 				continue
 			}
 			// a similar link has no direction, so either way round is the same link
@@ -702,7 +689,6 @@ export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<type
 			}
 			linked.push(link)
 		}
-		resizeByLinks(txn, touched)
 		return { linked, skipped, created: touched.size > 0 }
 	})
 	if (result.created) changed(ctx, 'link_papers', { linked: result.linked })
@@ -759,7 +745,7 @@ export function addNote(ctx: ToolContext, { text, paperId }: z.infer<z.ZodObject
 		const size = { w: 200, h: 200 + growY }
 		let at: Vec
 		if (card) {
-			// beside the card, on its right, if that's free; else the nearest free spot around it
+			// beside the card as drawn, on its right, if that's free; else the nearest free spot around it
 			const box = shapeBoxes(records).get(card.id)!
 			const right = { x: Math.round(box.x + box.w + 24), y: Math.round(box.y) }
 			at = isFree(shapeBoxes(records).values(), { ...right, ...size }) ? right : placeNear(records, size, centre(box))
@@ -775,12 +761,12 @@ export function addNote(ctx: ToolContext, { text, paperId }: z.infer<z.ZodObject
 			meta: agentMeta(ctx, paperId ? { paperId } : {}),
 		})
 		if (card) {
-			const box = shapeBoxes([card]).get(card.id)!
+			// the pin's offset is from the card's node, not from the card drawn around it
 			w.createBinding({
 				type: NOTE_PIN_TYPE,
 				fromId: note.id,
 				toId: card.id,
-				props: { dx: at.x - box.x, dy: at.y - box.y },
+				props: { dx: at.x - card.x, dy: at.y - card.y },
 				meta: agentMeta(ctx, { paperId: paperId! }),
 			})
 		}
@@ -823,8 +809,8 @@ export const canvasTools = [
 			'never overwrites a known value. kind (seed, kept or suggestion; default suggestion) applies to new cards ' +
 			'only. Never give coordinates: put the most similar paper already on the board in `near` and the card is ' +
 			'placed beside it without overlapping anything, inside that paper\'s cluster if it is in one (`near` may ' +
-			'also be a clusterId from get_board); without `near` it goes next to the latest card of this turn. New ' +
-			'cards start with status new and the "Agent is reading…" ring on (turn it off with mark_working). ' +
+			'also be a clusterId from get_board); without `near` it goes on a ring around the first card of this ' +
+			'turn. New cards start with status new and the "Agent is reading…" ring on (turn it off with mark_working). ' +
 			'Skipped with a reason: retracted papers, seeds already on the board, and cards a person made, moved ' +
 			'or edited. Returns {added, updated, skipped: [{paperId, reason}]} with paper IDs.',
 		addPapersInput,
@@ -872,9 +858,9 @@ export const canvasTools = [
 		'Link pairs of papers on the board with an arrow; at most 100 links per call, and both papers need cards. ' +
 			'kind: cites (a citation from PubMed: `from` cites `to`) or similar (your judgement that the two are ' +
 			'closely related; direction doesn\'t matter). Linking a pair again is a no-op. Skipped with a reason: a ' +
-			'paper linked to itself, a missing card, and links a person removed or hid; never try to recreate ' +
-			'those. Nodes grow with their number of links. Links can\'t be labelled or removed through this server. ' +
-			'Returns {linked, skipped}.',
+			'paper linked to itself, a missing card, a similar link between papers a citation already joins, and ' +
+			'links a person removed or hid; never try to recreate those. Links can\'t be labelled or removed ' +
+			'through this server. Returns {linked, skipped}.',
 		linkPapersInput,
 		linkPapers
 	),
@@ -890,7 +876,7 @@ export const canvasTools = [
 		'add_note',
 		'Add a sticky note to the board, written as the agent: a few sentences, at most 1000 characters. With ' +
 			'paperId it is pinned beside that paper\'s card, moves with it and shows in the paper\'s notes; ' +
-			'without, it goes next to the latest card of this turn. Returns {shapeId}. Notes can\'t be edited or ' +
+			'without, it goes near the first card of this turn. Returns {shapeId}. Notes can\'t be edited or ' +
 			'removed through this server.',
 		addNoteInput,
 		addNote

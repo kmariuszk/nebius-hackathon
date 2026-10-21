@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { after, test } from 'node:test'
 import { linkShapeId, paperShapeId } from '../shared/ids.ts'
-import type { PaperCardShape } from '../shared/shapes.ts'
+import { CARD_SIZE, type PaperCardShape } from '../shared/shapes.ts'
 import {
 	addNote,
 	addPapers,
@@ -63,6 +63,12 @@ const paper = (paperId: string, extra = {}) => ({ paperId, title: `Paper ${paper
 const rejects = (fn: () => unknown, pattern: RegExp) =>
 	assert.rejects(async () => fn(), (e: Error) => e instanceof ToolError && pattern.test(e.message))
 
+// every shape keeps the margin from every other; a card's box is the CARD_SIZE card drawn round its node
+function assertApart(records: TLRecord[]) {
+	const boxes = [...shapeBoxes(records).values()]
+	boxes.forEach((b, i) => assert.ok(isFree(boxes.slice(0, i), b), `box ${i} overlaps an earlier one`))
+}
+
 test('add_papers creates cards beside their neighbour, with defaults and attribution', () => {
 	const ctx = newCtx()
 	const first = addPapers(ctx, {
@@ -91,13 +97,32 @@ test('add_papers creates cards beside their neighbour, with defaults and attribu
 	assert.equal(card(ctx, 'pmid:3').props.kind, 'seed')
 	assert.deepEqual(c1.meta, { createdBy: 'agent', onBehalfOf: 'm_ana', runId: 'run_0123456789ab', paperId: 'pmid:1' })
 
-	// all four on one ring around pmid:1, none overlapping
-	const boxes = [...shapeBoxes(all(ctx)).values()]
-	boxes.forEach((b, i) => assert.ok(isFree(boxes.slice(0, i), b)))
+	// all four on one ring around pmid:1, no two cards overlapping as drawn
+	assertApart(all(ctx))
 	for (const id of ['pmid:2', 'pmid:3', 'pmid:4']) {
 		const c = card(ctx, id)
-		assert.ok(Math.abs(Math.hypot(c.x - c1.x, c.y - c1.y) - 88) < 1, `${id} is beside pmid:1`)
+		assert.ok(Math.abs(Math.hypot(c.x - c1.x, c.y - c1.y) - 212) < 1, `${id} is beside pmid:1`)
 	}
+})
+
+test('add_papers without near rings a run’s papers around its first card, not in a row', () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: [paper('first')] })
+	addPapers(ctx, { papers: [paper('b'), paper('c')] })
+	addPapers(ctx, { papers: [paper('d'), paper('e')] })
+	const first = card(ctx, 'first')
+	for (const id of ['b', 'c', 'd', 'e']) {
+		const c = card(ctx, id)
+		assert.ok(Math.abs(Math.hypot(c.x - first.x, c.y - first.y) - 212) < 1, `${id} is on the first ring`)
+	}
+	// another run starts its own ring, right of the content
+	const other = { ...ctx, runId: 'run_ba9876543210' }
+	addPapers(other, { papers: [paper('o1')] })
+	addPapers(other, { papers: [paper('o2')] })
+	const o1 = card(ctx, 'o1')
+	assert.ok(o1.x > Math.max(...['b', 'c', 'd', 'e'].map((id) => card(ctx, id).x)))
+	assert.ok(Math.abs(Math.hypot(card(ctx, 'o2').x - o1.x, card(ctx, 'o2').y - o1.y) - 212) < 1)
+	assertApart(all(ctx))
 })
 
 test('add_papers updates its own cards in place and skips what people touched', () => {
@@ -202,9 +227,11 @@ test('set_card fills the card field by field, checks quote IDs and records prove
 	assert.deepEqual(card(ctx, 'p').props.claims, [claims[0]])
 })
 
-test('link_papers draws bound arrows once, resizes nodes, and respects removed and hidden links', () => {
+test('link_papers draws bound arrows once, never resizes or moves a card, and respects citations, removed and hidden links', () => {
 	const ctx = newCtx()
 	addPapers(ctx, { papers: [paper('a'), paper('b', { near: 'a' }), paper('c', { near: 'a' }), paper('s', { kind: 'seed', near: 'a' })] })
+	const places = () => ['a', 'b', 'c', 's'].map((id) => card(ctx, id)).map((c) => [c.x, c.y, c.props.w, c.props.h])
+	const before = places()
 	const result = linkPapers(ctx, {
 		links: [
 			{ from: 'a', to: 'b', kind: 'cites' },
@@ -212,10 +239,16 @@ test('link_papers draws bound arrows once, resizes nodes, and respects removed a
 			{ from: 'a', to: 's', kind: 'cites' },
 			{ from: 'a', to: 'a', kind: 'similar' },
 			{ from: 'a', to: 'nope', kind: 'cites' },
+			{ from: 'b', to: 'a', kind: 'similar' },
 		],
 	})
 	assert.equal(result.linked.length, 3)
-	assert.deepEqual(result.skipped.map((s) => s.reason), ['a paper can’t link to itself', 'no card for nope'])
+	assert.deepEqual(result.skipped.map((s) => s.reason), [
+		'a paper can’t link to itself',
+		'no card for nope',
+		'already linked by a citation',
+	])
+	assert.equal(all(ctx).some((r) => r.id === linkShapeId('b', 'a', 'similar') || r.id === linkShapeId('a', 'b', 'similar')), false)
 
 	const records = all(ctx)
 	const arrowId = linkShapeId('a', 'b', 'cites') as TLShapeId
@@ -238,15 +271,20 @@ test('link_papers draws bound arrows once, resizes nodes, and respects removed a
 			['arrow', 'start', card(ctx, 'a').id],
 		]
 	)
-	// a has three links: 40 + 3 × 8; b has one (48); the seed is a square: 48 + 8
-	assert.equal(card(ctx, 'a').props.w, 64)
-	assert.equal(card(ctx, 'b').props.w, 48)
-	assert.equal(card(ctx, 's').props.w, 56)
+	// v6 draws every paper as the same card, so links leave nodes as they are (D23)
+	assert.deepEqual(places(), before)
 
-	// repeats, and the reverse of a similar link, change nothing
+	// repeats, and the reverse of a similar link, change nothing; a citation either way wins over similarity
 	const count = all(ctx).length
-	const again = linkPapers(ctx, { links: [{ from: 'a', to: 'b', kind: 'cites' }, { from: 'c', to: 'a', kind: 'similar' }] })
+	const again = linkPapers(ctx, {
+		links: [
+			{ from: 'a', to: 'b', kind: 'cites' },
+			{ from: 'c', to: 'a', kind: 'similar' },
+			{ from: 'a', to: 's', kind: 'similar' },
+		],
+	})
 	assert.equal(again.linked.length, 2)
+	assert.deepEqual(again.skipped, [{ from: 'a', to: 's', kind: 'similar', reason: 'already linked by a citation' }])
 	assert.equal(all(ctx).length, count)
 
 	// a person deletes the similar link and hides the citation
@@ -283,15 +321,16 @@ test('add_note writes a note, pinned beside its paper with a note-pin binding', 
 	assert.equal(note.type, 'note')
 	assert.deepEqual(note.props.richText, { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Check the cohort size' }] }] })
 	assert.deepEqual(note.meta, { createdBy: 'agent', onBehalfOf: 'm_ana', runId: null, paperId: 'a' })
+	// 24 px right of the card as drawn, level with its top; the pin is from the node
 	const c = card(ctx, 'a')
-	assert.deepEqual([note.x, note.y], [c.x + c.props.w + 24, c.y])
+	const drawn = { x: c.x + c.props.w / 2 - CARD_SIZE.w / 2, y: c.y + c.props.h / 2 - CARD_SIZE.h / 2 }
+	assert.deepEqual([note.x, note.y], [drawn.x + CARD_SIZE.w + 24, drawn.y])
 	const pin = records.find((r): r is TLBinding => r.typeName === 'binding' && r.fromId === pinned.shapeId)
 	assert.equal(pin?.type, 'note-pin')
 	assert.equal(pin?.toId, c.id)
-	assert.deepEqual(pin?.props, { dx: c.props.w + 24, dy: 0 })
+	assert.deepEqual(pin?.props, { dx: note.x - c.x, dy: note.y - c.y })
 
-	const boxes = [...shapeBoxes(records).values()]
-	boxes.forEach((b, i) => assert.ok(isFree(boxes.slice(0, i), b)))
+	assertApart(records)
 	const board = getBoard(ctx)
 	assert.deepEqual(
 		board.notes.map((n) => [n.shapeId, n.text, n.author, n.pinnedTo]),

@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { NOTE_PIN_TYPE, type NotePinBinding } from '../shared/bindings.ts'
 import { clusterShapeId } from '../shared/ids.ts'
 import { isAgentShape, isHumanTouched } from '../shared/meta.ts'
-import type { PaperCardShape } from '../shared/shapes.ts'
+import { CARD_SIZE, type PaperCardShape } from '../shared/shapes.ts'
 import {
 	agentMeta,
 	changed,
@@ -19,7 +19,7 @@ import {
 	ToolError,
 	type ToolContext,
 } from './canvasTools.ts'
-import { centre, placeNear, shapeBoxes } from './layout.ts'
+import { centre, MARGIN, placeNear, shapeBoxes } from './layout.ts'
 import type { ClusterResult } from './papersClient.ts'
 import { readRoom, schema, writeRoom, writer, type Txn } from './rooms.ts'
 
@@ -28,9 +28,8 @@ import { readRoom, schema, writeRoom, writer, type Txn } from './rooms.ts'
 // itself, so the canvas MCP lists these tools only while the papers MCP lists cluster_papers (I5).
 // A cluster is a built-in frame with meta.clusterId, labelGenerated and renamedByHuman (T01).
 
-// a grid cell per card in a new frame: the node, plus its label hanging below it
-const CELL = { w: 150, h: 130 }
-const LABEL_H = 34
+// a grid cell per card in a new frame: the drawn card (its label is inside it) and the margin round it
+const CELL = { w: CARD_SIZE.w + 2 * MARGIN, h: CARD_SIZE.h + 2 * MARGIN }
 const PAD = 16
 
 const applyClustersInput = {
@@ -76,11 +75,14 @@ function replaceNotes(txn: Txn, card: TLShapeId) {
 	const w = writer(txn)
 	for (const pin of pinsTo(txn, card)) {
 		const records = [...txn.values()].filter((r) => r.id !== pin.fromId)
-		const cardBox = shapeBoxes(records).get(card)!
+		const mid = centre(shapeBoxes(records).get(card)!)
 		const { w: nw, h: nh } = shapeBoxes([txn.get(pin.fromId)!]).get(pin.fromId)!
-		const at = placeNear(records, { w: nw, h: nh }, centre(cardBox))
+		const at = placeNear(records, { w: nw, h: nh }, mid)
+		// the pin's offset is from the node's page position, not from the card drawn around it
+		const { w: cw, h: ch } = (txn.get(card) as PaperCardShape).props
+		const node = { x: mid.x - cw / 2, y: mid.y - ch / 2 }
 		w.patchShape({ id: pin.fromId, parentId: w.pageId, ...at })
-		txn.set(pin.id, schema.types.binding.validate({ ...pin, props: { dx: at.x - cardBox.x, dy: at.y - cardBox.y } }))
+		txn.set(pin.id, schema.types.binding.validate({ ...pin, props: { dx: at.x - node.x, dy: at.y - node.y } }))
 	}
 }
 
@@ -118,11 +120,12 @@ function newClusterFrame(txn: Txn, ctx: ToolContext, clusterId: string, label: s
 	w.patchShape({ id: frame.id, index: getIndexBelow(lowest) })
 	cards.forEach((card, i) => {
 		const [col, row] = [i % cols, Math.floor(i / cols)]
+		// the card is drawn centred on its node, so centring the node centres the card in its cell
 		w.patchShape({
 			id: card.id,
 			parentId: frame.id,
 			x: Math.round(PAD + col * CELL.w + (CELL.w - card.props.w) / 2),
-			y: Math.round(PAD + row * CELL.h + (CELL.h - LABEL_H - card.props.h) / 2),
+			y: Math.round(PAD + row * CELL.h + (CELL.h - card.props.h) / 2),
 		})
 	})
 	for (const card of cards) replaceNotes(txn, card.id)

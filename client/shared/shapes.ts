@@ -65,7 +65,10 @@ export const paperCardProps: RecordProps<PaperCardShape> = {
 export const paperCardVersions = createShapePropsMigrationIds(PAPER_CARD_TYPE, {})
 export const paperCardMigrations = createShapePropsMigrationSequence({ sequence: [] })
 
-/** Node sizes (w = h) by kind; the canvas MCP grows them with the number of links. */
+/** The v6 card every paper is drawn as, centred on its node; the server's layout keeps this much room. */
+export const CARD_SIZE = { w: 172, h: 70 } as const
+
+/** Node sizes (w = h) by kind. New cards start at the minimum; nodes no longer grow with their links (D23). */
 export const NODE_SIZE = {
 	circle: { min: 40, max: 72 },
 	square: { min: 48, max: 80 },
