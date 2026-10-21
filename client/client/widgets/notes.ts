@@ -1,3 +1,5 @@
+import { CARD_SIZE } from '../../shared/shapes.ts'
+
 // Team notes: built-in notes pinned to a paper with a `note-pin` binding (T01).
 
 /** The text of a note's rich text (tiptap JSON): paragraphs and list items on their own lines. */
@@ -22,9 +24,10 @@ export function noteAuthor(meta: Record<string, unknown> | undefined, memberId: 
 export const NOTE_SCALE = 0.8
 
 /**
- * Where a new note goes: just right of the card, a little higher than its centre, each further
- * note a step lower so they fan out (as in v5). Returns the pin offset from the card's top-left.
+ * Where a pinned note goes, as the binding's offset from the node's top-left: 20 px right of the
+ * card, a little below its middle (as the v6 board and seedDemo.ts pin them), each further note
+ * on the same paper a step lower.
  */
-export function newNoteOffset(card: { w: number; h: number }, pinned: number) {
-	return { dx: card.w + 24, dy: card.h / 2 - 56 + pinned * 30 }
+export function pinOffset(node: { w: number; h: number }, pinnedAlready: number) {
+	return { dx: node.w / 2 + CARD_SIZE.w / 2 + 20, dy: node.h / 2 + 12 + pinnedAlready * 34 }
 }

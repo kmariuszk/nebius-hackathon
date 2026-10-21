@@ -13,7 +13,7 @@ import { cardLabel } from '../../shared/display.ts'
 import { isPaperCard } from '../../shared/paperCard.ts'
 import { CARD_SIZE, type PaperCardShape } from '../../shared/shapes.ts'
 import { boardOf, changes, recordEdit } from '../pinboard/changes.ts'
-import { NOTE_SCALE, plainText } from '../widgets/notes.ts'
+import { NOTE_SCALE, pinOffset, plainText } from '../widgets/notes.ts'
 import { toast } from './toast.ts'
 
 // Pinning notes on the canvas (T14): a note a person puts down with its centre on a paper's card
@@ -33,36 +33,22 @@ export interface Box {
 	h: number
 }
 
-/** A paper card's node in page space: the shape's own point and its props.w × props.h. */
-export interface CardNode {
+/** A paper card in page space: its shape ID and the 172 × 70 card it draws (getShapePageBounds). */
+export interface CardBox {
 	id: string
-	x: number
-	y: number
-	w: number
-	h: number
-}
-
-/** The 172 × 70 card drawn centred on the node. */
-export function drawnBox(node: Omit<CardNode, 'id'>): Box {
-	return {
-		x: node.x + node.w / 2 - CARD_SIZE.w / 2,
-		y: node.y + node.h / 2 - CARD_SIZE.h / 2,
-		w: CARD_SIZE.w,
-		h: CARD_SIZE.h,
-	}
+	box: Box
 }
 
 const inside = (p: Pt, b: Box) => p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h
 const centre = (b: Box): Pt => ({ x: b.x + b.w / 2, y: b.y + b.h / 2 })
 
 /** The card whose drawn box holds the point; of overlapping cards, the one whose centre is nearest. */
-export function cardUnder<C extends CardNode>(p: Pt, cards: readonly C[]): C | null {
+export function cardUnder<C extends CardBox>(p: Pt, cards: readonly C[]): C | null {
 	let best: C | null = null
 	let bestD = Infinity
 	for (const card of cards) {
-		const box = drawnBox(card)
-		if (!inside(p, box)) continue
-		const c = centre(box)
+		if (!inside(p, card.box)) continue
+		const c = centre(card.box)
 		const d = Math.hypot(c.x - p.x, c.y - p.y)
 		if (d < bestD) {
 			best = card
@@ -82,26 +68,17 @@ export function gap(a: Box, b: Box): number {
 /** A pinned note comes loose once it's more than a card's width from its paper. */
 export const UNPIN_GAP = CARD_SIZE.w
 
-/**
- * Where a pinned note goes, as the binding's offset from the node's top-left: 20 px right of the
- * card, a little below its middle (as the v6 board and seedDemo.ts pin them), each further note
- * on the same paper a step lower.
- */
-export function pinOffset(node: { w: number; h: number }, pinnedAlready: number) {
-	return { dx: node.w / 2 + CARD_SIZE.w / 2 + 20, dy: node.h / 2 + 12 + pinnedAlready * 34 }
-}
-
 export type NotePlace = { pin: string } | { unpin: true } | null
 
 /**
  * What putting a note down does: pin it to the card under its centre (or re-place it beside its
  * own card), unpin it when it's dragged too far from its paper, or nothing.
  */
-export function placeNote(note: Box, pinnedTo: string | null, cards: readonly CardNode[]): NotePlace {
+export function placeNote(note: Box, pinnedTo: string | null, cards: readonly CardBox[]): NotePlace {
 	const target = cardUnder(centre(note), cards)
 	if (target) return { pin: target.id }
 	const own = pinnedTo ? cards.find((c) => c.id === pinnedTo) : undefined
-	if (own && gap(note, drawnBox(own)) > UNPIN_GAP) return { unpin: true }
+	if (own && gap(note, own.box) > UNPIN_GAP) return { unpin: true }
 	return null
 }
 
@@ -110,12 +87,7 @@ export function placeNote(note: Box, pinnedTo: string | null, cards: readonly Ca
 /** How the note came to be put down: made with the Note tool, dropped from the toolbar, made some other way, or dragged. */
 type Why = 'tool' | 'dropped' | 'created' | 'moved'
 
-interface Pinner {
-	queue: Map<TLShapeId, Why>
-	flush(): void
-}
-
-const pinners = new WeakMap<Editor, Pinner>()
+const queues = new WeakMap<Editor, Map<TLShapeId, Why>>()
 
 /** Notes a person creates or drags are settled once they're put down. Returns the cleanup. */
 export function registerPinNotes(editor: Editor): () => void {
@@ -134,8 +106,7 @@ export function registerPinNotes(editor: Editor): () => void {
 			busy = false
 		}
 	}
-	const pinner: Pinner = { queue, flush }
-	pinners.set(editor, pinner)
+	queues.set(editor, queue)
 
 	// the toolbar's Note, dragged onto the board: caught before tldraw's own drop handling
 	const container = editor.getContainer()
@@ -161,7 +132,7 @@ export function registerPinNotes(editor: Editor): () => void {
 			container.removeEventListener('drop', drop, true)
 		},
 		editor.sideEffects.registerAfterCreateHandler('shape', (shape, source) => {
-			if (busy || source !== 'user' || shape.type !== 'note') return
+			if (busy || source !== 'user' || shape.type !== 'note' || queue.has(shape.id)) return
 			queue.set(shape.id, editor.isIn('note') ? 'tool' : 'created')
 		}),
 		editor.sideEffects.registerAfterChangeHandler('shape', (prev, next, source) => {
@@ -178,7 +149,7 @@ export function registerPinNotes(editor: Editor): () => void {
 	]
 	return () => {
 		cleanups.forEach((cleanup) => cleanup())
-		if (pinners.get(editor) === pinner) pinners.delete(editor)
+		if (queues.get(editor) === queue) queues.delete(editor)
 	}
 }
 
@@ -188,14 +159,14 @@ function settle(editor: Editor, id: TLShapeId, why: Why) {
 	if (note?.type !== 'note' || !bounds) return
 	const pin = editor.getBindingsFromShape(note, NOTE_PIN_TYPE)[0]
 	const cards = new Map<string, PaperCardShape>()
-	const nodes: CardNode[] = []
+	const boxes: CardBox[] = []
 	for (const s of editor.getCurrentPageShapes()) {
-		if (!isPaperCard(s) || editor.isShapeHidden(s)) continue
-		const at = editor.getShapePageTransform(s).point()
+		const box = isPaperCard(s) && !editor.isShapeHidden(s) ? editor.getShapePageBounds(s) : undefined
+		if (!isPaperCard(s) || !box) continue
 		cards.set(s.id, s)
-		nodes.push({ id: s.id, x: at.x, y: at.y, w: s.props.w, h: s.props.h })
+		boxes.push({ id: s.id, box })
 	}
-	const place = placeNote({ x: bounds.x, y: bounds.y, w: bounds.w, h: bounds.h }, pin?.toId ?? null, nodes)
+	const place = placeNote(bounds, pin?.toId ?? null, boxes)
 	let pinnedTo = pin ? editor.getShape(pin.toId) : undefined
 	if (place && 'pin' in place) {
 		const card = cards.get(place.pin)!
@@ -243,10 +214,10 @@ const DROPPED_NOTE = 200 * NOTE_SCALE
 
 /** The toolbar's Note dropped on the board at a page point: a note there, pinned if it's on a paper, ready to type in. */
 export function dropNoteAt(editor: Editor, point: Pt) {
-	const pinner = pinners.get(editor)
 	const id = createShapeId()
 	editor.markHistoryStoppingPoint('drop a note')
 	editor.setCurrentTool('select')
+	queues.get(editor)?.set(id, 'dropped')
 	editor.createShape({
 		id,
 		type: 'note',
@@ -254,10 +225,6 @@ export function dropNoteAt(editor: Editor, point: Pt) {
 		y: point.y - DROPPED_NOTE / 2,
 		props: { scale: NOTE_SCALE, size: 's', font: 'sans', align: 'start', verticalAlign: 'start' },
 	})
-	if (pinner) {
-		pinner.queue.set(id, 'dropped')
-		pinner.flush()
-	}
 	editor.select(id)
 	startEditingShapeWithRichText(editor, id)
 }

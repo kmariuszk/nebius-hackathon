@@ -1,24 +1,26 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { cardUnder, drawnBox, gap, pinOffset, placeNote, UNPIN_GAP } from './pinNotes.ts'
+import { react } from 'tldraw'
+import { defaultPaperCardProps } from '../../shared/shapes.ts'
+import { changes, watchBoard } from '../pinboard/changes.ts'
+import { pinOffset } from '../widgets/notes.ts'
+import { fakeEditor } from './fixtures/fakeEditor.ts'
+import { cardUnder, dropNoteAt, gap, placeNote, registerPinNotes, UNPIN_GAP } from './pinNotes.ts'
+import { boardToast } from './toast.ts'
 
-// Two 48 px nodes: Liu 2022's card is drawn 62 px either side of its node and 11 px above and
-// below it (172 × 70 centred on the 48 × 48 node); Tirosh 2016 sits 400 px to the right.
-const liu = { id: 'shape:paper-liu', x: 100, y: 100, w: 48, h: 48 }
-const tirosh = { id: 'shape:paper-tirosh', x: 500, y: 100, w: 48, h: 48 }
+// Two cards as getShapePageBounds gives them: Liu 2022's 172 × 70 card, drawn centred on a 48 px
+// node at (100, 100); Tirosh 2016 sits 400 px to the right.
+const liu = { id: 'shape:paper-liu', box: { x: 38, y: 89, w: 172, h: 70 } }
+const tirosh = { id: 'shape:paper-tirosh', box: { x: 438, y: 89, w: 172, h: 70 } }
 const cards = [liu, tirosh]
 const note = (x: number, y: number) => ({ x, y, w: 160, h: 160 })
-
-test('the drawn card is 172 × 70, centred on the node', () => {
-	assert.deepEqual(drawnBox(liu), { x: 38, y: 89, w: 172, h: 70 })
-})
 
 test('a point inside a card’s drawn box finds that card, even outside its node', () => {
 	assert.equal(cardUnder({ x: 205, y: 95 }, cards)?.id, liu.id) // right of the node, still on the card
 	assert.equal(cardUnder({ x: 215, y: 95 }, cards), null) // just past the card's right edge
 	assert.equal(cardUnder({ x: 124, y: 160 }, cards), null) // just below it
 	// overlapping cards: the one whose centre is nearest
-	const close = { id: 'shape:paper-close', x: 200, y: 100, w: 48, h: 48 }
+	const close = { id: 'shape:paper-close', box: { x: 138, y: 89, w: 172, h: 70 } }
 	assert.equal(cardUnder({ x: 190, y: 124 }, [liu, close])?.id, close.id)
 })
 
@@ -48,10 +50,34 @@ test('gap between boxes is 0 when they touch and diagonal past a corner', () => 
 	assert.equal(gap({ x: 0, y: 0, w: 10, h: 10 }, { x: 13, y: 14, w: 10, h: 10 }), 5)
 })
 
-test('pinned notes go 20 px right of the card, a little below its middle, each next one lower', () => {
-	// the drawn card's right edge is node.x + 24 + 86 = node.x + 110
-	assert.deepEqual(pinOffset(liu, 0), { dx: 130, dy: 36 })
-	assert.deepEqual(pinOffset(liu, 2), { dx: 130, dy: 104 })
-	// the same place seedDemo.ts pins the demo note: n1.w / 2 + 106, n1.w / 2 + 12
-	assert.deepEqual(pinOffset({ w: 60, h: 60 }, 0), { dx: 60 / 2 + 106, dy: 60 / 2 + 12 })
+test('the toolbar’s Note dropped on a paper is pinned once, beside the card, with one toast', () => {
+	const props = defaultPaperCardProps('pmid:2', { authors: ['Yang Liu'], year: 2022, w: 48, h: 48 })
+	const { editor, shapes, bindings, writes } = fakeEditor([{ id: liu.id, type: 'paper-card', x: 100, y: 100, props }])
+	const toasts: string[] = []
+	const stop = react('board toasts', () => {
+		const shown = boardToast.get()
+		if (shown) toasts.push(shown.text)
+	})
+	const cleanups = [watchBoard(editor, 'b_drop'), registerPinNotes(editor)]
+	try {
+		dropNoteAt(editor, { x: 124, y: 124 }) // the middle of Liu 2022's node
+		assert.deepEqual(
+			writes.filter((w) => w.includes('binding')),
+			['create binding note-pin']
+		)
+		const [pin] = [...bindings.values()]
+		const { dx, dy } = pinOffset(props, 0)
+		assert.equal(pin.toId, liu.id)
+		assert.deepEqual(pin.props, { dx, dy })
+		const note = shapes.get(pin.fromId)!
+		assert.deepEqual([note.x, note.y], [100 + dx, 100 + dy])
+		assert.deepEqual(toasts, ['Note pinned to Liu 2022. It moves with the paper.'])
+		assert.deepEqual(
+			changes.get('b_drop').entries.map((e) => e.change),
+			[{ type: 'note_added', noteId: note.id, text: '', paperId: 'pmid:2' }]
+		)
+	} finally {
+		stop()
+		cleanups.forEach((cleanup) => cleanup())
+	}
 })
