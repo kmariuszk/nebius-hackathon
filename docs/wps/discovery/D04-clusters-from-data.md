@@ -8,7 +8,7 @@
 | Depends on | [T15](../tldraw-integration/T15-graph-layout-and-strings.md) (cluster frames fit v6 cards), [H04](../agent-harness/H04-first-run-in-90-seconds.md) (the first run has time for one more step) |
 | Unblocks | Demo beat 7 (drag a paper into a cluster); the [T14 refresh](../tldraw-integration/T14-board-editing.md)'s cluster editing |
 | Milestone | W3 The team edits |
-| Status | Built on branch `w3/clusters` (Oct 21); criterion 6 waits for the live check |
+| Status | Built on branch `w3/clusters` (Oct 21). Criterion 6 holds in part: the Wave 3 live run on `w3/integration` (Super VL, cold cache, five demo seeds, report `20261021T191818Z`) ended with 3 cluster frames on a board of 13 papers, made by the harness's cluster step with no model call; whether each label reads as 2 to 4 words that fit their papers still needs a look on the board |
 | Owner | TBD |
 
 ## Goal
