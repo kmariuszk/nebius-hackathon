@@ -8,7 +8,7 @@
 | Depends on | H01 (the measurement), H02, [D01](../discovery/D01-validate-optional-arguments.md), [D02](../discovery/D02-scoring-without-timeouts.md) (the bugs that cost the most time) |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (clusters run after ranking), the demo recording |
 | Milestone | W2 One clean run |
-| Status | Built on `w2/rank`, plus on `w2/integration`: `rank_papers` ranks only the placed papers (ranking 20 took 34 to 52 s of Super VL reading for papers it never writes) and every model call times out after 120 s (`MODEL_TIMEOUT`). Strict timing not yet met twice in a row. In the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage): first card 50.5 / 73.4 / 91.0 / 76.7 / 103.9 s (target 90), answer 111.2 / 126.1 / 131.6 / 113.5 / 169.4 s (target 120), every card read 211 / 259 / 374 / 315 / 270 s (target 300); one run met all three. The swings come from Token Factory's latency: `score_candidates` took 1 to 42 s (the embedding warm-up doesn't always finish first), `rank_papers` 24 to 53 s, a search agent 26 to 41 s. Next levers: `score_candidates` waiting for in-flight warm-up embeddings, Super VL's reasoning off for the rerank (`enable_thinking: false`), or `PLACE = 6` |
+| Status | Done (Oct 21). Two strict H01 runs in a row passed on `w2/timing` (reports `20261021T185349Z`, `20261021T185847Z`): first card 89.8 / 67.0 s (target 90), answer 104.5 / 78.7 s (120), every card read 299.2 / 286.3 s (300). What got it there, after five earlier runs met all three targets once: `rank_papers` ranks only the placed papers with Super VL's reasoning off (24 to 53 s down to 2 to 3.5 s); `score_candidates` waits for warm-up embeddings in flight; embedding tries time out after 15, 30 then 90 s and a Lightning call after 45 s, and are sent again (Token Factory's tail: identical embedding batches took 2 s to 162 s). `PLACE = 6` wasn't needed. Margins are thin: `score_candidates` still takes 15 to 39 s and every card read sits near 300 s |
 | Owner | TBD |
 
 ## Goal
@@ -64,7 +64,8 @@ It never calls `add_papers`: a paper the rerank likes that isn't on the board st
 - [x] `master/background.py`: `PAPERS_AT_ONCE`, `CALLS_PER_MINUTE`.
 - [x] `models.py`: `num_retries=2`.
 - [x] Tests (below); `harness/README.md`'s master section updated (steps, timings).
-- [ ] Two strict H01 runs and one warm run; numbers recorded.
+- [x] Two strict H01 runs; numbers recorded.
+- [ ] One `LIVE_WARM=1` run, for the record.
 
 ## Acceptance criteria
 
