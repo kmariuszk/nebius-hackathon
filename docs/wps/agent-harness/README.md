@@ -128,7 +128,7 @@ The canvas skips a `similar` link when a `cites` link already joins the pair (T1
 
 | Risk | Effect | Mitigation | WP |
 | --- | --- | --- | --- |
-| Token Factory's limit (60 requests a minute to start), shared by the chat, the background and the papers MCP | 429s mid-run | `CALLS_PER_MINUTE` for the background, LiteLLM `num_retries` honouring `Retry-After` | H04 |
+| Token Factory's limit (60 requests a minute to start), shared by the chat, the background and the papers MCP | 429s mid-run | `CALLS_PER_MINUTE` for the background, LiteLLM `num_retries` retrying with backoff (it doesn't read `Retry-After`) | H04 |
 | Live timings vary run to run | A flaky gate | Timing asserted only in strict mode, twice in a row; everything else always asserted | H01 |
 | Model-free steps hide what happened from the chat | Less trace for judges | Every step logs, and `rank_papers` returns its rankings for the answer; tool cards for background passes stay out of scope | H03, H04 |
 

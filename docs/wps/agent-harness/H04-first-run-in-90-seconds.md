@@ -52,7 +52,7 @@ It never calls `add_papers`: a paper the rerank likes that isn't on the board st
 
 **Background parallelism** (`background.py`): `PAPERS_AT_ONCE = 4` (was 3), `CALLS_PER_MINUTE = 40` (was 30). Eight papers at about five model calls each is 40 calls: two waves of four, about 2 to 3 minutes.
 
-**Retries on 429** (`harness/harness/models.py`): `LiteLlm(..., num_retries=2)` so Token Factory's 429s wait for `Retry-After` instead of failing a step.
+**Retries on 429** (`harness/harness/models.py`): `LiteLlm(..., num_retries=2)` so a Token Factory 429 is retried with LiteLLM's exponential backoff (up to 10 s) instead of failing a step; LiteLLM doesn't read `Retry-After`.
 
 **Measuring.** H01 with `LIVE_TIMING=strict`, cold cache, five demo seeds, twice in a row; then once with `LIVE_WARM=1` for the record. The numbers go in this WP's Status row and in `harness/README.md`.
 
