@@ -206,7 +206,8 @@ def test_the_board_master_ranks_with_rank_papers_and_has_no_rerank_or_set_scores
     agent = build_agent("master", board)
     filters = [t.tool_filter for t in agent.tools if getattr(t, "tool_filter", None)]
     assert filters == [["resolve_seed", "get_paper", "score_candidates"], ["get_board", "add_papers", "link_papers",
-                                                                          "add_note"]]
+                                                                          "add_note", "apply_clusters",
+                                                                          "label_cluster"]]
     assert sum(isinstance(t, ranking.RankPapers) for t in agent.tools) == 1
     assert "Call `rank_papers`" in agent.instruction and f"the {master.PLACE} best-scored" in agent.instruction
     assert "Don't narrate between tool calls; the plan shows your progress." in agent.instruction

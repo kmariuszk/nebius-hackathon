@@ -279,7 +279,7 @@ async def test_tools_over_mcp(discovery):
         assert tools == {
             "search", "find_candidates", "score_candidates", "rerank", "resolve_seed", "get_paper",
             "get_fulltext", "check_quotes", "citation_links",
-            "get_figures",
+            "get_figures", "cluster_papers",
         }
         rerank_tool = next(t for t in (await client.list_tools()).tools if t.name == "rerank")
         assert "rerank_vl" in json.dumps(rerank_tool.input_schema["properties"]["backend"])

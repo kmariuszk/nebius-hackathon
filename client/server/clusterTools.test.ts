@@ -244,6 +244,55 @@ test('label_cluster renames the agent’s clusters only', async () => {
 	await rejects(() => labelCluster(ctx, { clusterId: 'nope', label: 'X' }), /No cluster nope/)
 })
 
+// One real cluster_papers result (discovery/tests/test_clusters.py's three groups, k=3, Lightning failing for one)
+const REAL = {
+	clusters: [
+		{ clusterId: 'c-pmid_101', paperIds: ['pmid:101', 'pmid:100', 'pmid:102', 'pmid:103'], label: 'Tumour ecosystem' },
+		{ clusterId: 'c-pmid_200', paperIds: ['pmid:200', 'pmid:202', 'pmid:201', 'pmid:203'], label: 'T cell exhaustion' },
+		{ clusterId: 'c-pmid_300', paperIds: ['pmid:300', 'pmid:303', 'pmid:302', 'pmid:301'], label: null },
+	],
+	similarities: [
+		{ a: 'pmid:100', b: 'pmid:101', similarity: 0.995 }, { a: 'pmid:100', b: 'pmid:103', similarity: 0.988 },
+		{ a: 'pmid:100', b: 'pmid:102', similarity: 0.986 }, { a: 'pmid:200', b: 'pmid:202', similarity: 0.995 },
+		{ a: 'pmid:200', b: 'pmid:201', similarity: 0.991 }, { a: 'pmid:200', b: 'pmid:203', similarity: 0.989 },
+		{ a: 'pmid:300', b: 'pmid:303', similarity: 0.988 }, { a: 'pmid:300', b: 'pmid:302', similarity: 0.988 },
+		{ a: 'pmid:300', b: 'pmid:301', similarity: 0.988 }, { a: 'pmid:101', b: 'pmid:102', similarity: 0.994 },
+		{ a: 'pmid:101', b: 'pmid:103', similarity: 0.982 }, { a: 'pmid:201', b: 'pmid:202', similarity: 0.989 },
+		{ a: 'pmid:201', b: 'pmid:203', similarity: 0.969 }, { a: 'pmid:301', b: 'pmid:302', similarity: 0.983 },
+		{ a: 'pmid:301', b: 'pmid:303', similarity: 0.967 }, { a: 'pmid:102', b: 'pmid:103', similarity: 0.979 },
+		{ a: 'pmid:202', b: 'pmid:203', similarity: 0.984 }, { a: 'pmid:302', b: 'pmid:303', similarity: 0.985 },
+	],
+	skipped: ["paper isbn:1: Unknown paper ID 'isbn:1': expected one of doi:…, pmid:…, pmcid:…, arxiv:…, openalex:…, s2:…"],
+}
+
+test('apply_clusters takes cluster_papers’ real result, and a second run with one more paper reuses its frames', async () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: REAL.clusters.flatMap((c) => c.paperIds).map((id) => paper(id)) })
+	clusters = REAL as ClusterResult
+
+	const result = await applyClusters(ctx, {})
+	assert.deepEqual(
+		result.clusters,
+		REAL.clusters.map(({ clusterId, paperIds, label }) => ({ clusterId, label: label ?? '', paperIds }))
+	)
+	assert.deepEqual(result.skipped, [])
+	assert.equal(frame(ctx, 'c-pmid_101').id, 'shape:cluster-c-pmid_101')
+	assert.equal(frame(ctx, 'c-pmid_300').meta.labelGenerated, false)
+	assertNoOverlaps(ctx)
+
+	// the next call, with one more paper close to a cluster, keeps the cluster IDs
+	addPapers(ctx, { papers: [paper('pmid:250')] })
+	clusters = {
+		...REAL,
+		clusters: REAL.clusters.map((c) => (c.clusterId === 'c-pmid_200' ? { ...c, paperIds: [...c.paperIds, 'pmid:250'] } : c)),
+	} as ClusterResult
+	const frames = all(ctx).filter((r) => r.typeName === 'shape' && r.type === 'frame')
+	const again = await applyClusters(ctx, {})
+	assert.deepEqual(again.clusters.map((c) => c.clusterId), ['c-pmid_101', 'c-pmid_200', 'c-pmid_300'])
+	assert.deepEqual(all(ctx).filter((r) => r.typeName === 'shape' && r.type === 'frame').map((f) => f.id), frames.map((f) => f.id))
+	assertNoOverlaps(ctx)
+})
+
 test('apply_clusters writes nothing when the papers MCP fails, and needs two papers', async () => {
 	const ctx = newCtx()
 	addPapers(ctx, { papers: [paper('a'), paper('down')] })

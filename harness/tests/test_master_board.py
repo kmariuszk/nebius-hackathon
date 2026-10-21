@@ -474,7 +474,7 @@ def test_the_acp_adapter_builds_the_master_with_the_chats_board():
     board = BoardTools("b_1", "m_ana", "http://board/api/mcp/canvas/b_1", {"Authorization": "Bearer m_ana"})
     agent = build_agent("master", board)
     filters = [t.tool_filter for t in agent.tools if hasattr(t, "tool_filter") and t.tool_filter]
-    assert ["get_board", "add_papers", "link_papers", "add_note"] in filters
+    assert ["get_board", "add_papers", "link_papers", "add_note", "apply_clusters", "label_cluster"] in filters
     assert processes(agent).board is board
     assert agent.instruction == master.BOARD_INSTRUCTION
     assert context.build(board).model.model == "openai/nvidia/Nemotron-3_5-Lightning"
