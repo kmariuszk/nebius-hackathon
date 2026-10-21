@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [H04](../agent-harness/H04-first-run-in-90-seconds.md) |
 | Milestone | W1 Nothing broken |
-| Status | Not started |
+| Status | Built on branch `w1/discovery` (Oct 20); criterion 5 (one successful `score_candidates` in H01's cold run) still needs a live run |
 | Owner | TBD |
 
 ## Goal
@@ -46,10 +46,10 @@
 
 ## Tasks
 
-- [ ] `embeddings.py`: `BATCH`, the semaphore, timeout, retries, `EmbedResult`.
-- [ ] `service.py`: partial `_paper_vectors`, `score_candidates`' `skipped` and errors, `_warm` after `search` and `find_candidates`.
-- [ ] `.env.example` and `discovery/README.md`: `EMBED_CONCURRENCY`, the new behaviour.
-- [ ] Tests in `discovery/tests/test_scoring.py`.
+- [x] `embeddings.py`: `BATCH`, the semaphore, timeout, retries, `EmbedResult`.
+- [x] `service.py`: partial `_paper_vectors`, `score_candidates`' `skipped` and errors, `_warm` after `search` and `find_candidates`.
+- [x] `.env.example` and `discovery/README.md`: `EMBED_CONCURRENCY`, the new behaviour.
+- [x] Tests in `discovery/tests/test_scoring.py`.
 
 ## Acceptance criteria
 

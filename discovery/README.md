@@ -15,7 +15,7 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | --- | --- | --- |
 | `search` | `query`, `limit`, `sources` (pubmed, openalex, web), `since` | `papers` (summaries with `foundBy`), `countsBySource`, `skipped` |
 | `find_candidates` | `seed_ids`, `exclude_ids`, `strategies` (pubmed_links, citing, recommend, keyword, web), `since`, `limit`, `query` | `candidateIds` (found by most strategies first), `countsByStrategy`, `skipped` |
-| `score_candidates` | `question`, `candidate_ids`, `seed_ids`, `limit` | `top` (ID, title, year, `score`, `questionSimilarity`, `seedSimilarity`, `closestSeed`), `scored`, `skipped` |
+| `score_candidates` | `question`, `candidate_ids`, `seed_ids`, `limit` | `top` (ID, title, year, `score`, `questionSimilarity`, `seedSimilarity`, `closestSeed`), `scored`, `skipped` (candidates not found or not embedded) |
 | `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `exclude_ids`, `k`, `backend` (super_vl, rerank_vl) | `ranked` (summary, `rank`, `score`, `reason`), `backend`, `model`, `seconds`, `candidates`, `skipped` |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
@@ -35,6 +35,8 @@ Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PM
 Two steps, cheap then expensive:
 
 1. `score_candidates` embeds every candidate's and seed's title and abstract with Qwen3-Embedding-8B on Token Factory (it serves no Nemotron embedder) and scores each candidate by the mean of its cosine similarity to the question and to the closest seed, or the question's alone without seeds. It handles hundreds of candidates in a few seconds, and in well under a second once their vectors are stored. The score is a formula, so it can be broken down into its two similarities.
+
+   Texts go to the embeddings endpoint 32 to a request, at most `EMBED_CONCURRENCY` (default 4) requests at once across the server, each with a 90-second timeout. A request that times out, answers 429 or answers 5xx is tried twice more, after 2 s and then 5 s (or what `Retry-After` asks). Candidates still without a vector are left out and `skipped` says how many and why (`"3 candidates weren't scored: embeddings timed out after 3 tries"`); the call is a tool error with the reason only when the question or every candidate can't be embedded. Papers that `search` and `find_candidates` return (and the seeds) are embedded in the background as soon as they're found, so `score_candidates` mostly reads stored vectors.
 2. `rerank` reorders up to 100 candidates for the goal. Pass it the top of `score_candidates`, so the 100 it sees are the closest in meaning rather than the first found.
 
 `rerank` has two backends, picked per call by `backend` or for the server by `RERANK_BACKEND` (default `super_vl`):
@@ -57,5 +59,5 @@ Concept.md's step 5 also adds citation overlap with the seeds, recency and a Lig
 | Semantic Scholar | Recommendations from the seeds, steered away from excluded papers | Optional `SEMANTIC_SCHOLAR_API_KEY` |
 | Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv, each hit resolved to a paper ID; Extract for arXiv and publisher full text | `TAVILY_API_KEY` |
 | arXiv | Records for arXiv hits | None |
-| Token Factory | Embeddings for `score_candidates` (`Qwen/Qwen3-Embedding-8B`; set `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY` for another endpoint) and `rerank` with Super VL | `TF_API_KEY` |
+| Token Factory | Embeddings for `score_candidates` (`Qwen/Qwen3-Embedding-8B`; set `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY` for another endpoint and `EMBED_CONCURRENCY` for requests at once) and `rerank` with Super VL | `TF_API_KEY` |
 | NVIDIA API | `rerank` with Rerank VL | `NVIDIA_API_KEY`, only for `RERANK_BACKEND=rerank_vl` or `backend: rerank_vl` |

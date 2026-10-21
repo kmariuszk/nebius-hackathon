@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import AfterValidator, BeforeValidator
 
 from discovery.fulltext import DEFAULT_MAX_CHARS
@@ -24,6 +25,7 @@ from discovery.service import (
     SearchSource,
     Strategy,
 )
+from discovery.sources import Skipped
 
 
 def _unset(value: Any) -> Any:
@@ -160,10 +162,14 @@ def build_server(discovery: Discovery) -> MCPServer:
 
         Returns the top papers (ID, title, year, score from 0 to 1, similarity to the
         question and to the closest seed, which seed that is), how many candidates
-        were scored, and the IDs that could not be found and why. Seeds are never
-        returned as candidates.
+        were scored, and the IDs that could not be found or embedded and why. Seeds
+        are never returned as candidates.
         """
-        return await discovery.score_candidates(question, candidate_ids, seed_ids, limit)
+        try:
+            return await discovery.score_candidates(question, candidate_ids, seed_ids, limit)
+        except (ValueError, Skipped) as error:
+            # A ToolError keeps its text; anything else reaches the model as "Error executing tool".
+            raise ToolError(str(error)) from error
 
     @server.tool()
     async def resolve_seed(
