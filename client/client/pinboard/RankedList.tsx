@@ -1,14 +1,12 @@
 import { useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 import { sentenceCase, shortAuthors } from '../../shared/display'
-import { boardDerived, FIT_LABEL, GOALS } from '../shapes/card'
+import { boardDerived, FIT_COLOR, FIT_LABEL, GOALS } from '../shapes/card'
 import { currentGoal, filters, openPaperId, paperMoreOpen } from '../viewerState'
 import { activeCount, DEFAULT_FILTERS } from './filters'
 
 // The v6 ranked list: the suggestions in the agent's reading order for what you're looking for,
 // narrowed by this viewer's filters.
-
-export const FIT_COLOR = { high: '#104281', medium: '#2a78d6', low: '#86b6ef' } as const
 
 const clearFilters = () => filters.set(DEFAULT_FILTERS)
 

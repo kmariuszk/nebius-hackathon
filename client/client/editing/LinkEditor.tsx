@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useValue, type Editor, type TLShape } from 'tldraw'
-import { nodeLabel } from '../../shared/display'
+import { cardLabel } from '../../shared/display'
 import type { PaperCardShape } from '../../shared/shapes'
 import { boardApi } from '../api'
 import { changes } from '../pinboard/changes'
@@ -28,7 +28,6 @@ interface Props {
 	memberId: string
 }
 
-const label = (card: PaperCardShape) => nodeLabel(card.props.authors, card.props.year)
 const close = () => linkEditorAt.set(null)
 
 // the board service hears about a deleted similar link once Undo is no longer on offer; until
@@ -158,7 +157,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 			onKeyUp={(e) => e.stopPropagation()}
 		>
 			<div className="le-h">
-				{label(from)} <span>{kind === 'cites' ? '→' : '↔'}</span> {label(to)}
+				{cardLabel(from)} <span>{kind === 'cites' ? '→' : '↔'}</span> {cardLabel(to)}
 			</div>
 			<input
 				ref={input}
@@ -183,7 +182,7 @@ function Open({ editor, boardId, memberId, at, arrow, pair: [from, to] }: OpenPr
 					</button>
 				))}
 			</div>
-			<div className="le-note">{linkNote(kind, label(from), label(to), arrow.meta.by, memberId)}</div>
+			<div className="le-note">{linkNote(kind, cardLabel(from), cardLabel(to), arrow.meta.by, memberId)}</div>
 			<div className="le-f">
 				{options.hide && (
 					<button type="button" className="pb-btn text" onClick={hide}>

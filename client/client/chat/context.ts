@@ -3,10 +3,9 @@ import type { Editor, TLShape, TLShapeId } from 'tldraw'
 import type { SnapshotResult } from '../../shared/acpExt.ts'
 import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
 import { paperShapeId } from '../../shared/ids.ts'
-import { PAPER_CARD_TYPE } from '../../shared/paperCard.ts'
-import type { PaperCardShape } from '../../shared/shapes.ts'
+import { isPaperCard } from '../../shared/paperCard.ts'
 import { currentGoal, openPaperId } from '../viewerState.ts'
-import { takeSnapshot, type SnapshotRequest } from './snapshot.ts'
+import { shapesInView, takeSnapshot, type SnapshotRequest } from './snapshot.ts'
 
 // What the researcher is looking at, added to what they typed when they press Send (T07; group
 // README, Shared contracts, "Prompt content"): the text first, then the selected shapes and the
@@ -48,16 +47,15 @@ export interface ContextShape {
 	createdBy?: string
 }
 
-const isCard = (s: TLShape | undefined): s is PaperCardShape => s?.type === PAPER_CARD_TYPE
 const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined)
 
 export function toContextShape(editor: Editor, shape: TLShape, goal: string): ContextShape {
 	const out: ContextShape = { shapeId: shape.id, type: shape.type }
 	const paperOf = (id: string) => {
 		const s = editor.getShape(id as TLShapeId)
-		return isCard(s) ? s.props.paperId : null
+		return isPaperCard(s) ? s.props.paperId : null
 	}
-	if (isCard(shape)) {
+	if (isPaperCard(shape)) {
 		const { paperId, title, year, status, scores, figure } = shape.props
 		Object.assign(out, { paperId, title, year, status })
 		const score = scores[goal]
@@ -92,12 +90,9 @@ export function toContextShape(editor: Editor, shape: TLShape, goal: string): Co
 
 /** `{visiblePaperIds, visibleNoteCount, zoom}` for the `tldraw://<boardId>/viewport` resource. */
 export function viewportSummary(editor: Editor) {
-	const view = editor.getViewportPageBounds()
-	const visible = editor
-		.getCurrentPageShapes()
-		.filter((s) => !editor.isShapeHidden(s) && editor.getShapePageBounds(s)?.collides(view))
+	const visible = shapesInView(editor)
 	return {
-		visiblePaperIds: visible.filter(isCard).map((s) => s.props.paperId).slice(0, MAX_VISIBLE_PAPERS),
+		visiblePaperIds: visible.filter(isPaperCard).map((s) => s.props.paperId).slice(0, MAX_VISIBLE_PAPERS),
 		visibleNoteCount: visible.filter((s) => s.type === 'note').length,
 		zoom: Math.round(editor.getZoomLevel() * 100) / 100,
 		...(openPaperId.get() ? { openPaperId: openPaperId.get() } : {}),

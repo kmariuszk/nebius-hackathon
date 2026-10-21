@@ -2,10 +2,9 @@ import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 import { nodeLabel } from '../../shared/display'
 import type { PaperCardShape } from '../../shared/shapes'
-import { boardDerived, FIT_LABEL } from '../shapes/card'
+import { boardDerived, FIT_COLOR, FIT_LABEL } from '../shapes/card'
 import { currentGoal, filters, type BoardFilters } from '../viewerState'
 import { activeCount, CITED_AT_LEAST, DEFAULT_FILTERS, filterOptions, toggled } from './filters'
-import { FIT_COLOR } from './RankedList'
 
 // The v6 Filter button in the toolbar and its panel (T09): fit, type, quality, year and discarded
 // papers, for this viewer only. Options no paper on the board has data for are left out.

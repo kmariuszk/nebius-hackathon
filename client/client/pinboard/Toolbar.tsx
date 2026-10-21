@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { useValue, type Editor, type TLShapeId } from 'tldraw'
-import { nodeLabel } from '../../shared/display'
+import { cardLabel } from '../../shared/display'
 import { paperShapeId } from '../../shared/ids'
+import { isPaperCard } from '../../shared/paperCard'
 import { chatTurns } from '../chat/chatBus'
 import { NOTE_DRAG_TYPE } from '../editing/pinNotes'
 import { toast } from '../editing/toast'
@@ -71,7 +72,7 @@ function Changes({ editor, boardId }: { editor: Editor; boardId: string }) {
 
 	const labelOf = (paperId: string) => {
 		const card = editor.getShape(paperShapeId(paperId) as TLShapeId)
-		return card?.type === 'paper-card' ? nodeLabel(card.props.authors, card.props.year) : paperId
+		return isPaperCard(card) ? cardLabel(card) : paperId
 	}
 	const update = () => {
 		setOpen(false)

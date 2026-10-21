@@ -20,6 +20,7 @@ export const cardOffset = (shape: PaperCardShape) => ({
 export const isSaved = (shape: PaperCardShape) => shape.props.kind !== 'suggestion'
 
 export const FIT_LABEL = { high: 'High fit', medium: 'Medium fit', low: 'Low fit' } as const
+export const FIT_COLOR = { high: '#104281', medium: '#2a78d6', low: '#86b6ef' } as const
 
 export const GOALS: Record<string, { label: string; desc: string }> = {
 	'new-findings': { label: 'New findings', desc: 'Papers that tell you more about your question.' },

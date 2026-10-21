@@ -1,5 +1,6 @@
 import { useRef, type MouseEvent } from 'react'
 import { useEditor, useValue, type Editor, type TLShape, type TLShapeId } from 'tldraw'
+import { isPaperCard } from '../../shared/paperCard'
 import type { PaperCardShape } from '../../shared/shapes'
 import { kindOf, linkTag } from '../editing/linkRules'
 import { hoveredLink, linkEditorAt, openLinkEditor } from '../editing/linkState'
@@ -48,8 +49,6 @@ interface Line {
 	drawn: boolean
 }
 
-const isCard = (s: TLShape | undefined): s is PaperCardShape => s?.type === 'paper-card'
-
 /** The two paper cards an arrow links, or null when it isn't a link between papers. */
 export function linkedCards(editor: Editor, arrow: TLShape): [PaperCardShape, PaperCardShape] | null {
 	const bindings = editor.getBindingsFromShape(arrow, 'arrow')
@@ -58,7 +57,7 @@ export function linkedCards(editor: Editor, arrow: TLShape): [PaperCardShape, Pa
 	const end = bindings.find((b) => b.props.terminal === 'end')
 	const a = start && editor.getShape(start.toId)
 	const b = end && editor.getShape(end.toId)
-	return isCard(a) && isCard(b) ? [a, b] : null
+	return isPaperCard(a) && isPaperCard(b) ? [a, b] : null
 }
 
 function pinOf(editor: Editor, card: PaperCardShape): Pt | null {
@@ -82,7 +81,7 @@ function computeLines(editor: Editor): Line[] {
 	const open = openPaperId.get()
 	const hoveredId = editor.getHoveredShapeId()
 	const hovered = hoveredId ? editor.getShape(hoveredId) : undefined
-	const nh = !open && isCard(hovered) ? hovered.props.paperId : null
+	const nh = !open && isPaperCard(hovered) ? hovered.props.paperId : null
 	// the string you point at (not through a card) and the one being edited
 	const pointed = !hovered && editor.isIn('select.idle') ? hoveredLink.get() : null
 	const editing = linkEditorAt.get()?.arrowId ?? null

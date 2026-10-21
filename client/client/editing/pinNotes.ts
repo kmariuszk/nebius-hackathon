@@ -9,7 +9,8 @@ import {
 	type TLShapeId,
 } from 'tldraw'
 import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
-import { nodeLabel } from '../../shared/display.ts'
+import { cardLabel } from '../../shared/display.ts'
+import { isPaperCard } from '../../shared/paperCard.ts'
 import { CARD_SIZE, type PaperCardShape } from '../../shared/shapes.ts'
 import { boardOf, changes, recordEdit } from '../pinboard/changes.ts'
 import { NOTE_SCALE, plainText } from '../widgets/notes.ts'
@@ -116,9 +117,6 @@ interface Pinner {
 
 const pinners = new WeakMap<Editor, Pinner>()
 
-const isCard = (s: TLShape | undefined): s is PaperCardShape => s?.type === 'paper-card'
-export const cardLabel = (card: PaperCardShape) => nodeLabel(card.props.authors, card.props.year)
-
 /** Notes a person creates or drags are settled once they're put down. Returns the cleanup. */
 export function registerPinNotes(editor: Editor): () => void {
 	const queue = new Map<TLShapeId, Why>()
@@ -192,7 +190,7 @@ function settle(editor: Editor, id: TLShapeId, why: Why) {
 	const cards = new Map<string, PaperCardShape>()
 	const nodes: CardNode[] = []
 	for (const s of editor.getCurrentPageShapes()) {
-		if (!isCard(s) || editor.isShapeHidden(s)) continue
+		if (!isPaperCard(s) || editor.isShapeHidden(s)) continue
 		const at = editor.getShapePageTransform(s).point()
 		cards.set(s.id, s)
 		nodes.push({ id: s.id, x: at.x, y: at.y, w: s.props.w, h: s.props.h })
@@ -214,7 +212,7 @@ function settle(editor: Editor, id: TLShapeId, why: Why) {
 
 	// for Update suggestions (T13): a new note, or an old one pinned or unpinned
 	const text = plainText(note.props.richText)
-	const paperId = isCard(pinnedTo) ? pinnedTo.props.paperId : null
+	const paperId = isPaperCard(pinnedTo) ? pinnedTo.props.paperId : null
 	if (why !== 'moved') recordEdit(editor, { type: 'note_added', noteId: note.id, text, ...(paperId ? { paperId } : {}) })
 	else if (paperId && pinnedTo?.id !== pin?.toId) recordEdit(editor, { type: 'note_pinned', noteId: note.id, text, paperId })
 	else if (!paperId && pin) {

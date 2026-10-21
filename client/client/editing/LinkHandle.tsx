@@ -1,6 +1,7 @@
 import { useState, type PointerEvent } from 'react'
-import { createShapeId, useEditor, useValue, type Editor, type TLShape, type TLShapeId } from 'tldraw'
+import { createShapeId, useEditor, useValue, type Editor, type TLShapeId } from 'tldraw'
 import { linkShapeId } from '../../shared/ids'
+import { isPaperCard } from '../../shared/paperCard'
 import type { PaperCardShape } from '../../shared/shapes'
 import { recordEdit } from '../pinboard/changes'
 import { linkedCards } from '../pinboard/Strings'
@@ -11,8 +12,6 @@ import { toast } from './toast'
 // The + handle (T14, v6 demo board): on the right edge of the card you point at; drag it onto
 // another paper to link them, and the link editor opens to name the link. In front of the canvas
 // (components.InFrontOfTheCanvas), so tldraw leaves its pointer events alone.
-
-const isCard = (s: TLShape | undefined): s is PaperCardShape => s?.type === 'paper-card'
 
 interface Drag {
 	from: TLShapeId
@@ -31,7 +30,7 @@ export function LinkHandle() {
 			const id = editor.getHoveredShapeId()
 			const shape = id ? editor.getShape(id) : undefined
 			// the open paper has its widgets around it instead
-			return isCard(shape) && openPaperId.get() !== shape.props.paperId ? shape.id : null
+			return isPaperCard(shape) && openPaperId.get() !== shape.props.paperId ? shape.id : null
 		},
 		[editor]
 	)
@@ -98,7 +97,7 @@ function dropLink(editor: Editor, fromId: TLShapeId, clientX: number, clientY: n
 		margin: editor.getHitTestMargin(),
 		filter: (s) => s.type === 'paper-card' && s.id !== fromId && !editor.isShapeHidden(s),
 	})
-	if (!isCard(from) || !isCard(target)) {
+	if (!isPaperCard(from) || !isPaperCard(target)) {
 		toast('Drop the link on another paper.')
 		return
 	}

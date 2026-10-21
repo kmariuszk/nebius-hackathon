@@ -1,10 +1,9 @@
 import { atom, Box, type Editor, type TLShape, type TLShapeId } from 'tldraw'
 import type { SnapshotParams, SnapshotResult } from '../../shared/acpExt.ts'
 import { NOTE_PIN_TYPE } from '../../shared/bindings.ts'
-import { nodeLabel } from '../../shared/display.ts'
+import { cardLabel } from '../../shared/display.ts'
 import { paperShapeId } from '../../shared/ids.ts'
-import { PAPER_CARD_TYPE } from '../../shared/paperCard.ts'
-import type { PaperCardShape } from '../../shared/shapes.ts'
+import { isPaperCard } from '../../shared/paperCard.ts'
 import { openPaperId } from '../viewerState.ts'
 
 // The pictures the agent sees (T07): one renderer for the agent's `_canvas/snapshot` requests and
@@ -49,6 +48,12 @@ export interface SnapshotPlan {
 	caption: string
 }
 
+/** The shapes shown on the page whose bounds touch the researcher's view. */
+export function shapesInView(editor: Editor): TLShape[] {
+	const view = editor.getViewportPageBounds()
+	return editor.getCurrentPageShapes().filter((s) => !editor.isShapeHidden(s) && editor.getShapePageBounds(s)?.collides(view))
+}
+
 /** What a request draws: the shapes, the page area and the caption. Throws with a reason the agent can repeat. */
 export function planSnapshot(editor: Editor, request: SnapshotRequest): SnapshotPlan {
 	const shown = editor.getCurrentPageShapes().filter((s) => !editor.isShapeHidden(s))
@@ -57,7 +62,7 @@ export function planSnapshot(editor: Editor, request: SnapshotRequest): Snapshot
 	switch (request.target) {
 		case 'viewport': {
 			const bounds = editor.getViewportPageBounds().clone()
-			const inView = shown.filter((s) => editor.getShapePageBounds(s)?.collides(bounds))
+			const inView = shapesInView(editor)
 			if (!inView.length) throw new Error("Nothing on the board is in the researcher's view right now.")
 			return { ids, bounds, caption: `The researcher's current view, with ${counts(inView)}${openNote(editor)}` }
 		}
@@ -101,13 +106,11 @@ function union(editor: Editor, shapes: TLShape[]) {
 	return Box.Common(shapes.flatMap((s) => editor.getShapePageBounds(s) ?? []))
 }
 
-const isCard = (s: TLShape): s is PaperCardShape => s.type === PAPER_CARD_TYPE
-
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
 
 /** "12 cards, 2 clusters, 3 notes" */
 export function counts(shapes: TLShape[]) {
-	const cards = shapes.filter(isCard).length
+	const cards = shapes.filter(isPaperCard).length
 	const clusters = shapes.filter((s) => s.type === 'frame').length
 	const notes = shapes.filter((s) => s.type === 'note').length
 	const parts = [cards && plural(cards, 'card'), clusters && plural(clusters, 'cluster'), notes && plural(notes, 'note')]
@@ -118,12 +121,12 @@ function openNote(editor: Editor) {
 	const paperId = openPaperId.get()
 	if (!paperId) return ''
 	const card = editor.getShape(paperShapeId(paperId) as TLShapeId)
-	const name = card && isCard(card) ? nodeLabel(card.props.authors, card.props.year) : paperId
+	const name = isPaperCard(card) ? cardLabel(card) : paperId
 	return `; ${name} is open, but its panels aren't in the picture`
 }
 
 function nameOf(shape: TLShape) {
-	if (isCard(shape)) return nodeLabel(shape.props.authors, shape.props.year)
+	if (isPaperCard(shape)) return cardLabel(shape)
 	if (shape.type === 'frame') {
 		const name = (shape.props as { name?: string }).name
 		return name ? `the "${name}" cluster` : 'a cluster'
@@ -137,7 +140,7 @@ function shapesCaption(named: TLShape[], drawn: TLShape[]) {
 	const shown = names.length > 6 ? [...names.slice(0, 5), plural(names.length - 5, 'more')] : names
 	const list = shown.length > 1 ? `${shown.slice(0, -1).join(', ')} and ${shown[shown.length - 1]}` : shown[0]
 	const ids = new Set(named.map((s) => s.id))
-	const linked = drawn.filter((s) => isCard(s) && !ids.has(s.id)).length
+	const linked = drawn.filter((s) => isPaperCard(s) && !ids.has(s.id)).length
 	return linked ? `${list}, with ${plural(linked, 'linked paper')}` : list
 }
 
