@@ -5,6 +5,9 @@ import { defaultBindingUtils, defaultShapeUtils, Editor, react, Tldraw, type TLC
 import { boardApi } from '../api'
 import { chatBus } from '../chat/chatBus'
 import { ChatPanel } from '../chat/ChatPanel'
+import { BoardToast } from '../editing/BoardToast'
+import { LinkEditor } from '../editing/LinkEditor'
+import { LinkHandle } from '../editing/LinkHandle'
 import { getBookmarkPreview } from '../getBookmarkPreview'
 import { getDisplayName, getMemberId } from '../identity'
 import { multiplayerAssetStore } from '../multiplayerAssetStore'
@@ -26,6 +29,7 @@ const bindingUtils = [...defaultBindingUtils, ...customBindingUtils]
 // toolbar in place of tldraw's menus and panels.
 const components: TLComponents = {
 	OnTheCanvas: Strings,
+	InFrontOfTheCanvas: LinkHandle,
 	SvgDefs: PinboardDefs,
 	MenuPanel: null,
 	StylePanel: null,
@@ -175,6 +179,8 @@ export function Room() {
 						{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
 						{editor && <PaperWidgets editor={editor} boardId={roomId} memberId={memberId} />}
 						{editor && <PinboardToolbar editor={editor} />}
+						{editor && <LinkEditor editor={editor} boardId={roomId} memberId={memberId} />}
+						<BoardToast />
 					</div>
 					<ChatPanel boardId={roomId} memberId={memberId} editor={editor} open={chatOpen} onOpenChange={setChatOpen} />
 				</div>

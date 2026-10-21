@@ -1,3 +1,4 @@
+import type { LinkKind } from '../shared/ids.ts'
 import type { PaperStatus } from '../shared/paperCard.ts'
 
 // The board service's REST API (T08) from the browser: JSON in and out, the member ID as the
@@ -65,5 +66,8 @@ export function boardApi(boardId: string, memberId: string) {
 		/** Keep, Discard, or (null) take the vote back; the card updates for everyone through sync. */
 		vote: (paperId: string, decision: 'keep' | 'discard' | null) =>
 			call<VoteResult>('PUT', `${board}/papers/${encodeURIComponent(paperId)}/vote`, memberId, { decision }),
+		/** A link a person deleted: get_board lists it in removedLinks and link_papers never draws it again (T14). */
+		removeLink: (from: string, to: string, kind: LinkKind) =>
+			call<void>('PUT', `${board}/removed-links`, memberId, { from, to, kind }),
 	}
 }

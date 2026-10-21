@@ -318,6 +318,180 @@
 .pb-tag.faded {
 	opacity: 0.25;
 }
+/* the part of a string you can point at and click (T14) */
+.pb-hit {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 12;
+	pointer-events: stroke;
+	cursor: pointer;
+}
+
+/* ---------- editing the board (T14): the + handle, the link editor, the board's toast ---------- */
+.pb-handle {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	margin: -10px 0 0 -10px;
+	pointer-events: all;
+	cursor: crosshair;
+	touch-action: none;
+}
+.pb-handle svg {
+	display: block;
+	overflow: visible;
+}
+.pb-handle circle {
+	fill: #fff;
+	stroke: #0b0b0b;
+	stroke-width: 1.5;
+}
+.pb-handle path {
+	stroke: #0b0b0b;
+	stroke-width: 1.6;
+}
+.pb-rubber {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+.pb-rubber line {
+	stroke: #3b3a37;
+	stroke-width: 1.8;
+	stroke-dasharray: 5 4;
+}
+.pb-led,
+.pb-toast {
+	--ink: #0b0b0b;
+	--ink2: #52514e;
+	--muted: #898781;
+	--hair: #ebe9e3;
+	--page: #f4f3ef;
+	--ring: rgba(11, 11, 11, 0.07);
+	font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+.pb-led {
+	position: absolute;
+	z-index: 320;
+	width: 300px;
+	box-sizing: border-box;
+	background: #fff;
+	color: var(--ink);
+	border-radius: 12px;
+	box-shadow: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.16);
+	padding: 12px;
+}
+.pb-led button {
+	font: inherit;
+	cursor: pointer;
+}
+.pb-led .le-h {
+	font-weight: 650;
+	margin-bottom: 8px;
+}
+.pb-led .le-h span {
+	color: var(--muted);
+	font-weight: 400;
+	margin: 0 2px;
+}
+.pb-led input {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid var(--hair);
+	border-radius: 8px;
+	padding: 8px 10px;
+	font: inherit;
+	margin-bottom: 8px;
+}
+.pb-led input:focus {
+	outline: 2px solid #2a78d6;
+	outline-offset: -1px;
+}
+.pb-led .chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.pb-led .fchip {
+	border: 1px solid var(--hair);
+	background: #fff;
+	border-radius: 999px;
+	padding: 3px 10px;
+	font-size: 12.5px;
+	color: var(--ink2);
+}
+.pb-led .fchip:hover {
+	border-color: var(--ink2);
+	color: var(--ink);
+}
+.pb-led .le-note {
+	font-size: 12px;
+	color: var(--muted);
+	margin-top: 8px;
+}
+.pb-led .le-f {
+	display: flex;
+	align-items: center;
+	margin-top: 10px;
+}
+.pb-btn.text {
+	background: none;
+	padding: 7px 4px;
+	color: var(--ink2);
+}
+.pb-btn.text:hover {
+	background: none;
+	color: var(--ink);
+}
+.pb-led .pb-btn.text + .pb-btn.text {
+	margin-left: 10px;
+}
+.pb-toast {
+	position: absolute;
+	left: 50%;
+	bottom: 72px;
+	transform: translateX(-50%);
+	z-index: 310;
+	background: var(--ink);
+	color: #fff;
+	border-radius: 10px;
+	padding: 10px 14px;
+	display: flex;
+	gap: 14px;
+	align-items: center;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+	max-width: 560px;
+	width: max-content;
+}
+.pb-toast button {
+	background: none;
+	border: 0;
+	color: #fff;
+	text-decoration: underline;
+	font: inherit;
+	font-weight: 600;
+	padding: 0;
+	white-space: nowrap;
+	cursor: pointer;
+}
+/* what you drag out of the toolbar's Note */
+.pb-ghost {
+	position: fixed;
+	left: -1000px;
+	top: -1000px;
+	width: 132px;
+	height: 84px;
+	box-sizing: border-box;
+	background: #fff1a8;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+	font: 12px system-ui, -apple-system, 'Segoe UI', sans-serif;
+	padding: 10px;
+	color: #a39a6a;
+}
 
 /* ---------- notes: tldraw's notes as yellow paper in a hand ---------- */
 .Board .tl-note__container {
@@ -377,6 +551,9 @@
 	font-weight: 600;
 	color: #0b0b0b;
 	cursor: pointer;
+}
+.pb-notebtn[draggable='true'] {
+	cursor: grab;
 }
 .pb-notebtn:hover {
 	background: #f4f3ef;
