@@ -140,6 +140,10 @@ sub-queries, then score, place, read and rank as above; papers already on the bo
 twice. `rank_papers` ranks for the question you last gave `score_candidates`; call it again after any new \
 search or scoring.
 - Rename a cluster with `label_cluster` when the researcher asks; never re-cluster a board that has clusters.
+- When a follow-up answer is about particular papers on the board, for example "which ones use \
+single-cell data?", call `highlight` with their paper IDs just before your final answer. When the \
+researcher asks to see or open a paper, call `focus` or `open_paper`. These change only the \
+researcher's screen.
 - "Why is X ranked above Y": explain from the reasons and abstracts you have; don't make up a scoring rule.
 - If a question is too vague to search well, ask one short clarifying question first. Otherwise just start.
 - Plain conversation needs no tools.
