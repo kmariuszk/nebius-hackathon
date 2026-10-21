@@ -114,27 +114,39 @@ function useBoardInfo(roomId: string, memberId: string) {
 	const [agentActive, setAgentActive] = useState(false)
 	useEffect(() => {
 		let live = true
+		let events: EventSource | null = null
+		let streamed = -1
 		const api = boardApi(roomId, memberId)
+		const presence = (active: boolean) => (e: MessageEvent) => {
+			streamed = Number(e.lastEventId)
+			setAgentActive(active)
+		}
+		const open = (after?: number) => {
+			if (events || !live) return
+			const query = after === undefined ? '' : `?after=${after}`
+			events = new EventSource(`/api/v1/boards/${encodeURIComponent(roomId)}/events${query}`)
+			events.addEventListener('agent.active', presence(true))
+			events.addEventListener('agent.idle', presence(false))
+		}
 		const load = () =>
 			api.get().then(
 				(b) => {
 					if (!live) return
 					setBoard(b)
-					setAgentActive(b.agentActive)
+					if (b.lastSeq >= streamed) setAgentActive(b.agentActive)
+					open(b.lastSeq)
 				},
-				(e) => console.warn(`Couldn't read board ${roomId}:`, e)
+				(e) => {
+					console.warn(`Couldn't read board ${roomId}:`, e)
+					open()
+				}
 			)
 		void load()
 		window.addEventListener('focus', load)
-		const events = new EventSource(`/api/v1/boards/${encodeURIComponent(roomId)}/events`)
-		const active = () => setAgentActive(true)
-		const idle = () => setAgentActive(false)
-		events.addEventListener('agent.active', active)
-		events.addEventListener('agent.idle', idle)
 		return () => {
 			live = false
 			window.removeEventListener('focus', load)
-			events.close()
+			events?.close()
 		}
 	}, [roomId, memberId])
 	return { board, agentActive }
