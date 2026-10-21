@@ -32,7 +32,7 @@ After the first run, the board's papers sit in two to six named clusters of simi
 
 **`cluster_papers(paper_ids, k=None)`** (`discovery/discovery/clusters.py`, tool in `server.py`), 2 to 500 IDs:
 
-1. Records (`self._papers`) and unit vectors (`self._paper_vectors(Embedder.from_env(...), papers)`, so stored vectors are reused).
+1. Records (`discovery.load_papers(paper_ids, "paper")`) and unit vectors (`self._paper_vectors(Embedder.from_env(...), papers)`, so stored vectors are reused).
 2. `k`: the argument if given; else 1 when there are fewer than 6 papers, else `clamp(round(sqrt(n / 2)), 2, 6)`.
 3. k-means++ on the unit vectors (cosine), numpy only, seeded with 0, at most 25 iterations, so the same papers always give the same clusters.
 4. A cluster of one paper joins the cluster whose centroid is closest.

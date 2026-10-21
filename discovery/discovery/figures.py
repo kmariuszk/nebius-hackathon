@@ -66,27 +66,29 @@ async def page_urls(client: httpx.AsyncClient, pmcid: str) -> dict[str, str]:
     raise Skipped(f"PMC's article page was a block page {TRIES} times")
 
 
-async def add_image_urls(client: httpx.AsyncClient, text: FullText) -> None:
+async def add_image_urls(client: httpx.AsyncClient, text: FullText) -> str | None:
     """Fill in the image URL of each figure of a PMC full text, matched by figure ID, then by
-    image file. When none is found, `text.imagesSkipped` says why; nothing is raised."""
+    image file. When no figure on the page matched, `text.imagesSkipped` says so. Returns why
+    the page couldn't be read, which a later read tries again, or None; nothing is raised."""
     pmcid = ids_from_url(text.url or "").get("pmcid")
     if text.source != "pmc" or not text.figures or not pmcid:
-        return
+        return None
     try:
         urls = await page_urls(client, pmcid)
     except (Skipped, httpx.HTTPError) as error:
         reason = str(error).split("\n")[0] or type(error).__name__
         log.warning("No figure images for %s: %s", pmcid, reason)
-        text.imagesSkipped = f"figure images: {reason}"
-        return
+        return f"figure images: {reason}"
     for figure in text.figures:
         figure.imageUrl = urls.get(figure.figureId) or (urls.get(stem(figure.graphic)) if figure.graphic else None)
     if not any(figure.imageUrl for figure in text.figures):
         text.imagesSkipped = "figure images: no figure on PMC's article page matched"
+    return None
 
 
 def lacks_image_urls(text: FullText) -> bool:
-    """A PMC full text saved before figures had image URLs: none has one, and nothing says why."""
+    """A PMC full text whose figures have no image URL yet, and nothing says why: saved before
+    figures had image URLs, or while PMC's article page couldn't be read."""
     return (
         text.source == "pmc"
         and bool(text.figures)

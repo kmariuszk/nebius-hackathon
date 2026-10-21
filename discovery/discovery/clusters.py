@@ -21,7 +21,6 @@ from typing import Any
 import httpx
 import numpy as np
 
-from discovery.citations import _load
 from discovery.embeddings import Embedder
 from discovery.rerank import TOKEN_FACTORY_URL
 from discovery.service import Discovery
@@ -178,7 +177,7 @@ async def cluster_papers(discovery: Discovery, paper_ids: list[str], k: int | No
     if k is not None and k < 1:
         raise ValueError("k must be at least 1, or left out")
     embedder = Embedder.from_env(discovery.client)
-    papers, skipped = await _load(discovery, unique)
+    papers, skipped = await discovery.load_papers(unique, "paper")
     stored, failures = await discovery._paper_vectors(embedder, list(papers.values()))
     ids = []
     for paper_id, paper in papers.items():

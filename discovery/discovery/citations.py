@@ -8,15 +8,14 @@ under the IDs the caller gave, whichever ID the reference list used.
 
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Awaitable
 from typing import Any
 
 import httpx
 
 from discovery.papers import Paper, format_id, parse_id
-from discovery.service import Discovery, _run
-from discovery.sources import Skipped, openalex, pubmed
+from discovery.service import Discovery, run_jobs
+from discovery.sources import openalex, pubmed
 
 MIN_PAPERS, MAX_PAPERS = 2, 200
 
@@ -29,7 +28,7 @@ async def citation_links(discovery: Discovery, paper_ids: list[str]) -> dict[str
     unique = list(dict.fromkeys(paper_ids))
     if not MIN_PAPERS <= len(unique) <= MAX_PAPERS:
         raise ValueError(f"Give {MIN_PAPERS} to {MAX_PAPERS} different paper IDs, not {len(unique)}")
-    papers, skipped = await _load(discovery, unique)
+    papers, skipped = await discovery.load_papers(unique, "paper")
     # Every ID of every paper, to the ID it was given as.
     given: dict[str, str] = {}
     for paper_id, paper in papers.items():
@@ -41,7 +40,7 @@ async def citation_links(discovery: Discovery, paper_ids: list[str]) -> dict[str
         jobs["pubmed"] = _pubmed(discovery.client, pmids, given)
     if rest := {paper_id for paper_id, paper in papers.items() if "pmid" not in paper.ids}:
         jobs["openalex"] = _openalex(discovery.client, rest, list(papers.values()), given)
-    found, failed = await _run(jobs)
+    found, failed = await run_jobs(jobs)
 
     # PubMed's first; each pair once, and no paper citing itself.
     links, seen = [], set()
@@ -51,21 +50,6 @@ async def citation_links(discovery: Discovery, paper_ids: list[str]) -> dict[str
                 seen.add(pair)
                 links.append({"from": pair[0], "to": pair[1], "source": source})
     return {"links": links, "skipped": skipped + failed}
-
-
-async def _load(discovery: Discovery, paper_ids: list[str]) -> tuple[dict[str, Paper], list[str]]:
-    """Each paper under the ID it was given as (which `Discovery._papers` doesn't keep), and a note
-    for each that couldn't be loaded."""
-    results = await asyncio.gather(*map(discovery.get_paper, paper_ids), return_exceptions=True)
-    papers, skipped = {}, []
-    for paper_id, result in zip(paper_ids, results):
-        if isinstance(result, (ValueError, Skipped, httpx.HTTPError)):
-            skipped.append(f"paper {paper_id}: {result}")
-        elif isinstance(result, BaseException):
-            raise result
-        else:
-            papers[paper_id] = result
-    return papers, skipped
 
 
 async def _pubmed(client: httpx.AsyncClient, pmids: list[str], given: dict[str, str]) -> list[tuple[str, str]]:

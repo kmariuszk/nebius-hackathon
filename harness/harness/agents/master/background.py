@@ -167,6 +167,7 @@ class ProcessPapers(BaseToolset):
         self.started: set[str] = set()
         self.tasks: set[asyncio.Task[None]] = set()
         self.citing: dict[str, asyncio.Task[None]] = {}  # each turn's citation step, by run ID
+        self.cited: set[str] = set()
         self.clustered = False  # the board has clusters, or this chat clustered it
         self.clustering: asyncio.Task[None] | None = None
         self.tool = FunctionTool(self.process_papers)
@@ -216,7 +217,7 @@ class ProcessPapers(BaseToolset):
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
             # 1. Seeds start no batch, so a turn that placed only seeds links citations here too (once a turn).
-            cite = asyncio.create_task(self.link_citations(job))
+            cite = asyncio.create_task(self.link_citations(job, seeds))
             self.tasks.add(cite)
             cite.add_done_callback(self.tasks.discard)
         # 4. Clusters, once per board, now that rank_papers has written the fits (D04).
@@ -245,7 +246,7 @@ class ProcessPapers(BaseToolset):
         await self.try_step("turn the reading badges on", jobs[0], lambda call: call(
             "mark_working", paperIds=[job.paper_id for job in jobs], on=True))
         # 1. Citation links among the board's papers, once a turn (D03).
-        await self.link_citations(jobs[0])
+        await self.link_citations(jobs[0], [job.paper_id for job in jobs])
         # 2. Near links: each paper to the one it was placed near, without a model.
         if links:
             await self.try_step("link the papers to the ones they were placed near", jobs[0], lambda call: call(
@@ -253,18 +254,27 @@ class ProcessPapers(BaseToolset):
         # 3. Reading.
         await asyncio.gather(*(self.read_then_relate(job) for job in jobs))
 
-    async def link_citations(self, job: Job) -> None:
+    async def link_citations(self, job: Job, paper_ids: list[str]) -> None:
         """Step 1, once a turn: a `cites` link for every citation between two papers on the board.
 
-        A later batch of the same turn waits for the first one's, so citations go before its near links.
+        A later batch of the same turn waits for the step already running, so citations go before its
+        near links, and runs it again when that step didn't cover `paper_ids`.
         """
         if job.run_id is None:  # no turns to tell apart (adk web): every batch links
             return await self.cite(job)
-        if job.run_id not in self.citing:
+        while True:
+            task = self.citing.get(job.run_id)
+            if task is not None and not task.done():
+                await asyncio.shield(task)  # one waiter cancelled doesn't cancel it for the others
+                continue
+            if task is not None and self.cited.issuperset(paper_ids):
+                return
+            self.citing = {run_id: t for run_id, t in self.citing.items() if not t.done()}
             self.citing[job.run_id] = task = asyncio.create_task(self.cite(job))
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
-        await asyncio.shield(self.citing[job.run_id])  # one waiter cancelled doesn't cancel it for the others
+            await asyncio.shield(task)
+            return
 
     async def cite(self, job: Job) -> None:
         """`citation_links` on every paper on the board, written with `link_papers`, without a model.
@@ -274,16 +284,17 @@ class ProcessPapers(BaseToolset):
                 log.info("the papers MCP has no citation_links, so the board gets no citation links")
                 return
             board = await call("get_board")
+            on_board = [p["paperId"] for p in board.get("papers") or []]
             dropped = set(board.get("discardedIds") or [])
-            paper_ids = [p["paperId"] for p in board.get("papers") or [] if p["paperId"] not in dropped]
-            if len(paper_ids) < 2:
-                return
-            found = await call("citation_links", paper_ids=paper_ids[:CITED_PAPERS])
-            links = [{"from": link["from"], "to": link["to"], "kind": "cites", "source": link["source"]}
-                     for link in found.get("links") or []]
-            for start in range(0, len(links), LINKS_PER_CALL):
-                await call("link_papers", links=links[start : start + LINKS_PER_CALL])
-            log.info("%d citations among the board's %d papers", len(links), len(paper_ids))
+            paper_ids = [p for p in on_board if p not in dropped]
+            if len(paper_ids) >= 2:
+                found = await call("citation_links", paper_ids=paper_ids[:CITED_PAPERS])
+                links = [{"from": link["from"], "to": link["to"], "kind": "cites", "source": link["source"]}
+                         for link in found.get("links") or []]
+                for start in range(0, len(links), LINKS_PER_CALL):
+                    await call("link_papers", links=links[start : start + LINKS_PER_CALL])
+                log.info("%d citations among the board's %d papers", len(links), len(paper_ids))
+            self.cited.update(on_board)
 
         tools = [self.board.canvas("get_board", "link_papers"), self.board.papers("citation_links")]
         try:

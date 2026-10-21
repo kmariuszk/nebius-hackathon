@@ -1,14 +1,25 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 import type { Editor } from 'tldraw'
+import { DEFAULT_TOUR_TITLE } from '../../shared/acpExt.ts'
 import { paperShapeId } from '../../shared/ids.ts'
 import type { PaperCardProps } from '../../shared/paperCard.ts'
 import { defaultPaperCardProps } from '../../shared/shapes.ts'
 import { currentGoal, openPaperId, paperMoreOpen, tour, type Tour, type TourStep } from '../viewerState.ts'
-import { boardSteps, runTour, stepsFromBoard, stepsOnBoard, tourReducer, TOUR_TITLE, visibleCard } from './tour.ts'
+import {
+	boardSteps,
+	runTour,
+	stepsFromBoard,
+	stepsOnBoard,
+	tourOnGone,
+	tourOnOpen,
+	tourOnVote,
+	tourReducer,
+	visibleCard,
+} from './tour.ts'
 
 const steps = (...ids: string[]): TourStep[] => ids.map((paperId) => ({ paperId, line: `Why ${paperId}` }))
-const start = (...ids: string[]) => tourReducer(null, { type: 'start', steps: steps(...ids), title: TOUR_TITLE })!
+const start = (...ids: string[]) => tourReducer(null, { type: 'start', steps: steps(...ids), title: DEFAULT_TOUR_TITLE })!
 const at = (t: Tour | null) => (t ? `${t.steps[t.i].paperId} (${t.i + 1} of ${t.steps.length})` : null)
 
 afterEach(() => {
@@ -23,7 +34,7 @@ afterEach(() => {
 test('start opens the first step; with nothing to show there is no tour', () => {
 	const t = start('a', 'b', 'c')
 	assert.deepEqual(t, { title: 'Catch-up', steps: steps('a', 'b', 'c'), i: 0 })
-	assert.equal(tourReducer(null, { type: 'start', steps: [], title: TOUR_TITLE }), null)
+	assert.equal(tourReducer(null, { type: 'start', steps: [], title: DEFAULT_TOUR_TITLE }), null)
 	// starting again starts over
 	assert.equal(at(tourReducer({ ...t, i: 2 }, { type: 'start', steps: steps('d', 'e'), title: 'New this week' })), 'd (1 of 2)')
 })
@@ -166,7 +177,7 @@ test('the board’s tour: new papers the viewer can see, best first; seeds, disc
 
 test('running the tour opens each step’s paper with More closed, and the end closes the widgets', () => {
 	paperMoreOpen.set(true)
-	runTour({ type: 'start', steps: steps('p1', 'p2', 'p3'), title: TOUR_TITLE })
+	runTour({ type: 'start', steps: steps('p1', 'p2', 'p3'), title: DEFAULT_TOUR_TITLE })
 	assert.equal(openPaperId.get(), 'p1')
 	assert.equal(paperMoreOpen.get(), false)
 	assert.equal(at(tour.get()), 'p1 (1 of 3)')
@@ -189,12 +200,70 @@ test('with no tour running, ending or stepping leaves the open paper alone', () 
 	openPaperId.set('x')
 	runTour({ type: 'end' })
 	runTour({ type: 'next' })
-	runTour({ type: 'start', steps: [], title: TOUR_TITLE })
+	runTour({ type: 'start', steps: [], title: DEFAULT_TOUR_TITLE })
 	assert.equal(openPaperId.get(), 'x')
 	assert.equal(tour.get(), null)
 	// × and Done end a running one, and close its paper
-	runTour({ type: 'start', steps: steps('p1', 'p2'), title: TOUR_TITLE })
+	runTour({ type: 'start', steps: steps('p1', 'p2'), title: DEFAULT_TOUR_TITLE })
 	runTour({ type: 'end' })
 	assert.equal(tour.get(), null)
 	assert.equal(openPaperId.get(), null)
+})
+
+test('a vote moves the tour on and says whether it ended it; outside a tour, Discard closes the paper', () => {
+	runTour({ type: 'start', steps: steps('p1', 'p2'), title: DEFAULT_TOUR_TITLE })
+	assert.equal(tourOnVote('p2', 'keep'), false)
+	assert.equal(tourOnVote('p1', 'keep'), false)
+	assert.equal(openPaperId.get(), 'p2')
+	runTour({ type: 'prev' })
+	assert.equal(tourOnVote('p2', 'keep'), false)
+	assert.equal(at(tour.get()), 'p1 (1 of 2)')
+	runTour({ type: 'next' })
+	assert.equal(tourOnVote('p2', 'keep'), true)
+	assert.equal(tour.get(), null)
+	assert.equal(openPaperId.get(), null)
+
+	openPaperId.set('x')
+	assert.equal(tourOnVote('x', 'keep'), false)
+	assert.equal(openPaperId.get(), 'x')
+	paperMoreOpen.set(true)
+	assert.equal(tourOnVote('x', 'discard'), false)
+	assert.equal(openPaperId.get(), null)
+	assert.equal(paperMoreOpen.get(), false)
+})
+
+test('a step whose card is hidden or deleted is skipped, and after the last step the tour ends', () => {
+	runTour({ type: 'start', steps: steps('p1', 'p2', 'p3'), title: DEFAULT_TOUR_TITLE })
+	tourOnVote('p1', 'keep')
+	assert.equal(openPaperId.get(), 'p2')
+	tourOnGone('p2')
+	assert.equal(at(tour.get()), 'p3 (2 of 2)')
+	assert.equal(openPaperId.get(), 'p3')
+	tourOnGone('p3')
+	assert.equal(tour.get(), null)
+	assert.equal(openPaperId.get(), null)
+
+	openPaperId.set('x')
+	tourOnGone('x')
+	assert.equal(openPaperId.get(), null)
+})
+
+test('opening a paper the tour isn’t on, or closing, ends the tour; opening its own step doesn’t', () => {
+	runTour({ type: 'start', steps: steps('p1', 'p2'), title: DEFAULT_TOUR_TITLE })
+	tourOnOpen('p1')
+	assert.equal(at(tour.get()), 'p1 (1 of 2)')
+	tourOnOpen('x')
+	assert.equal(tour.get(), null)
+	runTour({ type: 'start', steps: steps('p1', 'p2'), title: DEFAULT_TOUR_TITLE })
+	tourOnOpen(null)
+	assert.equal(tour.get(), null)
+})
+
+test('a Discard mid-tour moves on, so its Undo must not reopen the paper: that would end the tour', () => {
+	runTour({ type: 'start', steps: steps('p1', 'p2', 'p3'), title: DEFAULT_TOUR_TITLE })
+	runTour({ type: 'next' })
+	assert.equal(tourOnVote('p2', 'discard'), false)
+	assert.equal(at(tour.get()), 'p3 (2 of 2)')
+	tourOnOpen('p2')
+	assert.equal(tour.get(), null)
 })
