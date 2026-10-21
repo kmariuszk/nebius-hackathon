@@ -17,6 +17,7 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | `find_candidates` | `seed_ids`, `exclude_ids`, `strategies` (pubmed_links, citing, recommend, keyword, web), `since`, `limit`, `query` | `candidateIds` (found by most strategies first), `countsByStrategy`, `skipped` |
 | `score_candidates` | `question`, `candidate_ids`, `seed_ids`, `limit` | `top` (ID, title, year, `score`, `questionSimilarity`, `seedSimilarity`, `closestSeed`), `scored`, `skipped` (candidates not found or not embedded) |
 | `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `exclude_ids`, `k`, `backend` (super_vl, rerank_vl) | `ranked` (summary, `rank`, `score`, `reason`), `backend`, `model`, `seconds`, `candidates`, `skipped` |
+| `citation_links` | `paper_ids` (2 to 200) | `links` (`from` cites `to`, both among `paper_ids` and under the IDs given; `source` pubmed from PubMed's reference lists, or openalex from OpenAlex's `referenced_works` for papers without a PMID), `skipped` |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
 | `get_fulltext` | `paper_id`, `max_chars` (40,000) | `source` (pmc, web, abstract), `url`, `sections` (`title`, `text`), `figures` (`figureId`, `label`, `caption`), `truncated`, `omittedSections`, `skipped` |
@@ -55,7 +56,7 @@ Concept.md's step 5 also adds citation overlap with the seeds, recency and a Lig
 | Source | Used for | Key |
 | --- | --- | --- |
 | PubMed E-utilities | Keyword search, records with abstracts, similar/citing/reference links, PMC full text | None; `NCBI_API_KEY` raises the limit from 3 to 10 requests a second |
-| OpenAlex | Keyword search across fields, DOI lookups, papers citing the seeds | `OPENALEX_API_KEY` (free); required since keyless use shares a tiny per-IP budget |
+| OpenAlex | Keyword search across fields, DOI lookups, papers citing the seeds, reference lists of papers without a PMID | `OPENALEX_API_KEY` (free); required since keyless use shares a tiny per-IP budget |
 | Semantic Scholar | Recommendations from the seeds, steered away from excluded papers | Optional `SEMANTIC_SCHOLAR_API_KEY` |
 | Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv, each hit resolved to a paper ID; Extract for arXiv and publisher full text | `TAVILY_API_KEY` |
 | arXiv | Records for arXiv hits | None |

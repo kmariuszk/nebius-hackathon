@@ -298,6 +298,32 @@ test('link_papers draws bound arrows once, never resizes or moves a card, and re
 	assert.deepEqual(getBoard(ctx).removedLinks, [{ from: 'a', to: 'c', kind: 'similar' }])
 })
 
+test('link_papers records where a citation comes from', () => {
+	const ctx = newCtx()
+	addPapers(ctx, { papers: [paper('a'), paper('b', { near: 'a' }), paper('c', { near: 'a' })] })
+	const result = linkPapers(ctx, {
+		links: [
+			{ from: 'a', to: 'b', kind: 'cites', source: 'openalex' },
+			{ from: 'b', to: 'c', kind: 'cites', source: 'pubmed' },
+			{ from: 'c', to: 'a', kind: 'cites' },
+		],
+	})
+	assert.equal(result.linked.length, 3)
+	const by = (from: string, to: string) =>
+		(all(ctx).find((r) => r.id === linkShapeId(from, to, 'cites')) as TLShape).meta.by
+	assert.deepEqual([by('a', 'b'), by('b', 'c'), by('c', 'a')], ['openalex', 'pubmed', 'pubmed'])
+	assert.deepEqual(
+		getBoard(ctx)
+			.links.map((l) => [l.from, l.to, l.by])
+			.sort(),
+		[
+			['a', 'b', 'openalex'],
+			['b', 'c', 'pubmed'],
+			['c', 'a', 'pubmed'],
+		]
+	)
+})
+
 test('mark_working turns the ring on and off', () => {
 	const ctx = newCtx()
 	addPapers(ctx, { papers: [paper('a'), paper('b')] })
