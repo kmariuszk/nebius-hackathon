@@ -92,19 +92,49 @@ export const startCatchUp = (editor: Editor) => runTour({ type: 'start', steps: 
 
 /**
  * Moves this viewer's tour and opens the paper it's on (each opens with More closed). Ending closes
- * the widgets, and PaperWidgets flies the camera back to where it was before the tour.
+ * the widgets, and PaperWidgets flies the camera back to where it was before the tour. Returns
+ * whether this ended a running tour.
  */
-export function runTour(action: TourAction) {
+export function runTour(action: TourAction): boolean {
 	const was = tour.get()
 	const next = tourReducer(was, action)
-	if (next === was) return
+	if (next === was) return false
 	transact(() => {
 		tour.set(next)
 		paperMoreOpen.set(false)
 		if (next) openPaperId.set(next.steps[next.i].paperId)
 		else openPaperId.set(null)
 	})
+	return next === null && was !== null
 }
 
 /** The paper the tour is on, if one is running. */
 export const tourPaperId = (t: Tour | null) => (t ? t.steps[t.i].paperId : null)
+
+/** Closes the open paper's widgets. */
+export const closePaper = () => {
+	openPaperId.set(null)
+	paperMoreOpen.set(false)
+}
+
+/**
+ * After a saved vote the tour moves on; outside it, Discard closes the paper if it's still open.
+ * Returns whether the vote ended the tour.
+ */
+export function tourOnVote(paperId: string, decision: Vote): boolean {
+	if (tour.get()) return runTour({ type: 'voted', paperId, decision })
+	if (decision === 'discard' && openPaperId.get() === paperId) closePaper()
+	return false
+}
+
+/** A paper that left the board closes, or during the tour leaves it. */
+export function tourOnGone(paperId: string) {
+	if (tour.get()?.steps.some((s) => s.paperId === paperId)) runTour({ type: 'gone', paperId })
+	else closePaper()
+}
+
+/** Opening a paper the tour isn't on, or closing (`paperId` null), ends the tour. */
+export function tourOnOpen(paperId: string | null) {
+	const t = tour.get()
+	if (t && tourPaperId(t) !== paperId) tour.set(null)
+}

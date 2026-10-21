@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import { nodeLabel, sentenceCase, shortAuthors } from '../../shared/display.ts'
 import type { Fit, GlanceStep, PaperQuote } from '../../shared/paperCard.ts'
 import { chatBus } from '../chat/chatBus.ts'
-import { openPaperId, paperMoreOpen, type Tour } from '../viewerState.ts'
+import { openPaperId, paperMoreOpen, tour, type Tour } from '../viewerState.ts'
 import { addPinnedNote } from './boardWrites.ts'
 import { sourceLabel, splitClaims, type ClaimEvidence } from './claims.ts'
 import { useWidgets, type LinkedPaper, type WidgetsApi } from './context.ts'
@@ -442,8 +442,11 @@ export function FigureWidget() {
 
 /* ---------- actions, under the node ---------- */
 
-/** `onVoted` runs once a vote is saved: PaperWidgets decides what opens next. `tour` is set while Catch me up is on this paper. */
-export function ActionsWidget({ tour, onVoted }: { tour: Tour | null; onVoted(decision: Vote): void }) {
+/**
+ * `onVoted` runs once a vote is saved: PaperWidgets decides what opens next, and it returns whether the vote
+ * ended the tour. `touring` is set while Catch me up is on this paper.
+ */
+export function ActionsWidget({ touring, onVoted }: { touring: Tour | null; onVoted(decision: Vote): boolean }) {
 	const api = useWidgets()
 	const { shape, boardId, memberId, more } = api
 	const p = shape.props
@@ -455,8 +458,6 @@ export function ActionsWidget({ tour, onVoted }: { tour: Tour | null; onVoted(de
 	// the card changes when the board service's write reaches this browser through sync
 	const vote = async (v: Vote) => {
 		let before: Vote
-		// a vote on the tour's last paper ends it
-		const caughtUp = tour !== null && v !== null && tour.i === tour.steps.length - 1 ? ' You’re caught up.' : ''
 		setSending(true)
 		try {
 			before = await castVote(boardId, p, memberId, v)
@@ -468,13 +469,14 @@ export function ActionsWidget({ tour, onVoted }: { tour: Tour | null; onVoted(de
 		}
 		const undo = () =>
 			void castVote(boardId, p, memberId, before).then(
-				() => v === 'discard' && openPaperId.set(p.paperId),
+				() => v === 'discard' && !tour.get() && openPaperId.set(p.paperId),
 				(e: Error) => api.toast({ text: `Undo wasn’t saved: ${e.message}` })
 			)
+		// a vote on the tour's last paper ends it
+		const caughtUp = onVoted(v) ? ' You’re caught up.' : ''
 		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.${caughtUp}`, undo })
 		else if (v === 'discard') api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.${caughtUp}`, undo })
 		else api.toast({ text: `${label} is back on the board.`, undo })
-		onVoted(v)
 	}
 
 	// the chat opens (connecting if it has to) and sends it
@@ -508,7 +510,7 @@ export function ActionsWidget({ tour, onVoted }: { tour: Tour | null; onVoted(de
 
 	return (
 		<Widget k="actions" className="dock">
-			{tour && <TourBar tour={tour} />}
+			{touring && <TourBar tour={touring} />}
 			<div className="dbody">
 				{p.status === 'contested' && (
 					<div className="votes">
@@ -517,7 +519,7 @@ export function ActionsWidget({ tour, onVoted }: { tour: Tour | null; onVoted(de
 					</div>
 				)}
 				<div className="drow">
-					{!tour && (
+					{!touring && (
 						<button className="more" onClick={api.close} title="Close (Esc)">
 							× Close
 						</button>
