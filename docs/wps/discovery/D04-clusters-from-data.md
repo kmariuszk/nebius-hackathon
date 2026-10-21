@@ -8,7 +8,7 @@
 | Depends on | [T15](../tldraw-integration/T15-graph-layout-and-strings.md) (cluster frames fit v6 cards), [H04](../agent-harness/H04-first-run-in-90-seconds.md) (the first run has time for one more step) |
 | Unblocks | Demo beat 7 (drag a paper into a cluster); the [T14 refresh](../tldraw-integration/T14-board-editing.md)'s cluster editing |
 | Milestone | W3 The team edits |
-| Status | Not started |
+| Status | Built on branch `w3/clusters` (Oct 21); criterion 6 waits for the live check |
 | Owner | TBD |
 
 ## Goal
@@ -57,12 +57,13 @@ It runs once per board per chat (a flag on `ProcessPapers`), after `rank_papers`
 
 ## Tasks
 
-- [ ] `discovery/discovery/clusters.py`: k-means++, medoids, IDs, neighbours (pure functions over a matrix).
-- [ ] `discovery/discovery/service.py`: `cluster_papers` (records, vectors, labels); `server.py`: the tool.
-- [ ] `discovery/tests/test_clusters.py`.
-- [ ] `harness/harness/agents/master/background.py`: the cluster step; `master/agent.py`: canvas filter and instruction line.
-- [ ] `harness/tests/test_master_board.py`: the step runs once and only on a board without clusters.
-- [ ] `discovery/README.md`, [interfaces.md I5](../tldraw-integration/interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp) status.
+- [x] `discovery/discovery/clusters.py`: k-means++, medoids, IDs, neighbours (pure functions over a matrix). (The best of 10 k-means++ runs from seed 0, so one unlucky start doesn't split a group and leave a stray paper alone.)
+- [x] `discovery/discovery/service.py`: `cluster_papers` (records, vectors, labels); `server.py`: the tool. (In `clusters.py`, called from `server.py` like `citation_links`; `service.py` is unchanged.)
+- [x] `discovery/tests/test_clusters.py`.
+- [x] `harness/harness/agents/master/background.py`: the cluster step; `master/agent.py`: canvas filter and instruction line. (The flag is set once the board has clusters or `apply_clusters` succeeded; a failed call writes nothing, so the next turn tries again.)
+- [x] `harness/tests/test_master_board.py`: the step runs once and only on a board without clusters. (In `harness/tests/test_clusters_step.py`, beside the citation step's tests.)
+- [x] `discovery/README.md`, [interfaces.md I5](../tldraw-integration/interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp) status.
+- [ ] Stretch: the citation-overlap blend (`blend`), not built.
 
 ## Acceptance criteria
 

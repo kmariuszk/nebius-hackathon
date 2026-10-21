@@ -1,8 +1,8 @@
 """The papers MCP: the paper tools every agent uses (docs/Concept.md, Papers MCP tools).
 
-Scoring is embedding similarity only so far; verdicts and clustering are
-still to come. The tools here are the ones the search, master and
-reader agents need.
+Scoring is embedding similarity only so far; verdicts are still to come.
+The tools here are the ones the search, master and reader agents and the
+board service need.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from mcp.server import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import AfterValidator, BeforeValidator
 
-from discovery import citations
+from discovery import citations, clusters
 from discovery.fulltext import DEFAULT_MAX_CHARS
 from discovery.service import (
     DATE,
@@ -186,6 +186,28 @@ def build_server(discovery: Discovery) -> MCPServer:
         try:
             return await citations.citation_links(discovery, paper_ids)
         except ValueError as error:
+            raise ToolError(str(error)) from error
+
+    @server.tool()
+    async def cluster_papers(
+        paper_ids: list[str], k: Annotated[int | None, BeforeValidator(_unset)] = None
+    ) -> dict[str, Any]:
+        """Group papers into clusters of similar papers by their embeddings, each named by Lightning.
+
+        Args:
+            paper_ids: 2 to 500 paper IDs, such as every paper on a board.
+            k: How many clusters. Leave out to have one under 6 papers, else 2 to 6
+                by the number of papers.
+
+        Returns clusters ([{clusterId, paperIds, label}]: paperIds under the IDs given,
+        the most central paper first; clusterId "c-" and that paper's ID, so it stays
+        the same as papers are added; label null if it couldn't be named), similarities
+        ([{a, b, similarity}]: each paper's 3 nearest neighbours by cosine similarity)
+        and the papers that couldn't be loaded or embedded, and why.
+        """
+        try:
+            return await clusters.cluster_papers(discovery, paper_ids, k)
+        except (ValueError, Skipped) as error:
             raise ToolError(str(error)) from error
 
     @server.tool()

@@ -139,6 +139,7 @@ kept papers are the researcher's decisions. If the new focus is covered by the c
 sub-queries, then score, place, read and rank as above; papers already on the board are updated, not added \
 twice. `rank_papers` ranks for the question you last gave `score_candidates`; call it again after any new \
 search or scoring.
+- Rename a cluster with `label_cluster` when the researcher asks; never re-cluster a board that has clusters.
 - "Why is X ranked above Y": explain from the reasons and abstracts you have; don't make up a scoring rule.
 - If a question is too vague to search well, ask one short clarifying question first. Otherwise just start.
 - Plain conversation needs no tools.
@@ -196,7 +197,7 @@ def build(
             candidates.SearchTool(search_agent),
             candidates.FreshAgentTool(reader_agent),
             board.papers("resolve_seed", "get_paper", "score_candidates"),
-            board.canvas("get_board", "add_papers", "link_papers", "add_note"),
+            board.canvas("get_board", "add_papers", "link_papers", "add_note", "apply_clusters", "label_cluster"),
             background,
             RankPapers(background),
             *board.viewer(),

@@ -18,6 +18,7 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 | `score_candidates` | `question`, `candidate_ids`, `seed_ids`, `limit` | `top` (ID, title, year, `score`, `questionSimilarity`, `seedSimilarity`, `closestSeed`), `scored`, `skipped` (candidates not found or not embedded) |
 | `rerank` | `goal`, `paper_ids` (up to 100), `seed_ids`, `exclude_ids`, `k`, `backend` (super_vl, rerank_vl) | `ranked` (summary, `rank`, `score`, `reason`), `backend`, `model`, `seconds`, `candidates`, `skipped` |
 | `citation_links` | `paper_ids` (2 to 200) | `links` (`from` cites `to`, both among `paper_ids` and under the IDs given; `source` pubmed from PubMed's reference lists, or openalex from OpenAlex's `referenced_works` for papers without a PMID), `skipped` |
+| `cluster_papers` | `paper_ids` (2 to 500), `k` | `clusters` (`clusterId`, `paperIds` under the IDs given and most central first, `label` or null), `similarities` (`a`, `b`, `similarity`: each paper's 3 nearest neighbours), `skipped` (papers not found or not embedded) |
 | `resolve_seed` | `doi`, `pmid` or `title` | full paper record |
 | `get_paper` | `paper_id` | full paper record |
 | `get_fulltext` | `paper_id`, `max_chars` (40,000) | `source` (pmc, web, abstract), `url`, `sections` (`title`, `text`), `figures` (`figureId`, `label`, `caption`, `imageUrl`), `truncated`, `omittedSections`, `skipped` |
@@ -26,7 +27,7 @@ Keys come from the repo-root `.env` (see `.env.example`). Each source runs on it
 
 `since` takes `YYYY`, `YYYY-MM` or `YYYY-MM-DD` (a year or month counts from its first day); anything else is a tool error naming those formats. An optional argument sent as a placeholder (`"None"`, `"none"`, `"null"`, `"NULL"`, `"undefined"` or `""`) counts as left out.
 
-Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Clustering from `docs/Concept.md` is still to come, and scoring is embedding similarity only so far.
+Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PMC9187974` or `arxiv:2401.01234`. Scoring is embedding similarity only so far.
 
 ### Where full text comes from
 
@@ -35,6 +36,10 @@ Paper IDs look like `doi:10.1038/s41586-021-03704-y`, `pmid:34290406`, `pmcid:PM
 ### Figures
 
 Figures come from PMC only: label and caption from the JATS XML, and the image URL from the PMC article page (`discovery/figures.py`), since the JATS names the image file but not its CDN path. Each `<figure id>` on the page holds an `<img src>` on `cdn.ncbi.nlm.nih.gov`; figures are matched by ID, then by image file name. A page without a `<figure>` is a block page, which PMC sometimes sends: it's fetched twice more, 2 s apart. The URLs are cached with the full text. When no figure got one, `get_figures`'s `skipped` says why (`"figure images: PMC's article page was a block page 3 times"`), and that reason is cached too, so later reads don't fetch the page again. A full text cached before image URLs existed gets them on its next read. `get_figures` reads the same cached full text as `get_fulltext`, so the background can fetch figures without the whole text.
+
+### Clusters
+
+`cluster_papers` (`discovery/clusters.py`) groups papers by their embeddings, the same stored vectors `score_candidates` uses, with no model judging: k-means++ on the unit vectors by cosine similarity, in numpy, the best of 10 runs from seed 0, each at most 25 rounds, so the same papers always give the same clusters. `k` is the argument if given; else 1 under 6 papers, else round(√(n/2)) between 2 and 6. A cluster of one paper joins the cluster whose centroid is closest. Each cluster's medoid (the paper with the highest mean similarity to the others) comes first in its `paperIds`, the rest by similarity to it, and names it: `clusterId` is `c-` and the medoid's ID with every character outside `[A-Za-z0-9_-]` as `_` (the board's slug rule), so adding a paper rarely changes it and the board's `apply_clusters` fills the same frame. Lightning (`LIGHTNING_MODEL`, default `nvidia/Nemotron-3_5-Lightning`) names each cluster in 2 to 4 words from up to 8 of its titles, one request per cluster, in parallel, each with a 60-second timeout; a failure or an empty answer leaves `label` null for the researcher or `label_cluster` to fill. Papers that can't be loaded or embedded are in `skipped` and in no cluster; fewer than 2 that can is a tool error. The board service calls it from `apply_clusters`, which its canvas MCP lists once this server lists `cluster_papers`.
 
 ### How ranking works today
 
@@ -66,5 +71,5 @@ Concept.md's step 5 also adds citation overlap with the seeds, recency and a Lig
 | Semantic Scholar | Recommendations from the seeds, steered away from excluded papers | Optional `SEMANTIC_SCHOLAR_API_KEY` |
 | Tavily | Web search of PubMed, PMC, bioRxiv, medRxiv and arXiv, each hit resolved to a paper ID; Extract for arXiv and publisher full text | `TAVILY_API_KEY` |
 | arXiv | Records for arXiv hits | None |
-| Token Factory | Embeddings for `score_candidates` (`Qwen/Qwen3-Embedding-8B`; set `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY` for another endpoint and `EMBED_CONCURRENCY` for requests at once) and `rerank` with Super VL | `TF_API_KEY` |
+| Token Factory | Embeddings for `score_candidates` (`Qwen/Qwen3-Embedding-8B`; set `EMBED_BASE_URL`, `EMBED_MODEL`, `EMBED_API_KEY` for another endpoint and `EMBED_CONCURRENCY` for requests at once), `rerank` with Super VL, and cluster names with Lightning (`LIGHTNING_MODEL`) | `TF_API_KEY` |
 | NVIDIA API | `rerank` with Rerank VL | `NVIDIA_API_KEY`, only for `RERANK_BACKEND=rerank_vl` or `backend: rerank_vl` |
