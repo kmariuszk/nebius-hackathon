@@ -585,7 +585,14 @@ export async function addQuote(ctx: ToolContext, { paperId, text, source }: z.in
 
 const linkPapersInput = {
 	links: z
-		.array(z.object({ from: paperIdInput, to: paperIdInput, kind: z.enum(['cites', 'similar']) }))
+		.array(
+			z.object({
+				from: paperIdInput,
+				to: paperIdInput,
+				kind: z.enum(['cites', 'similar']),
+				source: z.enum(['pubmed', 'openalex']).optional(),
+			})
+		)
 		.min(1)
 		.max(100),
 }
@@ -627,7 +634,7 @@ export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<type
 		const linked: { from: string; to: string; kind: LinkKind }[] = []
 		const skipped: { from: string; to: string; kind: LinkKind; reason: string }[] = []
 		for (const link of links) {
-			const { from, to, kind } = link
+			const { from, to, kind, source } = link
 			const skip = (reason: string) => skipped.push({ ...link, reason })
 			if (from === to) {
 				skip('a paper can’t link to itself')
@@ -674,7 +681,8 @@ export function linkPapers(ctx: ToolContext, { links }: z.infer<z.ZodObject<type
 					// a citation points from the citing paper; similarity has no direction
 					...(kind === 'similar' ? { dash: 'dashed', arrowheadEnd: 'none' } : {}),
 				},
-				meta: agentMeta(ctx, { kind, label: '', by: kind === 'cites' ? 'pubmed' : 'agent', hiddenByHuman: false }),
+				// who says they're linked: the citation's source, else PubMed for a citation and the agent for similarity
+				meta: agentMeta(ctx, { kind, label: '', by: kind === 'cites' ? (source ?? 'pubmed') : 'agent', hiddenByHuman: false }),
 			})
 			for (const [terminal, card] of [['start', a], ['end', b]] as const) {
 				w.createBinding({
@@ -856,11 +864,13 @@ export const canvasTools = [
 	tool(
 		'link_papers',
 		'Link pairs of papers on the board with an arrow; at most 100 links per call, and both papers need cards. ' +
-			'kind: cites (a citation from PubMed: `from` cites `to`) or similar (your judgement that the two are ' +
-			'closely related; direction doesn\'t matter). Linking a pair again is a no-op. Skipped with a reason: a ' +
-			'paper linked to itself, a missing card, a similar link between papers a citation already joins, and ' +
-			'links a person removed or hid; never try to recreate those. Links can\'t be labelled or removed ' +
-			'through this server. Returns {linked, skipped}.',
+			'kind: cites (a citation: `from` cites `to`) or similar (your judgement that the two are closely ' +
+			'related; direction doesn\'t matter). source (optional): where a citation comes from, pubmed (the ' +
+			'default for cites) or openalex; the arrow records it, and records every similar link as the agent\'s. ' +
+			'Linking a pair again is a no-op. Skipped with a reason: a paper linked to itself, a missing ' +
+			'card, a similar link between papers a citation already joins, and links a person removed or hid; ' +
+			'never try to recreate those. Links can\'t be labelled or removed through this server. Returns ' +
+			'{linked, skipped}.',
 		linkPapersInput,
 		linkPapers
 	),

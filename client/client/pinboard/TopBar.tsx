@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { useValue, type Editor } from 'tldraw'
-import { boardDerived, GOALS } from '../shapes/card'
-import { currentGoal, openPaperId, paperMoreOpen } from '../viewerState'
+import { GOALS } from '../shapes/card'
+import { currentGoal } from '../viewerState'
+import { boardSteps, startCatchUp } from '../widgets/tour'
+import { BotIcon } from './BotIcon'
 
 // The v6 top bar (docs/mockups/flashcard-v6.html): back to your boards, the board, what you're
 // looking for, the Pinboard switch, who's here, Catch me up and Chat.
@@ -114,29 +116,19 @@ function Avatars({ editor }: { editor: Editor }) {
 				</div>
 			))}
 			<div className="pb-av bot" title="The agent">
-				<svg width="13" height="13" viewBox="0 0 16 16" aria-hidden="true">
-					<rect x="2" y="4.5" width="12" height="9" rx="3" fill="none" stroke="#fff" strokeWidth="1.5" />
-					<circle cx="6" cy="9" r="1.2" fill="#fff" />
-					<circle cx="10" cy="9" r="1.2" fill="#fff" />
-					<path d="M8 4.5V2" stroke="#fff" strokeWidth="1.5" />
-				</svg>
+				<BotIcon />
 			</div>
 		</div>
 	)
 }
 
-// steps through the new papers in the agent's reading order, opening each one's widgets
+// a tour of the new papers in this viewer's ranking order, run in this browser from the board's
+// own data, with no prompt to the agent (T06, decision D24)
 function CatchMeUp({ editor }: { editor: Editor }) {
-	const fresh = useValue('fresh papers', () => boardDerived(editor).fresh, [editor])
-	const next = () => {
-		if (!fresh.length) return
-		const i = fresh.indexOf(openPaperId.get() ?? '')
-		openPaperId.set(fresh[(i + 1) % fresh.length])
-		paperMoreOpen.set(false)
-	}
+	const count = useValue('catch-up papers', () => boardSteps(editor).length, [editor])
 	return (
-		<button type="button" className="pb-btn primary" onClick={next} disabled={!fresh.length} title="Open the new papers one by one">
-			Catch me up <span className="pb-count">{fresh.length}</span>
+		<button type="button" className="pb-btn primary" onClick={() => startCatchUp(editor)} disabled={!count} title="Open the new papers one by one">
+			Catch me up <span className="pb-count">{count}</span>
 		</button>
 	)
 }

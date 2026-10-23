@@ -2,11 +2,14 @@ import { Fragment, useEffect, useMemo, useRef, useState, type CSSProperties, typ
 import { nodeLabel, sentenceCase, shortAuthors } from '../../shared/display.ts'
 import type { Fit, GlanceStep, PaperQuote } from '../../shared/paperCard.ts'
 import { chatBus } from '../chat/chatBus.ts'
-import { openPaperId, paperMoreOpen } from '../viewerState.ts'
+import { BotIcon } from '../pinboard/BotIcon.tsx'
+import { openPaperId, paperMoreOpen, tour, type Tour } from '../viewerState.ts'
 import { addPinnedNote } from './boardWrites.ts'
 import { sourceLabel, splitClaims, type ClaimEvidence } from './claims.ts'
 import { useWidgets, type LinkedPaper, type WidgetsApi } from './context.ts'
+import { emptyState } from './emptyStates.ts'
 import { glanceIcon, RELATION_LABEL, type GlanceIcon } from './glance.ts'
+import { runTour } from './tour.ts'
 import { castVote, myVote, type Vote } from './votes.ts'
 
 // The widgets around an open paper (v5, docs/mockups/flashcard-v5.html), each answering one
@@ -108,10 +111,19 @@ export function WhyWidget() {
 	const score = p.scores[goal]
 	const color = score ? FIT_COLOR[score.fit] : UNSCORED
 	const { segments } = useMemo(() => splitClaims(p.oneLine, p.claims, p.quotes), [p.oneLine, p.claims, p.quotes])
+	const state = emptyState(p, 'why')
 
+	if (state.kind === 'seed') {
+		return (
+			<Widget k="why" className="why-w" style={{ '--fit': 'var(--ink)' } as CSSProperties}>
+				<Head>Why it matters to you</Head>
+				<p className="why">{state.text}</p>
+			</Widget>
+		)
+	}
 	return (
 		<Widget k="why" className="why-w" style={{ '--fit': color } as CSSProperties}>
-			<Head ai>Why it matters to you</Head>
+			<Head ai={state.kind !== 'ended'}>Why it matters to you</Head>
 			<div className="fitrow">
 				<span className="dot" style={{ background: color }} />
 				{score ? (
@@ -129,12 +141,13 @@ export function WhyWidget() {
 					{segments.map((s, i) => (s.claim ? <Claim key={i} text={s.text} claim={s.claim} /> : <Fragment key={i}>{s.text}</Fragment>))}
 				</p>
 			)}
-			{p.working && (
+			{state.kind === 'working' && (
 				<div className="reading">
 					<Spin />
 					Still reading. The rest fills in as it’s ready.
 				</div>
 			)}
+			{state.kind === 'ended' && <div className="meta ended">{state.text}</div>}
 		</Widget>
 	)
 }
@@ -282,10 +295,14 @@ function LinkedRow({ row }: { row: LinkedPaper }) {
 export function GlanceWidget() {
 	const { shape } = useWidgets()
 	const { glance, quotes } = shape.props
+	const state = emptyState(shape.props, 'glance')
+	if (state.kind === 'hidden') return null
 	return (
 		<Widget k="glance" className="glance-w">
-			<Head ai>The paper at a glance</Head>
-			{glance.length === 0 ? (
+			<Head ai={state.kind !== 'ended'}>The paper at a glance</Head>
+			{state.kind === 'ended' ? (
+				<div className="meta">{state.text}</div>
+			) : glance.length === 0 ? (
 				<>
 					<div className="reading first">
 						<Spin />
@@ -379,6 +396,15 @@ export function FigureWidget() {
 	const { shape, openFigure } = useWidgets()
 	const { figure } = shape.props
 	const [failed, setFailed] = useState<string | null>(null)
+	const state = emptyState(shape.props, 'figure')
+	if (state.kind === 'hidden') return null
+	if (state.kind === 'ended') {
+		return (
+			<Widget k="figure" className="fig-w">
+				<div className="nofig">{state.text}</div>
+			</Widget>
+		)
+	}
 	if (!figure) {
 		return (
 			<Widget k="figure" className="fig-w">
@@ -417,7 +443,11 @@ export function FigureWidget() {
 
 /* ---------- actions, under the node ---------- */
 
-export function ActionsWidget() {
+/**
+ * `onVoted` runs once a vote is saved: PaperWidgets decides what opens next, and it returns whether the vote
+ * ended the tour. `touring` is set while Catch me up is on this paper.
+ */
+export function ActionsWidget({ touring, onVoted }: { touring: Tour | null; onVoted(decision: Vote): boolean }) {
 	const api = useWidgets()
 	const { shape, boardId, memberId, more } = api
 	const p = shape.props
@@ -440,14 +470,14 @@ export function ActionsWidget() {
 		}
 		const undo = () =>
 			void castVote(boardId, p, memberId, before).then(
-				() => v === 'discard' && openPaperId.set(p.paperId),
+				() => v === 'discard' && !tour.get() && openPaperId.set(p.paperId),
 				(e: Error) => api.toast({ text: `Undo wasn’t saved: ${e.message}` })
 			)
-		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.`, undo })
-		else if (v === 'discard') {
-			api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.`, undo })
-			api.close()
-		} else api.toast({ text: `${label} is back on the board.`, undo })
+		// a vote on the tour's last paper ends it
+		const caughtUp = onVoted(v) ? ' You’re caught up.' : ''
+		if (v === 'keep') api.toast({ text: `Kept ${label} for everyone on the board.${caughtUp}`, undo })
+		else if (v === 'discard') api.toast({ text: `Discarded ${label}. It’s hidden unless you show discarded papers.${caughtUp}`, undo })
+		else api.toast({ text: `${label} is back on the board.`, undo })
 	}
 
 	// the chat opens (connecting if it has to) and sends it
@@ -481,25 +511,65 @@ export function ActionsWidget() {
 
 	return (
 		<Widget k="actions" className="dock">
-			{p.status === 'contested' && (
-				<div className="votes">
-					<span className="split">Split vote:</span>
-					{voteSummary(p.keepBy, p.discardBy, memberId)}
-				</div>
-			)}
-			<div className="drow">
-				<button className="more" onClick={api.close} title="Close (Esc)">
-					× Close
-				</button>
-				{p.kind !== 'seed' && (
-					<button className={`more${more ? ' open' : ''}`} onClick={() => paperMoreOpen.set(!more)}>
-						{more ? 'Less' : 'More'} <span className="chev">⌄</span>
-					</button>
+			{touring && <TourBar tour={touring} />}
+			<div className="dbody">
+				{p.status === 'contested' && (
+					<div className="votes">
+						<span className="split">Split vote:</span>
+						{voteSummary(p.keepBy, p.discardBy, memberId)}
+					</div>
 				)}
-				<span className="grow" />
-				{actions}
+				<div className="drow">
+					{!touring && (
+						<button className="more" onClick={api.close} title="Close (Esc)">
+							× Close
+						</button>
+					)}
+					{p.kind !== 'seed' && (
+						<button className={`more${more ? ' open' : ''}`} onClick={() => paperMoreOpen.set(!more)}>
+							{more ? 'Less' : 'More'} <span className="chev">⌄</span>
+						</button>
+					)}
+					<span className="grow" />
+					{actions}
+				</div>
 			</div>
 		</Widget>
+	)
+}
+
+/** Catch me up's strip on top of the actions (v6 demo board): where you are, the paper's line, and the way on. */
+function TourBar({ tour }: { tour: Tour }) {
+	const api = useWidgets()
+	const last = tour.i === tour.steps.length - 1
+	const done = () => {
+		runTour({ type: 'end' })
+		api.toast({ text: 'You’re caught up.' })
+	}
+	return (
+		<div className="tour">
+			<div className="r1">
+				<span className="av">
+					<BotIcon />
+				</span>
+				{tour.title.toUpperCase()} · {tour.i + 1} OF {tour.steps.length}
+				<span className="dots">
+					{tour.steps.map((s, k) => (
+						<i key={s.paperId} className={k === tour.i ? 'on' : undefined} />
+					))}
+				</span>
+				<span className="nav">
+					<button onClick={() => runTour({ type: 'prev' })} disabled={tour.i === 0} title="Previous">
+						‹
+					</button>
+					<button onClick={last ? done : () => runTour({ type: 'next' })}>{last ? 'Done' : 'Next ›'}</button>
+					<button onClick={() => runTour({ type: 'end' })} title="End the catch-up">
+						×
+					</button>
+				</span>
+			</div>
+			<div className="say">{tour.steps[tour.i].line}</div>
+		</div>
 	)
 }
 

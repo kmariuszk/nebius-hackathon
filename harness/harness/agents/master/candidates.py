@@ -7,10 +7,11 @@ ID a model copied wrong (say `doi:1136/…` for `doi:10.1136/…`) never reaches
 the ranking, and later turns rank old and new candidates together.
 
 On a board the master also notes what its own tools return (`note`): paper
-details, the board's papers and discarded papers, the scored order, what it
-placed and near which paper. `fill` then gives `score_candidates` the pool without the
-discarded papers, gives `rerank` the top of the latest scoring, and swaps the
-titles and links in `add_papers` for the ones the tools returned.
+details, the board's papers, seeds, goals and discarded papers, the scored
+order, what it placed and near which paper. `fill` then gives
+`score_candidates` the pool without the discarded papers, gives `rerank` the
+top of the latest scoring, and swaps the titles and links in `add_papers` for
+the ones the tools returned. `pool_for_rerank` is what `rank_papers` ranks.
 """
 
 from __future__ import annotations
@@ -216,10 +217,21 @@ def on_board(state: dict[str, Any]) -> set[str]:
     return ids
 
 
+def last_board(state: dict[str, Any]) -> dict[str, Any]:
+    """What the last `get_board` said: its papers, discarded papers, seeds, goals and question."""
+    boards = [value for key, value in state.items() if key.startswith(BOARD)]
+    return boards[-1] if boards else {}
+
+
 def discarded(state: dict[str, Any]) -> set[str]:
     """Papers the researchers discarded, as the last `get_board` listed them."""
-    boards = [value for key, value in state.items() if key.startswith(BOARD)]
-    return set(boards[-1]["discarded"]) if boards else set()
+    return set(last_board(state).get("discarded", []))
+
+
+def seeds(state: dict[str, Any]) -> list[str]:
+    """Seed papers: those on the board at the last `get_board`, then those placed as seeds since."""
+    placed_seeds = [paper_id for paper_id, kind in placed(state).items() if kind == "seed"]
+    return list(dict.fromkeys([*last_board(state).get("seeds", []), *placed_seeds]))
 
 
 def placed(state: dict[str, Any]) -> dict[str, str]:
@@ -246,6 +258,13 @@ def scored(state: dict[str, Any]) -> list[str]:
     return lists[-1] if lists else []
 
 
+def pool_for_rerank(state: dict[str, Any]) -> list[str]:
+    """What `rank_papers` reranks: every suggestion placed in this conversation, without seeds and
+    discarded papers. Only placed papers are written, so ranking others would only cost reading time."""
+    cards, skip = placed(state), discarded(state) | set(seeds(state))
+    return [paper_id for paper_id, kind in cards.items() if kind != "seed" and paper_id not in skip]
+
+
 def note(*, tool: BaseTool, args: dict[str, Any], tool_context: ToolContext, tool_response: Any) -> None:
     """After a master's tool call on a board: remember what it said about papers and the board."""
     result = structured(tool_response)
@@ -258,8 +277,14 @@ def note(*, tool: BaseTool, args: dict[str, Any], tool_context: ToolContext, too
         state[SCORED + key] = [paper["paperId"] for paper in result.get("top", []) if paper.get("paperId")]
         state[QUESTION] = args.get("question", "")
     elif tool.name == "get_board":
-        papers = [paper["paperId"] for paper in result.get("papers", []) if paper.get("paperId")]
-        state[BOARD + key] = {"papers": papers, "discarded": result.get("discardedIds") or []}
+        cards = [paper for paper in result.get("papers", []) if paper.get("paperId")]
+        state[BOARD + key] = {
+            "papers": [paper["paperId"] for paper in cards],
+            "discarded": result.get("discardedIds") or [],
+            "seeds": [paper["paperId"] for paper in cards if paper.get("kind") == "seed"],
+            "goals": result.get("goals") or [],
+            "question": result.get("question") or "",
+        }
     elif tool.name == "add_papers":
         kinds = {paper.get("paperId"): paper.get("kind") or "suggestion" for paper in args.get("papers", [])}
         nears = {paper.get("paperId"): paper["near"] for paper in args.get("papers", []) if paper.get("near")}

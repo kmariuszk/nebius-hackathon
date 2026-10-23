@@ -61,7 +61,7 @@ The canvas skips a `similar` link when a `cites` link already joins the pair (T1
 
 | Part | Rule |
 | --- | --- |
-| Papers | The suggestions the master placed in this conversation (`candidates.placed`), plus the next best of the latest `score_candidates`, up to `RERANK_POOL = 20` |
+| Papers | The suggestions the master placed in this conversation (`candidates.placed`), without seeds and discarded papers; only placed papers are written, so unplaced candidates aren't ranked (Oct 21: ranking 20 instead of 8 made `rank_papers` take 34 to 52 s) |
 | Goals | The board's goals from the last `get_board`; one `rerank` per goal, in parallel |
 | Goal text | The researcher's question (`candidates.QUESTION`) plus the goal's description: `new-findings` "new results on the question", `methods` "methods the researcher could reuse"; any other goal ID uses its label |
 | Writes | `set_scores` for every placed suggestion and every goal: fit `high` when the rerank score is 0.7 or more, `medium` from 0.4, else `low`; papers the rerank left out get score 0.2, fit `low`, why "Not in the agent's top picks for this goal" |
@@ -128,7 +128,7 @@ The canvas skips a `similar` link when a `cites` link already joins the pair (T1
 
 | Risk | Effect | Mitigation | WP |
 | --- | --- | --- | --- |
-| Token Factory's limit (60 requests a minute to start), shared by the chat, the background and the papers MCP | 429s mid-run | `CALLS_PER_MINUTE` for the background, LiteLLM `num_retries` honouring `Retry-After` | H04 |
+| Token Factory's limit (60 requests a minute to start), shared by the chat, the background and the papers MCP | 429s mid-run | `CALLS_PER_MINUTE` for the background, LiteLLM `num_retries` retrying with backoff (it doesn't read `Retry-After`) | H04 |
 | Live timings vary run to run | A flaky gate | Timing asserted only in strict mode, twice in a row; everything else always asserted | H01 |
 | Model-free steps hide what happened from the chat | Less trace for judges | Every step logs, and `rank_papers` returns its rankings for the answer; tool cards for background passes stay out of scope | H03, H04 |
 

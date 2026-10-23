@@ -2,13 +2,15 @@
 
 The master places papers, calls `process_papers` and carries on; the cards
 fill in while it ranks and answers (docs/Concept.md, Agent design,
-`read_then_relate`). First a model-free step links each paper to the paper it
-was placed near (kind `similar`). Then, per paper, each step has its own runner:
+`read_then_relate`). First model-free steps link the board's papers that cite
+each other (kind `cites`, once a turn) and each paper to the paper it was
+placed near (kind `similar`). Then, per paper, each step has its own runner:
 
 1. the reader agent reads the paper on its own and answers with its artifacts as JSON;
 2. a model-free step writes them to the card: each quote and highlight that is
    word for word in the abstract with `add_quote`, the summary and what
-   couldn't be checked with `set_card`;
+   couldn't be checked with `set_card`, then the first figure the reader
+   picked that `get_figures` has an image for;
 3. the context agent relates the paper to the board: "why it matters", the
    glance steps and links to the closest papers; when it saved no "why", it
    tries once more with the errors it got;
@@ -52,14 +54,17 @@ from harness.board.tools import BoardTools
 
 log = logging.getLogger(__name__)
 
-PAPERS_AT_ONCE = 3
-CALLS_PER_MINUTE = 30
+PAPERS_AT_ONCE = 4
+CALLS_PER_MINUTE = 40
 # Passages the reader found that are tried as quotes; only abstract sentences pass.
 QUOTES_TRIED = 8
 # Seconds a closing chat gives its open passes to clear their badges.
 CLOSE_SECONDS = 2.0
 APP = "background"
 ABSTRACT_ONLY = "Read from the abstract only: no full text was available."
+# citation_links takes at most 200 papers, link_papers 100 links a call.
+CITED_PAPERS = 200
+LINKS_PER_CALL = 100
 
 
 class Pace:
@@ -155,6 +160,8 @@ class ProcessPapers(BaseToolset):
         self.slots = asyncio.Semaphore(PAPERS_AT_ONCE)
         self.started: set[str] = set()
         self.tasks: set[asyncio.Task[None]] = set()
+        self.citing: dict[str, asyncio.Task[None]] = {}  # each turn's citation step, by run ID
+        self.cited: set[str] = set()
         self.tool = FunctionTool(self.process_papers)
 
     async def get_tools(self, readonly_context: ReadonlyContext | None = None) -> list[BaseTool]:
@@ -201,6 +208,10 @@ class ProcessPapers(BaseToolset):
                 "mark_working", paperIds=seeds, on=False)))
             self.tasks.add(task)
             task.add_done_callback(self.tasks.discard)
+            # 1. Seeds start no batch, so a turn that placed only seeds links citations here too (once a turn).
+            cite = asyncio.create_task(self.link_citations(job, seeds))
+            self.tasks.add(cite)
+            cite.add_done_callback(self.tasks.discard)
         # 4. Clusters, once per board (D04), go here.
         return None
 
@@ -222,13 +233,62 @@ class ProcessPapers(BaseToolset):
         # before failed. Badges on first: cards already on the board don't have one yet.
         await self.try_step("turn the reading badges on", jobs[0], lambda call: call(
             "mark_working", paperIds=[job.paper_id for job in jobs], on=True))
-        # 1. Citation links among the board's papers (D03) go here.
+        # 1. Citation links among the board's papers, once a turn (D03).
+        await self.link_citations(jobs[0], [job.paper_id for job in jobs])
         # 2. Near links: each paper to the one it was placed near, without a model.
         if links:
             await self.try_step("link the papers to the ones they were placed near", jobs[0], lambda call: call(
                 "link_papers", links=links))
         # 3. Reading.
         await asyncio.gather(*(self.read_then_relate(job) for job in jobs))
+
+    async def link_citations(self, job: Job, paper_ids: list[str]) -> None:
+        """Step 1, once a turn: a `cites` link for every citation between two papers on the board.
+
+        A later batch of the same turn waits for the step already running, so citations go before its
+        near links, and runs it again when that step didn't cover `paper_ids`.
+        """
+        if job.run_id is None:  # no turns to tell apart (adk web): every batch links
+            return await self.cite(job)
+        while True:
+            task = self.citing.get(job.run_id)
+            if task is not None and not task.done():
+                await asyncio.shield(task)  # one waiter cancelled doesn't cancel it for the others
+                continue
+            if task is not None and self.cited.issuperset(paper_ids):
+                return
+            self.citing = {run_id: t for run_id, t in self.citing.items() if not t.done()}
+            self.citing[job.run_id] = task = asyncio.create_task(self.cite(job))
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
+            await asyncio.shield(task)
+            return
+
+    async def cite(self, job: Job) -> None:
+        """`citation_links` on every paper on the board, written with `link_papers`, without a model.
+        Hidden while the papers MCP has no `citation_links`; a failure is only logged."""
+        async def write(call: Calls) -> None:
+            if "citation_links" not in call.tools:
+                log.info("the papers MCP has no citation_links, so the board gets no citation links")
+                return
+            board = await call("get_board")
+            on_board = [p["paperId"] for p in board.get("papers") or []]
+            dropped = set(board.get("discardedIds") or [])
+            paper_ids = [p for p in on_board if p not in dropped]
+            if len(paper_ids) >= 2:
+                found = await call("citation_links", paper_ids=paper_ids[:CITED_PAPERS])
+                links = [{"from": link["from"], "to": link["to"], "kind": "cites", "source": link["source"]}
+                         for link in found.get("links") or []]
+                for start in range(0, len(links), LINKS_PER_CALL):
+                    await call("link_papers", links=links[start : start + LINKS_PER_CALL])
+                log.info("%d citations among the board's %d papers", len(links), len(paper_ids))
+            self.cited.update(on_board)
+
+        tools = [self.board.canvas("get_board", "link_papers"), self.board.papers("citation_links")]
+        try:
+            await self.run(Step(name="citations", tools=tools, action=write, paper_id=job.paper_id), "", job)
+        except Exception as error:
+            log.warning("could not link the papers that cite each other: %s", error)
 
     async def try_step(self, what: str, job: Job, action: Callable[[Calls], Awaitable[Any]]) -> None:
         """A model-free step whose failure is only logged."""
@@ -276,10 +336,13 @@ class ProcessPapers(BaseToolset):
         return []
 
     async def write_reading(self, job: Job, reading: dict[str, Any], gaps: list[str]) -> dict[str, Any]:
-        """The reader's artifacts onto the card; returns the paper's title, abstract and card quotes."""
+        """The reader's artifacts onto the card, with its first figure pick that has an image; returns
+        the paper's title, abstract and card quotes."""
         card: dict[str, Any] = {"quotes": []}
         passages = [q.get("text") for q in reading.get("quotes") or []]
         passages += [h.get("text") for h in reading.get("highlights") or []]
+        figures = reading.get("figures") or []
+        picks = [str(f["figureId"]) for f in figures if isinstance(f, dict) and f.get("figureId")]
         if reading.get("source") == "abstract":
             gaps.append(ABSTRACT_ONLY)
 
@@ -300,6 +363,12 @@ class ProcessPapers(BaseToolset):
                 fields["gaps"] = gaps[:8]
             if fields:
                 await call("set_card", paperId=job.paper_id, **fields)
+            if picks:
+                try:
+                    if figure := card_figure(picks, await call("get_figures", paper_id=job.paper_id)):
+                        await call("set_card", paperId=job.paper_id, figure=figure)
+                except ToolFailed:
+                    pass  # logged by `call`; a card without a figure is no gap
 
         await self.step("reader", job, write, papers=True)
         return card
@@ -322,7 +391,7 @@ class ProcessPapers(BaseToolset):
     async def step(self, name: str, job: Job, action: Callable[[Calls], Awaitable[None]], papers: bool = False) -> None:
         tools = [self.board.canvas("get_board", "add_quote", "set_card", "mark_working", "link_papers")]
         if papers:
-            tools.append(self.board.papers("get_paper"))
+            tools.append(self.board.papers("get_paper", "get_figures"))
         await self.run(Step(name=name, tools=tools, action=action, paper_id=job.paper_id), "", job)
 
     async def ask(self, agent: LlmAgent, text: str, job: Job, tried: list[dict[str, Any]] | None = None) -> str:
@@ -398,6 +467,17 @@ def relate_request(job: Job, reading: dict[str, Any], card: dict[str, Any]) -> s
         f"Summary: {reading.get('summary', '')}\n"
         f"Highlights:\n{highlights or 'none'}"
     )
+
+
+def card_figure(picks: list[str], found: dict[str, Any]) -> dict[str, Any] | None:
+    """`set_card`'s figure: the reader's first pick that `get_figures` has an image for, or None."""
+    by_id = {f.get("figureId"): f for f in found.get("figures") or [] if isinstance(f, dict) and f.get("imageUrl")}
+    figure = next((by_id[p] for p in picks if p in by_id), None)
+    if figure is None:
+        return None
+    caption = str(figure.get("caption") or "")[:1500]
+    return {"imageUrl": figure["imageUrl"], "label": str(figure.get("label") or "")[:40], "caption": caption,
+            "captionByAi": False}
 
 
 def recorded(

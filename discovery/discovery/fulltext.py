@@ -34,6 +34,7 @@ _BOILERPLATE = re.compile(
 _METHODS = re.compile(r"\b(methods|materials)\b", re.I)
 # Tags whose text isn't part of the running prose: floats are listed as figures instead.
 _SKIP_TAGS = {"fig", "table-wrap", "fig-group", "supplementary-material", "disp-formula"}
+_XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
 
 
 @dataclass
@@ -47,6 +48,11 @@ class Figure:
     figureId: str
     label: str
     caption: str
+    imageUrl: str | None = None  # from PMC's article page (discovery/figures.py)
+    graphic: str | None = None  # the image file JATS names, to match when the IDs don't
+
+    def to_summary(self) -> dict[str, Any]:
+        return {"figureId": self.figureId, "label": self.label, "caption": self.caption, "imageUrl": self.imageUrl}
 
 
 @dataclass
@@ -55,6 +61,8 @@ class FullText:
     url: str | None
     sections: list[Section]
     figures: list[Figure] = field(default_factory=list)
+    # Why no figure has an image URL, once that was looked up and none was found.
+    imagesSkipped: str | None = None
 
     def to_record(self) -> dict[str, Any]:
         return asdict(self)
@@ -65,7 +73,11 @@ class FullText:
             source=record["source"],
             url=record.get("url"),
             sections=[Section(**s) for s in record["sections"]],
-            figures=[Figure(**f) for f in record.get("figures", [])],
+            figures=[
+                Figure(f["figureId"], f["label"], f["caption"], f.get("imageUrl"), f.get("graphic"))
+                for f in record.get("figures", [])
+            ],
+            imagesSkipped=record.get("imagesSkipped"),
         )
 
     def chars(self) -> int:
@@ -121,12 +133,14 @@ def from_jats(xml_text: str, url: str | None, abstract: str | None) -> FullText 
     figures = []
     for fig in article.iter("fig"):
         caption = fig.find("caption")
+        graphic = fig.find(".//graphic")
         figures.append(
             Figure(
                 figureId=fig.get("id") or f"fig{len(figures) + 1}",
                 label=_plain_text(fig.find("label")),
                 # The caption's title and paragraphs, which itertext would run together.
                 caption=" ".join(filter(None, map(_plain_text, caption if caption is not None else [])))[:600],
+                graphic=graphic.get(_XLINK_HREF) if graphic is not None else None,
             )
         )
     return FullText("pmc", url, sections, figures)

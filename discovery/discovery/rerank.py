@@ -24,7 +24,7 @@ SUPER_VL = "nvidia/Nemotron-3.5-Super-VL"
 MAX_CANDIDATES = 100
 # Characters of each abstract the model sees: enough for the method and the finding.
 ABSTRACT_CHARS = 1500
-# Super VL reasons before it answers, and 100 abstracts take a while to read.
+# 100 abstracts take a while to read, more so with reasoning on.
 TIMEOUT = 240.0
 
 SYSTEM = """\
@@ -37,6 +37,13 @@ Reply with JSON only."""
 
 def model_id() -> str:
     return os.environ.get("SUPER_VL_MODEL", "").strip() or SUPER_VL
+
+
+def thinking() -> bool:
+    """Whether Super VL reasons before ranking. Off unless `RERANK_THINKING=1`: on a small ranking
+    it wrote about 1,200 reasoning tokens and took 15.6 s instead of 2.0 s (Oct 21), and
+    `rank_papers` waits for it before the master can answer."""
+    return os.environ.get("RERANK_THINKING", "").strip() == "1"
 
 
 def prompt(goal: str, seeds: list[Paper], candidates: list[Paper], k: int) -> str:
@@ -87,6 +94,7 @@ async def rerank(
         "response_format": {"type": "json_object"},
         "temperature": 0,
         "max_tokens": 16000,
+        **({} if thinking() else {"chat_template_kwargs": {"enable_thinking": False}}),
     }
     started = time.monotonic()
     response = await client.post(

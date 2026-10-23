@@ -8,7 +8,7 @@
 | Depends on | — ([T15](../tldraw-integration/T15-graph-layout-and-strings.md) makes the card note count only these links) |
 | Unblocks | The red strings and "cites N of your seeds" on a real board; [D04](D04-clusters-from-data.md)'s optional citation blend |
 | Milestone | W2 One clean run |
-| Status | Not started |
+| Status | Built on `w2/citations` (Oct 21). Criterion 4 holds in part: in the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage), each board had 14 to 23 cites links with no model `link_papers` call; the PubMed spot check of three links is still to do. Criterion 5 needs a browser look |
 | Owner | TBD |
 
 ## Goal
@@ -52,12 +52,12 @@ It runs once per master turn that placed papers (from `after_turn` and from `pro
 
 ## Tasks
 
-- [ ] `discovery/discovery/sources/openalex.py`: `references(client, work_ids)`.
-- [ ] `discovery/discovery/service.py`: `citation_links`; `server.py`: the tool and its docstring.
-- [ ] `discovery/tests/test_service.py`: canned `elink` and OpenAlex payloads.
-- [ ] `client/server/canvasTools.ts`: `source` on `link_papers`; `canvasTools.test.ts`.
-- [ ] `harness/harness/agents/master/background.py`: `link_citations` and its call; `harness/tests/test_master_board.py`.
-- [ ] `discovery/README.md` (tools table), [interfaces.md I5](../tldraw-integration/interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp) row.
+- [x] `discovery/discovery/sources/openalex.py`: `references(client, work_ids)`, and `by_doi(client, dois)` for the OpenAlex IDs of board papers that came from PubMed, so a preprint's references to them are found.
+- [x] `citation_links` in its own module, `discovery/discovery/citations.py` (not `service.py`); `server.py`: the tool and its docstring.
+- [x] `discovery/tests/test_citations.py`: canned `elink` and OpenAlex payloads.
+- [x] `client/server/canvasTools.ts`: `source` on `link_papers`; `canvasTools.test.ts`.
+- [x] `harness/harness/agents/master/background.py`: `link_citations` and its calls from `batch` and, for a turn that placed only seeds, `after_turn`; `harness/tests/test_citations_step.py`.
+- [x] `discovery/README.md` (tools table), [interfaces.md I5](../tldraw-integration/interfaces.md#i5-what-the-board-service-needs-from-the-papers-mcp) row.
 
 ## Acceptance criteria
 

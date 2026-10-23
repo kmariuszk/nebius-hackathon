@@ -282,3 +282,42 @@ def test_retry_after_is_honoured_up_to_a_minute():
 
     assert [wait({"Retry-After": "7"}), wait({"Retry-After": "600"}), wait({})] == [7, 60, 2]
     assert wait({"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}) == 2
+
+
+async def test_scoring_waits_for_the_warm_up_instead_of_embedding_twice(discovery, embeddings, monkeypatch):
+    monkeypatch.setattr("discovery.sources.pubmed._throttle.interval", 0)
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if not request.url.path.endswith("/embeddings"):
+            return fake_apis(request)
+        await asyncio.sleep(0.05)  # the warm-up is still embedding when scoring starts
+        return embeddings(request)
+
+    discovery.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    found = await discovery.search("melanoma", sources=["pubmed"])
+    paper_ids = [paper["paperId"] for paper in found["papers"]]
+
+    result = await discovery.score_candidates("melanoma", paper_ids)
+
+    assert result["scored"] == 2
+    # Each paper was embedded once, by the warm-up; scoring embedded only the question.
+    assert len(embeddings.texts) == 3 and embeddings.texts[-1] == QUERY_INSTRUCTION + "melanoma"
+
+
+async def test_a_slow_batch_is_cut_short_and_sent_again_at_once(discovery, embeddings, monkeypatch):
+    monkeypatch.setattr("discovery.embeddings.RETRY_WAITS", (60, 60))  # only a 429 or a 5xx waits
+    reads: list[float] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        reads.append(request.extensions["timeout"]["read"])
+        if len(reads) < 3:
+            raise httpx.ReadTimeout("a slow replica", request=request)
+        return embeddings(request)
+
+    discovery.client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    started = asyncio.get_running_loop().time()
+    result = await discovery.score_candidates("melanoma", ["pmid:2"])
+
+    assert result["scored"] == 1
+    assert reads[:3] == [15, 30, 90]
+    assert asyncio.get_running_loop().time() - started < 5

@@ -8,7 +8,7 @@
 | Depends on | — |
 | Unblocks | [T10 refresh](../tldraw-integration/T10-paper-card.md) (the widgets show these gaps) |
 | Milestone | W1 Nothing broken |
-| Status | Built (Oct 20, `w1/harness-bg`). DH3, first of two runs: in the Wave 1 gate run on `w1/integration` (Oct 21, Super VL, cold cache, five demo seeds, report `20261021T160203Z`), 0 of 21 suggestions needed the "couldn't write why" gap, so the context agent stays on Lightning; one more run to confirm |
+| Status | Built (Oct 20, Wave 1). DH3 decided: in the Wave 1 gate and the Wave 2 live runs on `w2/integration` (Oct 21, Super VL, cold cache, five demo seeds; 5 completed, 1 hung on a Lightning outage), at most 1 card in 8 needed the "couldn't write why" gap (0 of 21, then 1, 0, 0, 0, 0 of 8), so the context agent stays on Lightning |
 | Owner | TBD |
 
 ## Goal

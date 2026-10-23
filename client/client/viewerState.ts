@@ -1,4 +1,5 @@
 import { atom } from 'tldraw'
+import type { TourParams } from '../shared/acpExt.ts'
 
 // Per-viewer state (decision D19): tldraw atoms that live in this browser only and are never
 // written to the room, so two people can look at the same board differently.
@@ -32,3 +33,15 @@ export const paperMoreOpen = atom<boolean>('paperMoreOpen', false)
 
 /** Papers lit up on this screen only: hovering "three of your seeds", or `_canvas/highlight` (T06). */
 export const litPaperIds = atom<string[]>('litPaperIds', [])
+
+export type TourStep = TourParams['steps'][number]
+
+export interface Tour {
+	title: string
+	steps: TourStep[]
+	/** The step whose paper is open. */
+	i: number
+}
+
+/** The Catch-me-up tour running in this browser (T06, decision D24), or null; widgets/tour.ts moves it. */
+export const tour = atom<Tour | null>('tour', null)

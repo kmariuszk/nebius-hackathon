@@ -8,7 +8,7 @@
 | Unblocks | T12 |
 | Milestone | M4; the Oct 20 refresh is W2 One clean run |
 | Priority | P1 (refresh) |
-| Status | Phase A (the widgets) built and on `main` by Oct 18, in the v6 look since PR #21; Phase B (PDF reading) not started and out of the Oct 20 plan. Refresh (Oct 20) not started: see What's left |
+| Status | Refresh built (PR #28, Oct 21): empty states that end (`widgets/emptyStates.ts`, tested), `onVoted` and the T06 tour bar in the actions widget, Find more through `chatBus`; left: refresh criteria 1–4 by hand in a browser. Phase A (the widgets) on `main` since Oct 18, in the v6 look since PR #21; Phase B (PDF reading) not started and out of the plan |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -42,9 +42,9 @@
 
 **Tasks:**
 
-- [ ] `client/client/widgets/parts.tsx`: the empty states; `onVoted`; Find more through `chatBus`.
-- [ ] `client/client/widgets/PaperWidgets.tsx`: pass `onVoted` and the tour state.
-- [ ] Tests: a pure `emptyState(card, widget)` helper in `widgets/emptyStates.ts` with `emptyStates.test.ts` (working, failed with a gap, seed, figure present).
+- [x] `client/client/widgets/parts.tsx`: the empty states; `onVoted`; Find more through `chatBus`.
+- [x] `client/client/widgets/PaperWidgets.tsx`: pass `onVoted` and the tour state.
+- [x] Tests: a pure `emptyState(card, widget)` helper in `widgets/emptyStates.ts` with `emptyStates.test.ts` (working, failed with a gap, seed, figure present).
 
 **Acceptance criteria (refresh):**
 
@@ -126,7 +126,7 @@ The group scales down to fit the free width between the docked panels (ranked li
 | Team notes | Always shown under More |
 | Figure | Only if the help switch hid it from the first view |
 
-**Seeds and kept papers** (`8-seed.png`). The title widget says "In your collection · Seed from Ana" (or "Kept by …"); the figure is on the left; the right shows "Suggestions linked to it" (each with its fit colour and "cites it"; clicking one opens it); the actions are × Close and "Find more like this", which sends a prompt on this viewer's chat (T05). No glance and no More. A discarded paper, shown with "Show discarded papers" (T09), offers "Bring it back" instead of Keep and Discard.
+**Seeds and kept papers** (`8-seed.png`). The title widget says "In your collection · Seed from Ana" (or "Kept by …"); the figure is on the left; the right shows Why ("One of your seed papers.") above "Suggestions linked to it" (each with its fit colour and "cites it"; clicking one opens it); the actions are × Close and "Find more like this", which sends a prompt on this viewer's chat (T05). No glance and no More. A discarded paper, shown with "Show discarded papers" (T09), offers "Bring it back" instead of Keep and Discard.
 
 **Lighting up seeds.** Hovering "three of your seeds" (a claim with evidence `seeds`), or a seed name under More, fades the widgets and sets `litPaperIds` to the seeds this paper cites (its `cites` links), so those seeds and their citation links light up on the board (`3-peek.png`). A small popover says "Cites 3 of your seeds", names them, and adds "From PubMed's citation links. A citation is a link, not agreement." Moving away clears it. This browser only.
 
@@ -138,7 +138,7 @@ The group scales down to fit the free width between the docked panels (ranked li
 | Figure | "Finding the most relevant figure…", while `working` is true and `figure` is null |
 | Why it matters to you | "Still reading. The rest fills in as it's ready.", while `working` is true |
 
-A paper without a free full text shows no figure: once `working` is false and `figure` is still null, the figure widget becomes a short "No figure · There's no free full text, so the agent couldn't read the figures." (`7-review.png`). Anything else discovery can't supply yet (citation count, how it was found) is left out, not faked.
+A paper without a free full text shows no figure: once `working` is false and `figure` is still null, the figure widget becomes a short "No free figure for this paper." (`7-review.png`). Anything else discovery can't supply yet (citation count, how it was found) is left out, not faked.
 
 **Catch me up** (with T06). Each paper's widgets grow out of its node, one after another (`5-catchup.png`). The actions widget gets a dark header: "CATCH-UP · 1 OF 3", step dots, ‹ Prev, Next › (Done on the last step), × to end, and the agent's line for this paper; × Close is hidden while the tour runs. Keep or Discard records the vote and moves to the next paper; the last one closes the widgets, zooms back out and says "You're caught up." The arrow keys step too.
 

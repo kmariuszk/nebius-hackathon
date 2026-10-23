@@ -278,7 +278,8 @@ async def test_tools_over_mcp(discovery):
         tools = {tool.name for tool in (await client.list_tools()).tools}
         assert tools == {
             "search", "find_candidates", "score_candidates", "rerank", "resolve_seed", "get_paper",
-            "get_fulltext", "check_quotes",
+            "get_fulltext", "check_quotes", "citation_links",
+            "get_figures",
         }
         rerank_tool = next(t for t in (await client.list_tools()).tools if t.name == "rerank")
         assert "rerank_vl" in json.dumps(rerank_tool.input_schema["properties"]["backend"])
@@ -299,7 +300,9 @@ async def test_fulltext_from_pmc_puts_methods_last_and_drops_back_matter(discove
     assert result["sections"][1]["text"].startswith(
         "We find that “TOX drives exhaustion” in tumours across patients. Spatial. Exhausted"
     )
-    assert result["figures"] == [{"figureId": "F1", "label": "Figure 1", "caption": "TOX levels. Per patient."}]
+    assert result["figures"] == [
+        {"figureId": "F1", "label": "Figure 1", "caption": "TOX levels. Per patient.", "imageUrl": None}
+    ]
     assert not result["truncated"] and result["skipped"] == []
 
     short = await discovery.get_fulltext("pmid:500", max_chars=2_000)
@@ -354,3 +357,20 @@ async def test_recommend_without_a_seed_is_skipped_rather_than_sent(discovery):
     result = await discovery.find_candidates([], strategies=["recommend"])
     assert result["candidateIds"] == []
     assert result["skipped"] == ["recommend: no seed Semantic Scholar can look up"]
+
+
+@pytest.mark.parametrize(("thinking", "expected"), [("", {"enable_thinking": False}), ("1", None)])
+async def test_rerank_asks_super_vl_not_to_reason_unless_told(discovery, monkeypatch, thinking, expected):
+    monkeypatch.setenv("RERANK_THINKING", thinking)
+    bodies = []
+
+    def recording(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/chat/completions"):
+            bodies.append(json.loads(request.content))
+        return fake_apis(request)
+
+    discovery.client = httpx.AsyncClient(transport=httpx.MockTransport(recording))
+    seed = await discovery.resolve_seed(doi="10.1038/s41586-021-03704-y")
+    await discovery.rerank("T cell exhaustion", ["pmid:100", "pmid:200"], seed_ids=[seed.paper_id], k=2)
+
+    assert [body.get("chat_template_kwargs") for body in bodies] == [expected]

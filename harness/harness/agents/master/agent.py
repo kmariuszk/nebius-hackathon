@@ -9,11 +9,11 @@ With a board (`build(board)`, as the ACP adapter does for every chat) it
 follows the discovery pipeline onto the board: it scores the candidates with
 `score_candidates`, places the best ones with `add_papers` next to their
 closest seed, starts the reader and context passes on them in the background
-(`process_papers`, see `background.py`), reranks with `rerank`, writes each
-card's fit per board goal with `set_scores` and answers in the chat while
-the cards fill in. Without one (`adk web`, `root_agent`) it ranks with
-`rerank` alone and answers in the chat, and calls the reader agent when the
-researcher asks about one paper in depth.
+(`process_papers`, see `background.py`), ranks them for every board goal with
+`rank_papers`, which writes each card's fit in code (`ranking.py`), and
+answers in the chat while the cards fill in. Without one (`adk web`,
+`root_agent`) it ranks with `rerank` alone and answers in the chat, and calls
+the reader agent when the researcher asks about one paper in depth.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from harness.agents.args import chain, clean_args
 from harness.agents.context import agent as context
 from harness.agents.master import candidates
 from harness.agents.master.background import ProcessPapers
+from harness.agents.master.ranking import RankPapers
 from harness.agents.reader import agent as reader
 from harness.agents.search import agent as search
 from harness.board.prompts import BOARD_CONTEXT, CANVAS_RULES
@@ -83,7 +84,7 @@ sub-queries first; the next `rerank` ranks old and new candidates together.
 """
 
 # How many top-scored candidates go onto the board in a first run.
-PLACE = 12
+PLACE = 8
 
 BOARD_INSTRUCTION = f"""\
 You are the research assistant on a shared paper discovery board. You talk with one researcher about \
@@ -117,21 +118,14 @@ returned them; the other details are filled in for you.
 6. Read. Call `process_papers` with `paper_ids` set to []. It starts reading every paper you placed in the \
 background and fills in their cards while you carry on; their "Agent is reading…" badge stays on until then. \
 Don't wait for it.
-7. Rank. Call `rerank` with `goal` set to the researcher's question plus anything they have told you since \
-about what they want, `seed_ids` set to the seeds, `k` set to {PLACE}, and `paper_ids` set to []. `paper_ids` \
-is filled in for you with the top-scored candidates.
-8. Fit. If the rerank ranked papers that aren't on the board yet, place them first with `add_papers` as \
-in step 5; they are read too. Then for every paper you placed (not the seeds), call `set_scores`, all in the \
-same turn, with one entry \
-per board goal in `goals`: score from 0 to 1, fit low, medium or high, and `why`, one line on what the \
-paper offers for that goal. Base them on the rerank: its score and reason for the papers it ranked, low for \
-the ones it left out. The goal `new-findings` means new results on the question, `methods` means methods \
-the researcher could reuse.
-9. Answer with the ranked papers as a numbered list, best first:
-   [Title](paper:<paperId>) (year). The reason from `rerank`.
+7. Rank. Call `rank_papers`. It ranks the papers you placed for every board goal and writes their fit; \
+don't call `rerank` or `set_scores` yourself.
+8. Answer with the papers in the first goal's list from `rank_papers`, as a numbered list, best first:
+   [Title](paper:<paperId>) (year). The reason from `rank_papers`.
    Then one short line: how many candidates were scored (`scored` in the `score_candidates` result), which \
-sub-queries you ran, and any sources or seeds that were skipped. Say that the cards fill in as the papers \
-are read. Offer one or two useful next steps, such as narrowing to a method or expanding from the top paper.
+sub-queries you ran, and any sources, seeds or cards that were skipped. Say that the cards fill in as the \
+papers are read. Offer one or two useful next steps, such as narrowing to a method or expanding from the top \
+paper.
 
 ## Follow-ups
 
@@ -141,9 +135,10 @@ are read. Offer one or two useful next steps, such as narrowing to a method or e
 short blockquotes, each with its link. Say so when it read only the abstract.
 - "More like that", "focus on X", or <board-changes>: call `get_board` first, since its `discardedIds` and \
 kept papers are the researcher's decisions. If the new focus is covered by the candidates you have, call \
-`rerank` again with the updated goal and `set_scores` for the cards whose fit changed. If it needs new \
-angles, run new sub-queries, then score, place, read and rank as above; papers already on the board are \
-updated, not added twice.
+`score_candidates` again with the updated question, then `rank_papers`. If it needs new angles, run new \
+sub-queries, then score, place, read and rank as above; papers already on the board are updated, not added \
+twice. `rank_papers` ranks for the question you last gave `score_candidates`; call it again after any new \
+search or scoring.
 - "Why is X ranked above Y": explain from the reasons and abstracts you have; don't make up a scoring rule.
 - If a question is too vague to search well, ask one short clarifying question first. Otherwise just start.
 - Plain conversation needs no tools.
@@ -152,6 +147,7 @@ updated, not added twice.
 
 - Only mention papers, IDs, titles, years and links that a tool returned. Never invent or guess them.
 - If a tool fails or reports `skipped` sources or cards, say so plainly and carry on with what you have.
+- Write text only in your final answer. Don't narrate between tool calls; the plan shows your progress.
 - Keep answers compact: the list is the answer, not the process. Don't paste raw JSON.
 
 {CANVAS_RULES}
@@ -199,9 +195,10 @@ def build(
         tools=[
             candidates.SearchTool(search_agent),
             candidates.FreshAgentTool(reader_agent),
-            board.papers("resolve_seed", "get_paper", "score_candidates", "rerank"),
-            board.canvas("get_board", "add_papers", "set_scores", "link_papers", "add_note"),
+            board.papers("resolve_seed", "get_paper", "score_candidates"),
+            board.canvas("get_board", "add_papers", "link_papers", "add_note"),
             background,
+            RankPapers(background),
             *board.viewer(),
             board.plan(),
         ],

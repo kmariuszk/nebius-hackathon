@@ -14,22 +14,52 @@ from harness import settings
 TOKEN_FACTORY_URL = "https://api.tokenfactory.nebius.com/v1/"
 SUPER_VL = "nvidia/Nemotron-3.5-Super-VL"
 LIGHTNING = "nvidia/Nemotron-3_5-Lightning"
+# Seconds one model call may take. Unbounded, a call Token Factory never answers blocked its
+# agent for good (Lightning stopped answering for minutes on Oct 21); a timed-out call is retried.
+MODEL_TIMEOUT = 120.0
+# Lightning answers a search or context step in 3 to 20 s, but its first reply once took 104 s
+# (Oct 21), so its calls are cut sooner and sent again.
+LIGHTNING_TIMEOUT = 45.0
 
 
 def super_vl() -> LiteLlm:
     """The master and reader agents: planning, chat, papers and figures, listwise rerank."""
-    return token_factory(settings.get("SUPER_VL_MODEL", SUPER_VL))
+    model_id, timeout = settings.get("SUPER_VL_MODEL", SUPER_VL), _super_vl_timeout()
+    return token_factory(model_id, timeout, [(model_id, timeout), (model_id, timeout)])
 
 
 def lightning() -> LiteLlm:
-    """The search and context agents: fast, high-volume tool calls."""
-    return token_factory(settings.get("LIGHTNING_MODEL", LIGHTNING))
+    """The search and context agents: fast, high-volume tool calls.
+
+    A call that fails twice goes to Super VL instead, with Super VL's timeout: on Oct 21 Lightning
+    stopped answering for minutes twice while Super VL kept answering in seconds.
+    """
+    model_id = settings.get("LIGHTNING_MODEL", LIGHTNING)
+    fallback = settings.get("SUPER_VL_MODEL", SUPER_VL)
+    return token_factory(
+        model_id, LIGHTNING_TIMEOUT, [(model_id, LIGHTNING_TIMEOUT), (fallback, _super_vl_timeout())]
+    )
 
 
-def token_factory(model_id: str) -> LiteLlm:
-    """Any Token Factory model, through LiteLLM's OpenAI-compatible provider."""
+def _super_vl_timeout() -> float:
+    return float(settings.get("MODEL_TIMEOUT", "") or MODEL_TIMEOUT)
+
+
+def token_factory(model_id: str, timeout: float, fallbacks: list[tuple[str, float]]) -> LiteLlm:
+    """Any Token Factory model, through LiteLLM's OpenAI-compatible provider.
+
+    A call goes to `model_id` for at most `timeout` seconds; if it fails, such as a 429 or a
+    timeout, it goes to each `(model, timeout)` of `fallbacks` in turn, since the limit is
+    shared by the chat, the background and the papers MCP. Neither LiteLLM nor the OpenAI
+    client retries on its own, so a call Token Factory never answers costs the sum of the
+    timeouts, and a 429 moves to the next try at once.
+    """
     return LiteLlm(
         model=f"openai/{model_id}",
         api_base=settings.get("TF_BASE_URL", TOKEN_FACTORY_URL),
         api_key=settings.require("TF_API_KEY"),
+        num_retries=0,
+        max_retries=0,
+        timeout=timeout,
+        fallbacks=[{"model": f"openai/{model}", "timeout": seconds} for model, seconds in fallbacks],
     )

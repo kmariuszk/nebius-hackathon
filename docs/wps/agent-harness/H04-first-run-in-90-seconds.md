@@ -8,7 +8,7 @@
 | Depends on | H01 (the measurement), H02, [D01](../discovery/D01-validate-optional-arguments.md), [D02](../discovery/D02-scoring-without-timeouts.md) (the bugs that cost the most time) |
 | Unblocks | [D04](../discovery/D04-clusters-from-data.md) (clusters run after ranking), the demo recording |
 | Milestone | W2 One clean run |
-| Status | Not started |
+| Status | Done (Oct 21). Two strict H01 runs in a row passed on `w2/timing` (reports `20261021T185349Z`, `20261021T185847Z`): first card 89.8 / 67.0 s (target 90), answer 104.5 / 78.7 s (120), every card read 299.2 / 286.3 s (300). What got it there, after five earlier runs met all three targets once: `rank_papers` ranks only the placed papers with Super VL's reasoning off (24 to 53 s down to 2 to 3.5 s); `score_candidates` waits for warm-up embeddings in flight; embedding tries time out after 15, 30 then 90 s and a Lightning call after 45 s, and are sent again (Token Factory's tail: identical embedding batches took 2 s to 162 s). `PLACE = 6` wasn't needed. Margins are thin: `score_candidates` still takes 15 to 39 s and every card read sits near 300 s |
 | Owner | TBD |
 
 ## Goal
@@ -35,7 +35,7 @@ On a fresh board with the five demo seeds and a cold discovery cache, the first 
 **`rank_papers`** (`harness/harness/agents/master/ranking.py`, contract in the [group README](README.md#shared-contracts)). A `BaseToolset` like `ProcessPapers`, exposing one `FunctionTool`, `rank_papers()`, with no arguments:
 
 1. Read from the session state that `candidates.note` keeps: the placed suggestions (`candidates.placed`, kind not `seed`), the latest scored order (`candidates.scored`), the question (`candidates.QUESTION`), the seeds and goals from the last `get_board` (`note` also stores `goals` and the seed IDs from `get_board`, a small addition).
-2. Pool: the placed suggestions, then the next scored candidates, up to `RERANK_POOL = 20`, without discarded papers.
+2. Pool: the placed suggestions, without seeds and discarded papers. (First built with the next scored candidates up to 20; the Oct 21 live runs showed that cost 34 to 52 s of Super VL reading for papers `rank_papers` never writes, so the pool is the placed papers only.)
 3. One `rerank` per goal, in parallel (`asyncio.gather`), through a `Step` with `board.papers("rerank")`, so the calls carry the turn's headers: `goal` is the question plus the goal's description, `seed_ids` the seeds, `exclude_ids` the discarded papers, `k = len(pool)`.
 4. One `set_scores` per placed suggestion through a `Step` with `board.canvas("set_scores")`, every goal at once: score and fit from the rerank (high from 0.7, medium from 0.4, else low), `why` the rerank's reason cut to 200 characters; left out → 0.2, low, "Not in the agent's top picks for this goal".
 5. Return `{goals: {<goalId>: [{paperId, title, year, reason}] (placed papers only, best first)}, scored: <n>, skipped: [...]}`.
@@ -52,19 +52,20 @@ It never calls `add_papers`: a paper the rerank likes that isn't on the board st
 
 **Background parallelism** (`background.py`): `PAPERS_AT_ONCE = 4` (was 3), `CALLS_PER_MINUTE = 40` (was 30). Eight papers at about five model calls each is 40 calls: two waves of four, about 2 to 3 minutes.
 
-**Retries on 429** (`harness/harness/models.py`): `LiteLlm(..., num_retries=2)` so Token Factory's 429s wait for `Retry-After` instead of failing a step.
+**Retries on 429** (`harness/harness/models.py`): `LiteLlm(..., num_retries=2)` so a Token Factory 429 is retried with LiteLLM's exponential backoff (up to 10 s) instead of failing a step; LiteLLM doesn't read `Retry-After`.
 
 **Measuring.** H01 with `LIVE_TIMING=strict`, cold cache, five demo seeds, twice in a row; then once with `LIVE_WARM=1` for the record. The numbers go in this WP's Status row and in `harness/README.md`.
 
 ## Tasks
 
-- [ ] `master/agent.py`: `PLACE = 8`, the new Rank step and narration rule, tool filters, `rank_papers` in the tools.
-- [ ] `master/ranking.py`: `RankPapers` toolset and `rank_papers`.
-- [ ] `master/candidates.py`: `note` stores the goals and seed IDs from `get_board`; a `pool_for_rerank(state)` helper.
-- [ ] `master/background.py`: `PAPERS_AT_ONCE`, `CALLS_PER_MINUTE`.
-- [ ] `models.py`: `num_retries=2`.
-- [ ] Tests (below); `harness/README.md`'s master section updated (steps, timings).
-- [ ] Two strict H01 runs and one warm run; numbers recorded.
+- [x] `master/agent.py`: `PLACE = 8`, the new Rank step and narration rule, tool filters, `rank_papers` in the tools.
+- [x] `master/ranking.py`: `RankPapers` toolset and `rank_papers`.
+- [x] `master/candidates.py`: `note` stores the goals and seed IDs from `get_board`; a `pool_for_rerank(state)` helper.
+- [x] `master/background.py`: `PAPERS_AT_ONCE`, `CALLS_PER_MINUTE`.
+- [x] `models.py`: `num_retries=2`.
+- [x] Tests (below); `harness/README.md`'s master section updated (steps, timings).
+- [x] Two strict H01 runs; numbers recorded.
+- [ ] One `LIVE_WARM=1` run, for the record.
 
 ## Acceptance criteria
 
