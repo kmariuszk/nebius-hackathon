@@ -4,9 +4,12 @@ import type { Editor } from 'tldraw'
 import { AgentMessage } from './AgentMessage'
 import './chat.css'
 import { chatBus, chatTurns, endedTurns, promptBlocks, type AskRequest } from './chatBus'
+import { setLocalStorageItem } from '../localStorage'
+import { followAgent } from '../viewerState'
 import { chatReducer, initialChatState, type Turn } from './chatState'
 import { openAgentConnection, type AgentConnection } from './connection'
 import { addBoardContext, promptWhenReady } from './context'
+import { sameIds } from './follow.ts'
 import { formatCost, formatTokens, stopReasonText } from './format'
 import { PermissionPrompt } from './PermissionPrompt'
 import { PlanList } from './PlanList'
@@ -14,7 +17,7 @@ import { registerSnapshots } from './snapshot'
 import { ThoughtBlock } from './ThoughtBlock'
 import { ToolCard } from './ToolCard'
 import { registerViewerActions } from './viewerActions'
-import { viewerBus } from './viewerBus'
+import { viewerBus, type ViewerAction } from './viewerBus'
 
 export interface ChatPanelProps {
 	boardId: string
@@ -44,10 +47,41 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 	const lastTurn = state.turns[state.turns.length - 1]
 	const running = !!lastTurn?.running
 
-	useEffect(() => (editor ? registerViewerActions(editor) : undefined), [editor])
+	// the running turn's run IDs (from its tool cards' `_meta`), for follow.ts's placement gate
+	const runIds = useRef<ReadonlySet<string>>(new Set())
+	useLayoutEffect(() => {
+		const ids = new Set<string>()
+		for (const turn of state.turns) {
+			if (!turn.running) continue
+			for (const item of turn.items) {
+				if (item.kind === 'tool' && typeof item.meta.runId === 'string') ids.add(item.meta.runId)
+			}
+		}
+		// keep the same Set object while the run is unchanged: follow.ts resets on a new run, and a
+		// fresh Set from every streamed update would look like one
+		if (!sameIds(ids, runIds.current)) runIds.current = ids
+	}, [state.turns])
+
+	useEffect(
+		() =>
+			editor
+				? registerViewerActions(editor, { memberId, runIds: () => runIds.current })
+				: undefined,
+		[editor, memberId]
+	)
 	useEffect(() => (editor ? registerSnapshots(editor) : undefined), [editor])
 	// "Include my view": a picture of what the researcher sees goes with each message they send (T07)
 	const [includeView, setIncludeView] = useState(true)
+	// "Follow the agent": whether the agent may move this viewer's camera (T06, persisted per viewer)
+	const [follow, setFollow] = useState(() => followAgent.get())
+	const toggleFollow = (on: boolean) => {
+		setFollow(on)
+		followAgent.set(on)
+		setLocalStorageItem('paper-canvas:follow-agent', on ? 'on' : 'off')
+	}
+
+	// a gated agent action becomes a chip in the chat when Follow the agent is off
+	useEffect(() => viewerBus.on('chip', ({ label, action }) => dispatch({ type: 'show', label, action })), [])
 
 	useEffect(() => {
 		let timer: ReturnType<typeof setTimeout> | undefined
@@ -253,6 +287,17 @@ export function ChatPanel({ boardId, memberId, editor, open, onOpenChange: setOp
 									Include my view
 								</label>
 							</small>
+							<small>
+								<label title="Let the agent move your view to the papers it adds and shows you">
+									<input
+										type="checkbox"
+										role="switch"
+										checked={follow}
+										onChange={(e) => toggleFollow(e.target.checked)}
+									/>{' '}
+									Follow the agent
+								</label>
+							</small>
 						</div>
 						<button type="button" className="ChatPanel-x" aria-expanded={true} onClick={() => setOpen(false)} title="Hide the chat">
 							×
@@ -350,6 +395,12 @@ function TurnView({ turn, onAnswer }: { turn: Turn; onAnswer: (requestId: string
 						return <ToolCard key={item.key} card={item} />
 					case 'permission':
 						return <PermissionPrompt key={item.key} item={item} onAnswer={onAnswer} />
+					case 'show':
+						return (
+							<button key={item.key} type="button" className="ChatLinkBtn" onClick={() => runViewerAction(item.action)}>
+								{item.label}
+							</button>
+						)
 				}
 			})}
 			{turn.running && !streaming && (
@@ -361,6 +412,21 @@ function TurnView({ turn, onAnswer }: { turn: Turn; onAnswer: (requestId: string
 			{turn.error && <div className="ChatNote ChatNote--error">{turn.error}</div>}
 		</div>
 	)
+}
+
+// A chip click runs the action locally (no from: 'agent'), so it works however Follow is set.
+function runViewerAction(action: ViewerAction) {
+	switch (action.type) {
+		case 'focus':
+			viewerBus.emit('focus', action.params)
+			break
+		case 'open_paper':
+			viewerBus.emit('open_paper', { paperId: action.paperId })
+			break
+		case 'tour':
+			viewerBus.emit('tour', { title: action.title, steps: action.steps })
+			break
+	}
 }
 
 function stopPropagation(e: SyntheticEvent) {

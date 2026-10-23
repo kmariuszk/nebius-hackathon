@@ -21,7 +21,8 @@
 | Paper links (`paper:` URLs) focus the board | Built | `chat/AgentMessage.tsx`, `chat/viewerActions.ts` |
 | Sending a prompt from elsewhere in the app | Missing: "Find more like this" dispatches `pdc:ask` and nobody listens (F18); the Start page has no way to send the first prompt (F11) | `client/client/widgets/parts.tsx` |
 | Whitespace between tool cards | Each whitespace-only message chunk after a tool card starts a new message item, so blank bubbles appear (F5) | `chat/chatState.ts`, `applyUpdate` (`if (!text) return state` lets `"\n"` through) |
-| "Follow the agent", "Include my view" | Not built; they belong to [T06](T06-viewer-actions.md) and [T07](T07-board-context.md) | — |
+| "Follow the agent" | Built on `feat/follow-agent` (Oct 22); see [T06](T06-viewer-actions.md) | `chat/follow.ts`, `ChatPanel.tsx` |
+| "Include my view" | Built; see [T07](T07-board-context.md) | `chat/context.ts`, `ChatPanel.tsx` |
 
 ## What's left (v6)
 

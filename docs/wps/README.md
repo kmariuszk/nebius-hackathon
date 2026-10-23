@@ -126,6 +126,6 @@ Each finding from the Oct 19 review, with its evidence and the WP whose acceptan
 - Deploying: a Docker image with the harness and the papers MCP (today's `client/Dockerfile` has the board service only), and running on Nebius.
 - [T11](tldraw-integration/T11-external-agents.md) personal tokens for external agents.
 - The PDF reader with shared highlights, and "highlight a passage, it becomes a node" ([T10](tldraw-integration/T10-paper-card.md)'s Phase B).
-- [T06](tldraw-integration/T06-viewer-actions.md)'s "Follow the agent" switch and busy-user queue.
+- The rest of [T06](tldraw-integration/T06-viewer-actions.md) beyond the built actions: echo mode's `_canvas/focus`, and hinting visibility.
 - [T12](tldraw-integration/T12-integration-demo.md)'s keyless end-to-end test, Docker smoke test and memory measurement.
 - Verdicts, citation overlap and recency in `score_candidates`, and early placement on verdicts (Concept's steps 5 and 7).

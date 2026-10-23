@@ -8,7 +8,7 @@
 | Unblocks | T09 (row click reuses focus), T12, the catch-me-up tour (harness owner) |
 | Milestone | M3; the Oct 20 refresh (the tour) is W2 One clean run |
 | Priority | P1 (refresh) |
-| Status | Refresh built (PR #28, Oct 21): Catch me up is a local tour (`widgets/tour.ts`, tested) started by the top bar, `?tour=1` and `_canvas/tour`, with the tour bar in the actions widget and `/seen` when it ends; left: refresh criteria 1–4 by hand in a browser (two browsers for 4). Harness half done: the four tools send `_canvas/*`; `focus`, `highlight` and `open_paper` handled in the browser. Deferred: the busy-user queue and "Follow the agent" (criteria 4 and 5) |
+| Status | Refresh built (PR #28, Oct 21): Catch me up is a local tour (`widgets/tour.ts`, tested) started by the top bar, `?tour=1` and `_canvas/tour`, with the tour bar in the actions widget and `/seen` when it ends; left: refresh criteria 1–4 by hand in a browser (two browsers for 4). Harness half done: the four tools send `_canvas/*`; `focus`, `highlight` and `open_paper` handled in the browser. Oct 22: the busy-user queue and "Follow the agent" (criteria 4, 5 and 7) built on branch `feat/follow-agent` |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -21,7 +21,7 @@
 | "Catch me up (N)" | Built in the top bar, but it only cycles `openPaperId` through the new papers: no tour bar, no agent line, no Prev/Next/Done/× (F14) | `client/client/pinboard/TopBar.tsx`, `CatchMeUp` |
 | Keep / Discard during Catch me up | Keep stays on the same paper; Discard closes the widgets (F15) | `client/client/widgets/parts.tsx`, `ActionsWidget` |
 | `?tour=1` from Home | Ignored | `client/client/pages/Room.tsx` |
-| Busy-user queue, "Follow the agent" | Not built | — |
+| Busy-user queue, "Follow the agent" | Built (Oct 22) | `client/client/chat/follow.ts`, `viewerActions.ts`, `viewerState.ts`, `ChatPanel.tsx` |
 
 ## What's left (v6)
 
@@ -48,7 +48,21 @@ The spec is the v6 demo board (`client/public/landing/demo-board.html`, "Catch m
 
 **The tour bar** sits in the actions widget under the node (T10's `ActionsWidget`): "CATCH-UP · i OF n", one dot per step, the line, ‹ Prev, Next › (Done on the last step) and ×; Keep and Discard stay beside it and move on.
 
-**Deferred** (not in the demo script): the busy-user queue and "Follow the agent" (acceptance criteria 4 and 5 above stay open).
+### Follow the agent (Oct 22)
+
+The "Follow the agent" switch in the chat header (on by default, kept per viewer in `paper-canvas:follow-agent`, `followAgent` in `viewerState.ts`) decides what the agent may do to that viewer's camera. Only `_canvas/*` notifications are gated — `connection.ts` marks them `from: 'agent'`; every local action (chat paper links, tool-card "Show on board", ranked-list rows, the top bar's Catch me up, the chips themselves) runs as before.
+
+| What the agent asks | Follow on | Follow off |
+| --- | --- | --- |
+| `focus` | Runs, through the busy queue (5 s expiry) | "Show the paper" / "Show N papers" chip; clicking focuses |
+| `open_paper` | Runs, through the busy queue (no expiry) | "Open <card title>" chip ("Open the paper" if the card isn't found) |
+| `tour` | Runs, through the busy queue (no expiry) | "Start the tour (N papers)" chip |
+| `highlight` | Runs — never gated, it doesn't move the camera | Runs |
+| Papers placed by this chat's running turn | The camera follows them | Nothing |
+
+The busy queue (`follow.ts`, driven by `viewerActions.ts`) treats the viewer as busy while `editor.inputs` reports pointing, dragging, pinching or panning, or a shape's text is being edited (`editor.getEditingShapeId()`), since `select.idle` is not reliable under the note and hand tools. Actions queue in arrival order and run once the viewer is idle; idle is checked on every editor `event` and on a 250 ms timer while the queue is non-empty.
+
+Following placements (`registerFollow` in `follow.ts`): remote-created `paper-card` shapes with `meta.createdBy === 'agent'`, `meta.onBehalfOf` the viewer's member ID and a `meta.runId` from the running turn's tool cards are batched for 500 ms, then one `zoomToBounds(Box.Common(bounds), { inset: 96, targetZoom: Math.min(1, editor.getZoomLevel()), animation: { duration: 450 } })` frames every card placed in the run so far — skipped when the cards are all in view already, a paper is open, a tour is running, or the viewer touched the canvas in the last 3 s. Following stops when the turn ends, and never touches a teammate's camera.
 
 **Tasks:**
 
@@ -123,9 +137,9 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 - [ ] Echo mode sends `_canvas/focus` for selected shapes.
 - [x] `client/client/widgets/tour.ts`: tour state (steps, index), driving T10's widgets and the tour header in the actions widget; the `_canvas/tour` schema in `client/shared/acpExt.ts`.
 - [x] `harness/tests/test_viewer_tools.py`: scripted model calls `focus`; the test client receives `_canvas/focus` with the right `sessionId` and IDs, after the preceding message chunk.
-- [ ] `client/client/chat/viewerActions.ts` with `resolveTargets` and the busy queue as pure, tested functions.
+- [x] `client/client/chat/viewerActions.ts` with target resolution and the busy queue as pure, tested functions (`chat/follow.ts`).
 - [ ] Hinting visibility check; the `InFrontOfTheCanvas` fallback only if needed.
-- [ ] "Follow the agent" switch in `ChatPanel.tsx`.
+- [x] "Follow the agent" switch in `ChatPanel.tsx`.
 
 ## Acceptance criteria
 
@@ -135,11 +149,12 @@ Local sources reuse the same handlers: paper links in chat messages, the "Show o
 4. With "Follow the agent" off, the agent's focus shows as a "Show" chip, and clicking it focuses.
 5. A focus that arrives while Ana is dragging a paper waits until she lets go.
 6. "Catch me up" on a board with three new papers opens the first paper's widgets with "CATCH-UP · 1 OF 3" and the agent's line under the node; Keep moves to paper 2 and records the vote for everyone; × ends the tour; Ben's view never moves.
+7. With "Follow the agent" on, the cards the agent places during a running turn are followed into view: the camera frames them within about a second of each batch and never zooms in past the viewer's zoom; Ben's view never moves.
 
 ## Tests
 
 - Harness: `test_viewer_tools.py` (above).
-- Browser: `client/client/chat/viewerActions.test.ts` for target resolution (missing shapes, mixed IDs, other pages) and the busy queue.
+- Browser: `client/client/chat/follow.test.ts` for the placement gate, the move skip rules, the busy queue and the chip labels; `chat/viewerActions.test.ts` for the gate through the handlers.
 - Manual: the two-browser checks in criteria 1 and 2, recorded for T12.
 
 ## Risks
