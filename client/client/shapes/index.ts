@@ -1,5 +1,6 @@
 import type { Editor, TLAnyBindingUtilConstructor, TLAnyShapeUtilConstructor, TLShape } from 'tldraw'
 import { NOTE_PIN_TYPE } from '../../shared/bindings'
+import { exportingSnapshot } from '../chat/snapshot'
 import { linkedCards } from '../pinboard/Strings'
 import { filters } from '../viewerState'
 import { NotePinBindingUtil } from './NotePinBindingUtil'
@@ -22,8 +23,9 @@ export function getShapeVisibility(shape: TLShape, editor?: Editor): 'visible' |
 	if (shape.type === 'arrow') {
 		if (shape.meta.hiddenByHuman === true) return 'hidden'
 		if (editor && boundToHidden(editor, shape, 'arrow')) return 'hidden'
-		// links between papers are drawn as strings (pinboard/Strings.tsx), not as arrows
-		if (editor && linkedCards(editor, shape)) return 'hidden'
+		// links between papers are drawn as strings (pinboard/Strings.tsx), not as arrows; a snapshot
+		// for the agent can't export the strings, so it shows the arrows while it draws (T07)
+		if (editor && exportingSnapshot.get() === 0 && linkedCards(editor, shape)) return 'hidden'
 	}
 	if (shape.type === 'note' && editor && boundToHidden(editor, shape, NOTE_PIN_TYPE)) return 'hidden'
 	return 'inherit'

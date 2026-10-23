@@ -1,4 +1,5 @@
 import type { PaperType } from './paperCard.ts'
+import type { PaperCardShape } from './shapes.ts'
 
 // How papers read on the board, shared by the node, the widgets and the ranked list.
 
@@ -17,6 +18,8 @@ export function nodeLabel(authors: string[], year: number | null): string {
 	const name = authors[0] ? familyName(authors[0]) : ''
 	return [name, year ?? ''].join(' ').trim() || 'Unknown'
 }
+
+export const cardLabel = (card: PaperCardShape) => nodeLabel(card.props.authors, card.props.year)
 
 /** The byline's authors: "Tirosh", "Tirosh and Izar", "Tirosh et al.". */
 export function shortAuthors(authors: string[]): string {

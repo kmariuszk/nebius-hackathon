@@ -318,6 +318,184 @@
 .pb-tag.faded {
 	opacity: 0.25;
 }
+/* the part of a string you can point at and click (T14) */
+.pb-hit {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 12;
+	pointer-events: stroke;
+	cursor: pointer;
+}
+/* a snapshot shows the link arrows in its picture (chat/snapshot.ts), not on this screen */
+.tl-canvas.pb-exporting .tl-shape[data-shape-type='arrow'] {
+	visibility: hidden;
+}
+
+/* ---------- editing the board (T14): the + handle, the link editor, the board's toast ---------- */
+.pb-handle {
+	position: absolute;
+	width: 20px;
+	height: 20px;
+	margin: -10px 0 0 -10px;
+	pointer-events: all;
+	cursor: crosshair;
+	touch-action: none;
+}
+.pb-handle svg {
+	display: block;
+	overflow: visible;
+}
+.pb-handle circle {
+	fill: #fff;
+	stroke: #0b0b0b;
+	stroke-width: 1.5;
+}
+.pb-handle path {
+	stroke: #0b0b0b;
+	stroke-width: 1.6;
+}
+.pb-rubber {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	overflow: visible;
+	pointer-events: none;
+}
+.pb-rubber line {
+	stroke: #3b3a37;
+	stroke-width: 1.8;
+	stroke-dasharray: 5 4;
+}
+.pb-led,
+.pb-toast {
+	--ink: #0b0b0b;
+	--ink2: #52514e;
+	--muted: #898781;
+	--hair: #ebe9e3;
+	--page: #f4f3ef;
+	--ring: rgba(11, 11, 11, 0.07);
+	font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+.pb-led {
+	position: absolute;
+	z-index: 320;
+	width: 300px;
+	box-sizing: border-box;
+	background: #fff;
+	color: var(--ink);
+	border-radius: 12px;
+	box-shadow: 0 0 0 1px var(--ring), 0 12px 32px rgba(0, 0, 0, 0.16);
+	padding: 12px;
+}
+.pb-led button {
+	font: inherit;
+	cursor: pointer;
+}
+.pb-led .le-h {
+	font-weight: 650;
+	margin-bottom: 8px;
+}
+.pb-led .le-h span {
+	color: var(--muted);
+	font-weight: 400;
+	margin: 0 2px;
+}
+.pb-led input {
+	width: 100%;
+	box-sizing: border-box;
+	border: 1px solid var(--hair);
+	border-radius: 8px;
+	padding: 8px 10px;
+	font: inherit;
+	margin-bottom: 8px;
+}
+.pb-led input:focus {
+	outline: 2px solid #2a78d6;
+	outline-offset: -1px;
+}
+.pb-led .chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.pb-led .fchip {
+	border: 1px solid var(--hair);
+	background: #fff;
+	border-radius: 999px;
+	padding: 3px 10px;
+	font-size: 12.5px;
+	color: var(--ink2);
+}
+.pb-led .fchip:hover {
+	border-color: var(--ink2);
+	color: var(--ink);
+}
+.pb-led .le-note {
+	font-size: 12px;
+	color: var(--muted);
+	margin-top: 8px;
+}
+.pb-led .le-f {
+	display: flex;
+	align-items: center;
+	margin-top: 10px;
+}
+.pb-btn.text {
+	background: none;
+	padding: 7px 4px;
+	color: var(--ink2);
+}
+.pb-btn.text:hover {
+	background: none;
+	color: var(--ink);
+}
+.pb-led .pb-btn.text + .pb-btn.text {
+	margin-left: 10px;
+}
+.pb-toast {
+	position: absolute;
+	left: 50%;
+	bottom: 72px;
+	transform: translateX(-50%);
+	z-index: 310;
+	background: var(--ink);
+	color: #fff;
+	border-radius: 10px;
+	padding: 10px 14px;
+	display: flex;
+	gap: 14px;
+	align-items: center;
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+	max-width: 560px;
+	width: max-content;
+}
+.pb-toast button {
+	background: none;
+	border: 0;
+	color: #fff;
+	text-decoration: underline;
+	font: inherit;
+	font-weight: 600;
+	padding: 0;
+	white-space: nowrap;
+	cursor: pointer;
+}
+/* what you drag out of the toolbar's Note */
+.pb-ghost {
+	position: fixed;
+	left: -1000px;
+	top: -1000px;
+	width: 132px;
+	height: 84px;
+	box-sizing: border-box;
+	background: #fff1a8;
+	box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+	font: 12px system-ui, -apple-system, 'Segoe UI', sans-serif;
+	padding: 10px;
+	color: #a39a6a;
+}
 
 /* ---------- notes: tldraw's notes as yellow paper in a hand ---------- */
 .Board .tl-note__container {
@@ -378,6 +556,9 @@
 	color: #0b0b0b;
 	cursor: pointer;
 }
+.pb-notebtn[draggable='true'] {
+	cursor: grab;
+}
 .pb-notebtn:hover {
 	background: #f4f3ef;
 }
@@ -391,6 +572,226 @@
 	background: #ffe36b;
 	border-radius: 2px;
 	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* "N changes · the agent is waiting · Update suggestions" (T13) */
+.pb-changes,
+.pb-controls {
+	--ink: #0b0b0b;
+	--ink2: #52514e;
+	--muted: #898781;
+	--hair: #ebe9e3;
+	--page: #f4f3ef;
+	--ring: rgba(11, 11, 11, 0.07);
+}
+.pb-changes {
+	position: relative;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 0 4px 0 12px;
+	border-left: 1px solid var(--hair);
+	margin-left: 4px;
+	font-size: 12.5px;
+	color: var(--ink2);
+	white-space: nowrap;
+}
+.pb-changes button {
+	border: 0;
+	background: var(--ink);
+	color: #fff;
+	border-radius: 8px;
+	padding: 6px 11px;
+	font: inherit;
+	font-size: 12.5px;
+	font-weight: 600;
+	cursor: pointer;
+}
+.pb-changes .chgbtn {
+	background: none;
+	color: var(--ink2);
+	font-weight: 400;
+	padding: 4px 6px;
+	border-radius: 6px;
+	text-decoration: underline dotted #9a988f;
+	text-underline-offset: 3px;
+}
+.pb-changes .chgbtn:hover,
+.pb-changes .chgbtn[aria-expanded='true'] {
+	background: var(--page);
+	color: var(--ink);
+}
+.pb-chgpop {
+	top: auto;
+	left: auto;
+	bottom: calc(100% + 12px);
+	right: -4px;
+	white-space: normal;
+}
+.pb-pop .chglist {
+	margin: 0;
+	padding-left: 20px;
+	font-size: 13px;
+	color: var(--ink);
+}
+.pb-pop .chglist li {
+	margin: 3px 0;
+}
+.pb-pop .mnote {
+	border-top: 1px solid var(--hair);
+	margin-top: 10px;
+	padding-top: 10px;
+	font-size: 11.5px;
+	color: var(--muted);
+}
+.pb-pop .mnote b {
+	color: var(--ink2);
+}
+
+/* the ? at the bottom right, and the key (T13) */
+.pb-controls {
+	position: absolute;
+	right: 16px;
+	bottom: 16px;
+	z-index: 300;
+	font: 13px/1.45 system-ui, -apple-system, 'Segoe UI', sans-serif;
+	-webkit-font-smoothing: antialiased;
+}
+.pb-ctl {
+	width: 36px;
+	height: 36px;
+	border-radius: 50%;
+	border: 0;
+	background: #fff;
+	box-shadow: 0 0 0 1px var(--ring), 0 2px 8px rgba(0, 0, 0, 0.08);
+	font: inherit;
+	font-weight: 700;
+	color: var(--ink2);
+	cursor: pointer;
+}
+.pb-ctl:hover {
+	color: var(--ink);
+}
+.pb-ctl[aria-expanded='true'] {
+	box-shadow: 0 0 0 2px var(--ink);
+}
+.pb-legend {
+	top: auto;
+	left: auto;
+	bottom: 46px;
+	right: 0;
+	max-height: calc(100vh - 150px);
+	overflow: auto;
+	box-sizing: border-box;
+}
+.pb-legend h6:not(:first-child) {
+	margin-top: 14px;
+}
+.pb-legend .row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin: 6px 0;
+	line-height: 1.35;
+}
+.pb-legend .row b {
+	color: var(--ink);
+}
+.pb-legend .ic {
+	width: 30px;
+	flex: none;
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	font-style: normal;
+}
+.pb-legend .kc {
+	width: 26px;
+	height: 16px;
+	border-radius: 2px;
+	display: block;
+	position: relative;
+	box-sizing: border-box;
+}
+.pb-legend .kc.saved {
+	background: var(--pb-paperw);
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08), 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+.pb-legend .kc.saved::after {
+	content: '';
+	position: absolute;
+	top: -4px;
+	left: 50%;
+	margin-left: -4px;
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: radial-gradient(circle at 36% 32%, #ffb3ae 0 12%, #e0453f 32%, #9e2420 100%);
+}
+.pb-legend .kc.sugg {
+	background: rgba(255, 253, 247, 0.6);
+	box-shadow: 0 0 0 1px rgba(34, 29, 24, 0.22);
+}
+.pb-legend .kc.sugg::after {
+	content: '';
+	position: absolute;
+	top: -4px;
+	left: 50%;
+	margin-left: -8px;
+	width: 16px;
+	height: 6px;
+	background: #e6dcc0;
+	transform: rotate(-4deg);
+}
+.pb-legend .kcl {
+	width: 28px;
+	height: 18px;
+	border-radius: 5px;
+	display: block;
+	position: relative;
+	border: 1.5px dotted rgba(70, 44, 18, 0.45);
+	box-sizing: border-box;
+}
+.pb-legend .kcl::after {
+	content: '';
+	position: absolute;
+	top: -5px;
+	left: 3px;
+	width: 15px;
+	height: 6px;
+	background: #e6dcc0;
+	transform: rotate(-2deg);
+}
+.pb-legend .kb {
+	background: var(--ink);
+	color: #fff;
+	border-radius: 999px;
+	padding: 0 6px;
+	font-size: 10px;
+	font-weight: 650;
+	line-height: 16px;
+}
+.pb-legend .kn {
+	width: 16px;
+	height: 14px;
+	background: #fff0a3;
+	box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+	display: block;
+}
+.pb-legend .ka {
+	font: 500 13px var(--pb-hand);
+	color: var(--pb-marker);
+}
+.pb-legend .plus {
+	display: inline-grid;
+	place-items: center;
+	width: 16px;
+	height: 16px;
+	border-radius: 50%;
+	border: 1.5px solid var(--ink);
+	font-weight: 700;
+	line-height: 1;
+	margin: 0 2px;
 }
 
 /* the chat opens from the top bar; no rail */
@@ -539,6 +940,7 @@
 	line-height: 1.3;
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
+	line-clamp: 2;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 	margin: 3px 0 2px;
@@ -553,6 +955,7 @@
 	margin-top: 4px;
 	display: -webkit-box;
 	-webkit-line-clamp: 2;
+	line-clamp: 2;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
 }
@@ -577,4 +980,156 @@
 	padding: 20px 12px;
 	color: var(--muted);
 	font-size: 13px;
+}
+.pb-list .clear {
+	border: 0;
+	background: none;
+	padding: 0;
+	font: inherit;
+	color: var(--ink2);
+	text-decoration: underline;
+	cursor: pointer;
+}
+
+/* ---------- filter: a button in the toolbar, its panel above it ---------- */
+.pb-filter {
+	--ink: #0b0b0b;
+	--ink2: #52514e;
+	--muted: #898781;
+	--hair: #ebe9e3;
+	--page: #f4f3ef;
+	--ring: rgba(11, 11, 11, 0.07);
+	position: relative;
+	display: flex;
+}
+.pb-filter::before {
+	content: '';
+	width: 1px;
+	margin: 7px 2px;
+	background: var(--hair);
+}
+.pb-filterbtn {
+	height: 38px;
+	border: 0;
+	background: transparent;
+	border-radius: 8px;
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	padding: 0 12px 0 10px;
+	font: inherit;
+	font-weight: 600;
+	color: var(--ink);
+	cursor: pointer;
+}
+.pb-filterbtn:hover {
+	background: var(--page);
+}
+.pb-filterbtn[aria-expanded='true'] {
+	background: #e6effc;
+	color: #104281;
+}
+.pb-filterbtn .badge {
+	background: var(--ink);
+	color: #fff;
+	border-radius: 999px;
+	font-size: 11px;
+	padding: 0 6px;
+	font-weight: 700;
+	line-height: 17px;
+}
+.pb-filterpop {
+	position: absolute;
+	bottom: 46px;
+	right: -4px;
+	width: 310px;
+	max-height: calc(100vh - 160px);
+	overflow: auto;
+	box-sizing: border-box;
+	background: #fff;
+	border-radius: 12px;
+	box-shadow: 0 0 0 1px var(--ring), 0 10px 30px rgba(0, 0, 0, 0.14);
+	padding: 14px;
+	font-size: 13px;
+	line-height: 1.45;
+	color: var(--ink2);
+	text-align: left;
+}
+.pb-filterpop h6 {
+	margin: 0 0 8px;
+	font-size: 11px;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: var(--muted);
+}
+.pb-filterpop h6:not(:first-child) {
+	margin-top: 14px;
+}
+.pb-filterpop .chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 6px;
+}
+.pb-fchip {
+	border: 1px solid var(--hair);
+	background: #fff;
+	border-radius: 999px;
+	padding: 3px 10px;
+	font: inherit;
+	font-size: 12.5px;
+	color: var(--ink2);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	cursor: pointer;
+}
+.pb-fchip[aria-pressed='true'] {
+	background: var(--ink);
+	color: #fff;
+	border-color: var(--ink);
+}
+.pb-fchip .sw {
+	width: 9px;
+	height: 9px;
+	border-radius: 50%;
+	box-shadow: 0 0 0 1.5px #fff;
+}
+.pb-filterpop .sub6 {
+	font-size: 12px;
+	color: var(--ink2);
+	margin: 10px 0 6px;
+}
+.pb-chk {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	margin-top: 10px;
+	cursor: pointer;
+}
+.pb-filterpop h6 + .pb-chk {
+	margin-top: 0;
+}
+.pb-filterpop .mnote {
+	margin-top: 4px;
+	padding-top: 6px;
+	font-size: 11.5px;
+	color: var(--muted);
+}
+.pb-filterpop .pfoot {
+	display: flex;
+	align-items: center;
+	border-top: 1px solid var(--hair);
+	margin-top: 14px;
+	padding-top: 10px;
+	font-size: 12.5px;
+}
+.pb-filterpop .pfoot button {
+	margin-left: auto;
+	border: 0;
+	background: none;
+	padding: 0;
+	font: inherit;
+	color: var(--ink2);
+	text-decoration: underline;
+	cursor: pointer;
 }

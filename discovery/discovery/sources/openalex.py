@@ -102,6 +102,7 @@ def parse_work(work: dict[str, Any]) -> Paper:
         abstract=_abstract(work.get("abstract_inverted_index")),
         open_access_pdf=best.get("pdf_url"),
         type=work.get("type"),
+        cited_by=work.get("cited_by_count"),
     )
 
 

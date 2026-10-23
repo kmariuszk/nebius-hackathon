@@ -8,6 +8,7 @@ import {
 	snapshotParams,
 	tourParams,
 } from '../../shared/acpExt.ts'
+import { takeSnapshot } from './snapshot.ts'
 import { viewerBus } from './viewerBus.ts'
 
 // The browser's ACP client (T05, decision D10): the SDK's builder API over its WebSocket stream to
@@ -75,9 +76,13 @@ export async function openAgentConnection({
 			viewerBus.emit('open_paper', { paperId: params.paperId })
 		)
 		.onNotification(CANVAS_METHODS.tour, tourParams, ({ params: { sessionId: _, ...p } }) => viewerBus.emit('tour', p))
-		// T07 renders the picture; until then the agent gets an error it can explain
-		.onRequest(CANVAS_METHODS.snapshot, snapshotParams, () => {
-			throw new acp.RequestError(-32601, 'Snapshots are not supported yet')
+		// the agent looks at the board (T07): a PNG of this viewer's page, or an error it can explain
+		.onRequest(CANVAS_METHODS.snapshot, snapshotParams, async ({ params: { sessionId: _, ...request } }) => {
+			try {
+				return await takeSnapshot(request)
+			} catch (e) {
+				throw new acp.RequestError(-32000, e instanceof Error ? e.message : String(e))
+			}
 		})
 		.connect(stream)
 

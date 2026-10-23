@@ -18,6 +18,10 @@ placed near (kind `similar`). Then, per paper, each step has its own runner:
    context agent left "why it matters" or the glance out, which the card's
    `gaps` then says. Every failed tool call is logged at WARNING.
 
+At the end of the master's turn, a last model-free step groups the board's
+papers into clusters with `apply_clusters`, once a chat, when the board has
+6 papers or more and no clusters yet.
+
 At most `PAPERS_AT_ONCE` papers are read at a time, and the background
 agents make at most `CALLS_PER_MINUTE` model calls a minute, since Token
 Factory's limit (60 a minute to start with) is shared with the chat and the
@@ -51,6 +55,7 @@ from pydantic import Field
 
 from harness.agents.master import candidates
 from harness.board.tools import BoardTools
+from harness.toolsets import error_text, failed, structured
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +70,8 @@ ABSTRACT_ONLY = "Read from the abstract only: no full text was available."
 # citation_links takes at most 200 papers, link_papers 100 links a call.
 CITED_PAPERS = 200
 LINKS_PER_CALL = 100
+# A board is clustered once it has this many papers (D04).
+CLUSTERED_PAPERS = 6
 
 
 class Pace:
@@ -112,7 +119,7 @@ class Calls:
             error = error_text(result)
             log.warning("background %s %s %s: %s", self.paper_id, self.tool_context.agent_name, name, error)
             raise ToolFailed(f"{name}: {error}")
-        return candidates.structured(result)
+        return structured(result)
 
 
 class Step(BaseAgent):
@@ -162,6 +169,8 @@ class ProcessPapers(BaseToolset):
         self.tasks: set[asyncio.Task[None]] = set()
         self.citing: dict[str, asyncio.Task[None]] = {}  # each turn's citation step, by run ID
         self.cited: set[str] = set()
+        self.clustered = False  # the board has clusters, or this chat clustered it
+        self.clustering: asyncio.Task[None] | None = None
         self.tool = FunctionTool(self.process_papers)
 
     async def get_tools(self, readonly_context: ReadonlyContext | None = None) -> list[BaseTool]:
@@ -212,7 +221,11 @@ class ProcessPapers(BaseToolset):
             cite = asyncio.create_task(self.link_citations(job, seeds))
             self.tasks.add(cite)
             cite.add_done_callback(self.tasks.discard)
-        # 4. Clusters, once per board (D04), go here.
+        # 4. Clusters, once per board, now that rank_papers has written the fits (D04).
+        if self.board.canvas_url and not self.clustered and (self.clustering is None or self.clustering.done()):
+            self.clustering = task = asyncio.create_task(self.cluster(Job("", state.get("run_id"), "")))
+            self.tasks.add(task)
+            task.add_done_callback(self.tasks.discard)
         return None
 
     def start(self, paper_ids: list[str], state: dict[str, Any]) -> None:
@@ -289,6 +302,31 @@ class ProcessPapers(BaseToolset):
             await self.run(Step(name="citations", tools=tools, action=write, paper_id=job.paper_id), "", job)
         except Exception as error:
             log.warning("could not link the papers that cite each other: %s", error)
+
+    async def cluster(self, job: Job) -> None:
+        """Step 4: `apply_clusters` on every paper on the board, without a model, once the board has
+        `CLUSTERED_PAPERS` papers, unless it has clusters already (the agent's or a person's). Hidden
+        while the canvas has no `apply_clusters`; a failure is only logged, and tried again next turn."""
+        async def apply(call: Calls) -> None:
+            if "apply_clusters" not in call.tools:
+                log.info("the canvas has no apply_clusters (no cluster_papers in the papers MCP), so no clusters")
+                return
+            board = await call("get_board")
+            if board.get("clusters"):
+                self.clustered = True  # later papers go into them by `near`
+                return
+            if len(board.get("papers") or []) < CLUSTERED_PAPERS:
+                return
+            found = await call("apply_clusters")  # no paperIds: every paper, people's stay put
+            self.clustered = True
+            log.info("%d clusters on the board; %d papers or clusters skipped",
+                     len(found.get("clusters") or []), len(found.get("skipped") or []))
+
+        step = Step(name="clusters", tools=[self.board.canvas("get_board", "apply_clusters")], action=apply)
+        try:
+            await self.run(step, "clusters", job)
+        except Exception as error:
+            log.warning("could not cluster the board's papers: %s", error)
 
     async def try_step(self, what: str, job: Job, action: Callable[[Calls], Awaitable[Any]]) -> None:
         """A model-free step whose failure is only logged."""
@@ -495,7 +533,7 @@ def recorded(
     error = "" if ok else error_text(tool_response)
     if not ok:
         log.warning("background %s %s %s: %s", job.paper_id, tool_context.agent_name, tool.name, error)
-    written = candidates.structured(tool_response).get("written") if ok and tool.name == "set_card" else None
+    written = structured(tool_response).get("written") if ok and tool.name == "set_card" else None
     tried.append({"tool": tool.name, "ok": ok, "error": error, "written": written or []})
 
 
@@ -512,20 +550,6 @@ def retry_note(tried: list[dict[str, Any]]) -> str:
         f"\n\nYour last attempt didn't save. Errors: {errors}. Call set_card with paperId and oneLine first, "
         "then claims and glance in a second call."
     )
-
-
-def failed(result: Any) -> bool:
-    return not isinstance(result, dict) or bool(result.get("isError")) or "error" in result
-
-
-def error_text(result: Any) -> str:
-    if isinstance(result, dict):
-        if "error" in result:
-            return str(result["error"])
-        texts = [c.get("text", "") for c in result.get("content") or [] if isinstance(c, dict)]
-        if any(texts):
-            return " ".join(texts)
-    return json.dumps(result, default=str)[:300]
 
 
 def short(error: object) -> str:

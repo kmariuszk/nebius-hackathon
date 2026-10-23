@@ -8,7 +8,7 @@
 | Unblocks | T09 (the "Looking for" control), T12 |
 | Milestone | M4; the Oct 20 refresh is W3 The team edits |
 | Priority | P1 (refresh) |
-| Status | Top bar and toolbar built in the v6 look and merged (PR #21, Oct 18); changes counter, Update suggestions, help, the board's title and agent presence not built. Refresh (Oct 20) not started: see What's left; depends on the [T05 refresh](T05-chat-panel.md) |
+| Status | Refresh built on branch `w3/editing` (Oct 21); a browser look is still to do: the title and the agent's avatar coming and going with a harness (criteria 1 and 2), the counter, list and "See what it did" (3 and 4), and the key beside a real board (5) |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -38,6 +38,7 @@ The spec is the v6 demo board's toolbar and its "Update suggestions" flow (`clie
 | `moved` | A person moves a paper card (the store side effect that sets `pinnedByHuman`, source `user`) | `{type, paperId}` |
 | `link_added`, `link_renamed`, `link_hidden`, `link_removed` | The [T14 refresh](T14-board-editing.md)'s link editor | `{type, from, to, kind, label?}` |
 | `note_added`, `note_pinned` | A person creates a note, or pins one to a paper | `{type, text, paperId?}` |
+| `note_unpinned`, `note_removed` | A person drags a note from before this session off its paper, or deletes one | `{type, text, paperId?}`, the paper it was pinned to |
 | `voted` | `castVote` succeeds (`client/client/widgets/votes.ts`) | `{type, paperId, decision}` |
 | `cluster_renamed` | A person renames a cluster frame | `{type, clusterId, label}` |
 
@@ -47,17 +48,25 @@ Repeated changes to the same thing collapse (moving a paper three times is one `
 
 **Update suggestions** calls `chatBus.ask({ text: "Update suggestions", resources: [{ uri: "tldraw://<boardId>/changes", mimeType: "application/json", text: <the JSON> }] })` (T05 refresh) and clears the changes. When that turn ends with `end_turn`, a toast says "Done. The agent caught up with your changes." with **See what it did**, which opens the chat scrolled to that turn.
 
-**What the master does with it** is already in its instruction ("<board-changes>: call `get_board` first…"); with [H04](../agent-harness/H04-first-run-in-90-seconds.md) the re-rank is `rank_papers`. A scripted harness test pins it down: an Update suggestions prompt with a `moved` and a `voted` change leads to `get_board`, then `rank_papers`, and no `add_papers` for the moved paper.
+**What the master does with it** is already in its instruction ("<board-changes>: call `get_board` first…"); with [H04](../agent-harness/H04-first-run-in-90-seconds.md) the re-rank is `rank_papers`. A scripted harness test guards the parts that are code, not the model's choice: an Update suggestions prompt with a `moved` and a `voted` change reaches the model as `<board-changes>`, and `rank_papers` leaves out the paper discarded since the last ranking. Whether the model calls `get_board` first and places nothing again is the live check's to see.
 
 **Help** (`client/client/pinboard/Help.tsx`, a **?** at the bottom right): the v6 key, explaining the cards (In your collection, Suggested · fit, the red rank number), the corner badges (New, Split vote, Reading…, ✓ Kept, Discarded), the three kinds of string (red cites, dotted similar, blue yours), notes and clusters.
 
 **Tasks:**
 
-- [ ] `TopBar.tsx`: title and question; agent avatar from `agentActive`.
-- [ ] `client/client/pinboard/changes.ts` and `changes.test.ts` (recording, collapsing, the JSON); hooks in `sideEffects.ts` and `votes.ts`.
-- [ ] `Toolbar.tsx`: the changes counter, list and Update suggestions; the "See what it did" toast (`ChatPanel` exposes "scroll to turn").
-- [ ] `client/client/pinboard/Help.tsx`.
-- [ ] `harness/tests/test_master_board.py`: the Update suggestions case.
+- [x] `TopBar.tsx`: title and question; agent avatar from `agentActive`.
+- [x] `client/client/pinboard/changes.ts` and `changes.test.ts` (recording, collapsing, the JSON); hooks in `sideEffects.ts` and `votes.ts`.
+- [x] `Toolbar.tsx`: the changes counter, list and Update suggestions; the "See what it did" toast (`ChatPanel` exposes "scroll to turn").
+- [x] `client/client/pinboard/Help.tsx`.
+- [x] The harness's Update suggestions case, in its own file: `harness/tests/test_update_suggestions.py`.
+
+**As built (Oct 21):**
+
+- Collapsing: the latest move, vote or name of a thing wins; naming a link you drew this session folds into its `link_added`, and deleting it drops both; a note added and then pinned is one `note_added` with its `paperId`, which follows the note's text as you type, its unpinning and its deletion. A note from before this session that you unpin or delete is a `note_unpinned` or `note_removed` of its own, with its text and the paper it was pinned to. Undo in the link editor's toasts puts that link's changes back. Note entries carry the note's shape ID inside the browser only; the JSON is exactly `{since, changes: [{type, …, at}]}`, and `since` is when this list started (the last Update suggestions, or the first visit this session).
+- The changes come from `sideEffects.ts` (papers moved, cluster frames renamed, note text and deletes), `editing/pinNotes.ts` (`note_added`, `note_pinned`, `note_unpinned`), the [T14](T14-board-editing.md) link handle and editor, and `castVote`.
+- Update suggestions (`changes.ts` `updateSuggestions`) also toasts "The agent is updating suggestions with your N changes…", as the demo board does; "Done. The agent caught up with your changes." waits for the next turn whose prompt is "Update suggestions" to end with `end_turn`. The chat reports ended turns and opens at a turn through `chatTurns` in `chatBus.ts` (`ChatPanel` marks each turn with `data-turn`).
+- The board's title falls back to its question, then the room ID; the agent's avatar follows `agentActive` from `GET /boards/:id` (on load and window focus) and the SSE stream's `agent.active` / `agent.idle`.
+- Help lists the editing gestures this board has (double-click to edit a note or rename a cluster; scroll to move, ⌘-scroll to zoom, ⌘Z), not the demo's PDF drop or cluster resizing.
 
 **Acceptance criteria (refresh, replacing 1 to 5 above for v6):**
 

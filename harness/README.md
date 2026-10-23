@@ -148,9 +148,10 @@ Each run writes `tests/live/reports/<UTC time>.json` (gitignored; format in the 
 
 A run takes about 10 minutes on today's pipeline and makes a few dozen Token Factory calls (the master, three search agents, the reader and context agent per card), plus the papers MCP's own scoring and rerank calls. Run one at a time, never in CI; use `LIVE_MODEL=cheap` while iterating and the default models for the gate.
 
+After a turn that placed papers, four steps follow, three of them model-free (the reading runs the reader and context agents) ([group README](../docs/wps/agent-harness/README.md#shared-contracts)): citation links (`citation_links`, then `link_papers` kind `cites`), near links (each new paper to the paper it was placed near), the reading, and, at the end of the turn, clusters: once per board with 6 papers or more and no cluster yet, `apply_clusters` groups the board with the papers MCP's `cluster_papers`.
+
 ## Not built yet
 
 - Verdicts, citation overlap and recency in `score_candidates`: it scores by embedding similarity to the question and the closest seed, so the master places the top of that score. The master's instruction already skips candidates marked `placeable: false` once the papers MCP sends that field.
-- Clustering (`cluster_papers`, `apply_clusters`, `label_cluster`): neither MCP has the tools yet, so the master doesn't cluster.
 - Full-text quotes on the card: the canvas MCP's `add_quote` only accepts sentences from the abstract, so the reader's full-text quotes are left out.
 - Tool cards for the background passes: they run after the turn, so the chat shows no cards for them; the board shows their progress with the reading badge.

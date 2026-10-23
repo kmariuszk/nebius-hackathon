@@ -8,7 +8,7 @@
 | Unblocks | T12 |
 | Milestone | M3 (board), M4 (paper pages); the Oct 20 refresh is W3 The team edits |
 | Priority | P2 (refresh) |
-| Status | Not started, apart from the prompt mapping in the harness. Refresh (Oct 20): see What's left; depends on the [T05 refresh](T05-chat-panel.md) and, for `look_at_figure`, [D05](../discovery/D05-real-figures.md) |
+| Status | Refresh built on branch `w3/looks` (Oct 21); what remains: the live Super VL criteria 1–4, a look in the browser (the export with strings, the "Include my view" switch, a hidden tab), the chips under the user's message, and the live tests |
 | Owner | TBD |
 
 ## Where it stands (Oct 20)
@@ -16,10 +16,10 @@
 | Part | State | Where |
 | --- | --- | --- |
 | Context tags in the user's message (`<selected-shape>`, `<viewport>`, `<board-changes>`, `<board-context>`, images) | Built on the harness side | `harness/harness/acp/mapping.py`, `harness/harness/board/prompts.py` (`BOARD_CONTEXT`) |
-| The chat panel sending selected shapes, the viewport and its image | Not built: the panel sends text only | `client/client/chat/ChatPanel.tsx` |
-| `_canvas/snapshot` | The browser answers with a "not supported yet" error (F22) | `client/client/chat/connection.ts`, `connection.test.ts` ("_canvas/snapshot gets a \"not supported yet\" error") |
-| `look_at_board`, `look_at_paper` and the image plugin | Not built | — |
-| PDF reader (for `paper_page`) | Not built and out of scope (T10's Phase B) | — |
+| The chat panel sending selected shapes, the viewport and its image | Built on `w3/looks` (Oct 21): Send adds the selection (up to 20), the open paper, the view summary and, with "Include my view" on, the view's picture | `client/client/chat/context.ts`, `ChatPanel.tsx` |
+| `_canvas/snapshot` | Built on `w3/looks`: `viewport`, `board` and `shapes`, at most 1,600 px, link arrows shown while it draws, an error at once for a hidden tab and after 8 s otherwise (inside the harness's 10 s) | `client/client/chat/snapshot.ts`, `connection.ts`, `client/client/shapes/index.ts` |
+| `look_at_board`, `look_at_figure` and the image plugin | Built on `w3/looks` | `harness/harness/board/viewer.py`, `harness/harness/acp/images.py` (registered in `worker.py`), `harness/tests/test_look_tools.py` |
+| PDF reader (for `paper_page`) | Not built and out of scope (T10's Phase B); `paper_page` is dropped (D25) | — |
 
 ## What's left (v6)
 
@@ -33,9 +33,11 @@ Everything in the Design below still stands, with these changes for v6 and for w
 
 **Tasks** (the original Tasks below, minus `paper_page`, plus):
 
-- [ ] `look_at_figure` in `viewer.py`, through the same image plugin.
-- [ ] Arrows visible during export.
-- [ ] `connection.test.ts`: the snapshot test answers with a PNG instead of an error.
+- [x] `look_at_figure` in `viewer.py`, through the same image plugin. `get_board` doesn't carry the card's figure, so it reads `get_figures`: the figure named by an optional `label` (the selection's `figure` gives the card's), else the first one with a picture.
+- [x] Arrows visible during export: `exportingSnapshot` in `chat/snapshot.ts`, read by `getShapeVisibility`, is on while a snapshot draws, or until `takeSnapshot` gives up on it; a `pb-exporting` class on the live `.tl-canvas` keeps the arrows off the screen meanwhile (tldraw draws the export beside that element, so the picture keeps them).
+- [x] `connection.test.ts`: the snapshot test answers with a PNG instead of an error.
+
+**Built on `w3/looks` beyond the plan:** `ImagesPlugin` also leaves earlier prompts' pictures out of later turns (a note in their place), and drops a picture left over from a cancelled turn. Keyless tests: `client/client/chat/snapshot.test.ts`, `context.test.ts`, `connection.test.ts`, `harness/tests/test_look_tools.py` (criteria 5's error path, 6 and 7).
 
 **Acceptance criteria (refresh):** criteria 1, 2, 3, 5, 6 and 7 below stand; criterion 4 becomes: "With a paper open that has a figure, 'what does this figure show?' makes the agent call `look_at_figure` (a tool card shows it) and describe the figure's panels, axes or drawing, not just its caption."
 
@@ -64,9 +66,11 @@ Built when the user presses Send:
 1. **Text block:** what they typed.
 2. **Selected shapes:** up to 20 from `editor.getSelectedShapes()`, each a `resource` block with `uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json` and compact JSON: `{shapeId, type, paperId?, title?, year?, status?, fit?, why?, text?, pinnedTo?, author? | createdBy?}` (`fit` and `why` for the viewer's current goal). Note, text and geo shapes get `text` from `editor.getShapeUtil(shape).getText(shape)`; frames carry their label and the paper IDs inside. Over 20: the first 20 plus "and N more selected". The open paper (`openPaperId`, T10) is added the same way when it isn't selected, shown as a "Context: Liu 2022" chip with × to leave it out (v5, `shots-v5/9-narrow.png`).
 3. **Viewport summary:** a `resource` block `tldraw://<boardId>/viewport` with `{visiblePaperIds, visibleNoteCount, zoom}`.
-4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the researcher's current view of the board:", then an `image` block from the shared renderer (section 3, target `viewport`).
+4. **Viewport image** when "Include my view" is on (the default) and the page isn't empty: a text block "Picture of the board: " followed by the snapshot's caption ("Picture of the board: The researcher's current view, with 12 cards, 2 clusters"; `PICTURE_LINE` in `context.ts`), then an `image` block from the shared renderer (section 3, target `viewport`).
 5. **From the PDF reader** (T10 Phase B): "Ask about this page" adds the rendered PDF page, and "Ask about this area" (drag a box on the page) adds just that crop, each preceded by a line like "Page 5 of Lindqvist 2024 (pmid:…), area the researcher marked:".
-6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last prompt, as JSON: `[{type: "moved" | "linked" | "link_named" | "link_hidden" | "link_deleted" | "note_added" | "note_pinned", paperIds, label?, text?}]`. The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
+6. **From "Update suggestions"** (T13): a `resource` block `tldraw://<boardId>/changes` with this viewer's edits since their last Update suggestions, as JSON: `{since, changes: [{type, …, at}]}`, where `type` is `moved`, `link_added`, `link_renamed`, `link_hidden`, `link_removed`, `note_added`, `note_pinned`, `note_unpinned`, `note_removed`, `voted` or `cluster_renamed` ([T13](T13-board-chrome.md) lists each one's fields). The agent re-ranks and re-runs around those papers and never undoes them (T02's rules).
+
+Requests sent through `chatBus` (Update suggestions, Find more like this, the onboarding prompt) carry no board context: they go as their text and their own resources (Update suggestions' changes), without items 2 to 4.
 
 Chips under the user's message show what was attached ("3 cards", "your view", "page 5"); clicking one focuses it locally (T06).
 
@@ -79,7 +83,7 @@ Two more session-bound tools in `BoardTools.viewer()`, alongside T06's:
 | `look_at_board` | `look_at_board(target: "viewport" \| "board" \| "papers", paper_ids: list[str] = [])` | The researcher's current view, the whole board, or just the named papers' cards and their neighbours |
 | `look_at_paper` | `look_at_paper(paper_id: str, page: int = 1)` | One rendered page of the paper's PDF |
 
-Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canvas/snapshot`) with a target from the [shared contract](README.md#shared-contracts): `look_at_board("viewport")` and `look_at_board("board")` send those targets, `look_at_board("papers", paper_ids)` sends `target: "shapes"` with `paperIds`, and `look_at_paper` sends `target: "paper_page"`. It waits up to 10 seconds, and returns a short JSON result to the model: `{"ok": true, "image": "board view, 1600×980, 41 cards visible"}` or `{"ok": false, "reason": "…"}`. The docstrings say when looking helps: layout and cluster questions, "what am I looking at", anything about a figure, chart or drawing.
+Each calls `await conn.ext_method("canvas/snapshot", {...})` (on the wire `_canvas/snapshot`) with a target from the [shared contract](README.md#shared-contracts): `look_at_board("viewport")` and `look_at_board("board")` send those targets, `look_at_board("papers", paper_ids)` sends `target: "shapes"` with `paperIds`, and `look_at_paper` sends `target: "paper_page"`. It waits up to 10 seconds, and returns a short JSON result to the model: `{"ok": true, "image": "board view, 1600×980, 41 cards visible"}` or `{"ok": false, "error": "…"}`. The docstrings say when looking helps: layout and cluster questions, "what am I looking at", anything about a figure, chart or drawing.
 
 **Getting the image in front of the model.** Token Factory's tool messages carry text only ([function calling](https://docs.tokenfactory.nebius.com/ai-models-inference/function-calling)), so the picture can't be the tool's result. Instead:
 
@@ -110,14 +114,14 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 
 ## Tasks
 
-- [ ] `client/client/canvas/snapshot.ts`: the four targets, size cap, captions, errors.
-- [ ] `client/client/chat/context.ts`: prompt blocks, chips, "Include my view".
-- [ ] `client/shared/acpExt.ts`: `zod` schema for `_canvas/snapshot` params and result; `.onRequest` in T05's connection.
-- [ ] `harness/harness/board/viewer.py`: `look_at_board`, `look_at_paper`, the pending-images list.
-- [ ] `harness/harness/acp/images.py`: the `before_model_callback` plugin; register it in T04's runner.
-- [ ] `harness/harness/acp/mapping.py`: image blocks with captions.
-- [ ] Instruction paragraph (a constant in `harness/harness/board/`) telling agents what the context tags and the look tools are, used by `board_assistant` and offered to `master` through [I1](interfaces.md#i1-agent-factory-takes-the-boards-tools).
-- [ ] Tests (below).
+- [x] `client/client/canvas/snapshot.ts`: the four targets, size cap, captions, errors. (In `chat/snapshot.ts`, three targets: no `paper_page`.)
+- [ ] `client/client/chat/context.ts`: prompt blocks, chips, "Include my view". (Built apart from the chips under the user's message and the open paper's × chip: they need the chat state's turn to carry what was attached.)
+- [x] `client/shared/acpExt.ts`: `zod` schema for `_canvas/snapshot` params and result; `.onRequest` in T05's connection.
+- [x] `harness/harness/board/viewer.py`: `look_at_board`, `look_at_paper`, the pending-images list. (`look_at_figure` instead of `look_at_paper`; the list is `BoardTools.images`.)
+- [x] `harness/harness/acp/images.py`: the `before_model_callback` plugin; register it in T04's runner.
+- [x] `harness/harness/acp/mapping.py`: image blocks with captions. (Already in place: the caption is the text block before the image.)
+- [x] Instruction paragraph (a constant in `harness/harness/board/`) telling agents what the context tags and the look tools are, used by `board_assistant` and offered to `master` through [I1](interfaces.md#i1-agent-factory-takes-the-boards-tools). (`BOARD_CONTEXT`, which both use.)
+- [ ] Tests (below). (Keyless and browser tests done, the keyless one as `harness/tests/test_look_tools.py`; the live tests are still to write.)
 
 ## Acceptance criteria
 
@@ -131,13 +135,13 @@ One renderer for prompt images and `_canvas/snapshot` requests (T05 registers it
 
 ## Tests
 
-- **Keyless** (`harness/tests/test_board_vision.py`): the scripted model calls `look_at_board`; a fake ACP client answers `_canvas/snapshot` with `docs/mockups/shots/canvas.png`; assert the next `LlmRequest` has exactly one user `Content` with the caption and the PNG as `inline_data`, and the request after that has none.
-- **Live on Super VL** (`harness/tests/live/test_vision_live.py`, run with `uv run pytest -m live`, skipped without `TF_API_KEY`):
+- **Keyless** (`harness/tests/test_look_tools.py`): the scripted model calls `look_at_board`; a fake ACP client answers `_canvas/snapshot` with a PNG; the next `LlmRequest` has exactly one user `Content` with the caption and the PNG as `inline_data`, and the request after that has none. It also covers a hidden tab, the timeout, `look_at_figure`, and the request over the ACP wire.
+- **Live on Super VL** (to write: `harness/tests/live/test_vision_live.py`, run with `uv run pytest -m live`, skipped without `TF_API_KEY`):
   - Board screenshot: `canvas.png` as a prompt image; the answer mentions at least three of Tirosh, Smalley, Sade-Feldman, Lindqvist, Chen, Park, Ibrahim, and at least one cluster name.
   - Figure: `card-full.png`; the answer mentions UMAP or the tissue section.
   - Agent-initiated look: `board_assistant` on Super VL, asked "how is the board organised?", calls `look_at_board`; the fake client answers with `canvas.png`; the answer names a cluster ("Tumour ecosystem", "Checkpoint response" or "CD8 / CD4 T-cell states").
   - Thoughts separated: in every live answer, the final text contains no thought parts, and thought parts exist.
-- **Browser** (`client/client/canvas/snapshot.test.ts`): the size cap and bounds selection as pure functions; `context.test.ts` for `toContextShape` and the 20-shape cap.
+- **Browser** (`client/client/chat/snapshot.test.ts`): the size cap, bounds and captions, the link arrows' count and the timeout; `client/client/chat/context.test.ts` for `toContextShape`, the 20-shape cap, the prompt's order and Stop before the prompt is sent; `client/client/chat/connection.test.ts` for the `_canvas/snapshot` round trip through the fake harness.
 
 ## Risks
 

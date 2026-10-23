@@ -286,7 +286,7 @@ Fixed here so the lanes can build against each other. A WP that changes one upda
 
 | Method | Params | Result |
 | --- | --- | --- |
-| `_canvas/snapshot` | `{sessionId, target: "viewport" \| "board" \| "shapes" \| "paper_page", shapeIds?, paperIds?, paperId?, page?, maxSide?}`: `shapes` takes `shapeIds` and/or `paperIds`; `paper_page` takes `paperId` and `page`. These four targets are the only ones; T07's `look_at_board("papers", …)` sends `shapes` with `paperIds` | `{mimeType: "image/png", data: <base64>, width, height, caption}`, or a JSON-RPC error if the browser can't take it (hidden tab, no PDF, timeout after 10 s) |
+| `_canvas/snapshot` | `{sessionId, target: "viewport" \| "board" \| "shapes", shapeIds?, paperIds?, maxSide?}`: `shapes` takes `shapeIds` and/or `paperIds`. These three targets are the only ones (`paper_page` was dropped with the PDF reader, decision D25); T07's `look_at_board("papers", …)` sends `shapes` with `paperIds` | `{mimeType: "image/png", data: <base64>, width, height, caption}`, or a JSON-RPC error if the browser can't take it (hidden tab, nothing to show, timeout after 10 s) |
 
 **Prompt content (client to agent, T07).** A text block first, then one `resource` block per selected shape (`uri: tldraw://<boardId>/<shapeId>`, `mimeType: application/vnd.tldraw.shape+json`, `text`: compact shape JSON), then one `resource` block for the viewport (`uri: tldraw://<boardId>/viewport`), then `image` blocks: the viewport, and a PDF page or region when the researcher asks from the PDF reader (T10). "Update suggestions" (T13) adds a `resource` block `tldraw://<boardId>/changes` with the researcher's edits. Each image is preceded by a text line saying what it is.
 

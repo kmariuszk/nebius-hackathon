@@ -1,11 +1,18 @@
-import { useEditor, useValue, type Editor, type TLShape } from 'tldraw'
+import { useRef, type MouseEvent } from 'react'
+import { useEditor, useValue, type Editor, type TLShape, type TLShapeId } from 'tldraw'
+import { isPaperCard } from '../../shared/paperCard'
 import type { PaperCardShape } from '../../shared/shapes'
+import { kindOf, linkTag } from '../editing/linkRules'
+import { hoveredLink, linkEditorAt, openLinkEditor } from '../editing/linkState'
 import { isSaved } from '../shapes/card'
-import { openPaperId } from '../viewerState'
+import { currentGoal, filters, openPaperId } from '../viewerState'
+import { stringFadedByFilters } from './filters'
 
 // v6 strings (docs/mockups/flashcard-v6.html): the links between papers are drawn here, under the
 // cards, running pin to pin with a little sag. The built-in arrows that hold the links stay in the
-// room for the server and the widgets; getShapeVisibility hides them on screen.
+// room for the server and the widgets; getShapeVisibility hides them on screen. Each string has a
+// wide invisible stroke on top that you can point at (its pill shows) and click (the link editor
+// opens, T14); the rest of the layer ignores the pointer.
 
 /** Pin, blur and tape filters for the cards and strings, inside tldraw's own <defs>. */
 export function PinboardDefs() {
@@ -26,13 +33,12 @@ export function PinboardDefs() {
 	)
 }
 
-type Kind = 'cites' | 'similar' | 'user'
 interface Pt {
 	x: number
 	y: number
 }
 interface Line {
-	id: string
+	id: TLShapeId
 	d: string
 	mid: Pt
 	cls: string
@@ -40,9 +46,9 @@ interface Line {
 	tag: string | null
 	mine: boolean
 	faded: boolean
+	/** Links between your own papers are only drawn when you point at or open one; they can still be pointed at. */
+	drawn: boolean
 }
-
-const isCard = (s: TLShape | undefined): s is PaperCardShape => s?.type === 'paper-card'
 
 /** The two paper cards an arrow links, or null when it isn't a link between papers. */
 export function linkedCards(editor: Editor, arrow: TLShape): [PaperCardShape, PaperCardShape] | null {
@@ -52,7 +58,7 @@ export function linkedCards(editor: Editor, arrow: TLShape): [PaperCardShape, Pa
 	const end = bindings.find((b) => b.props.terminal === 'end')
 	const a = start && editor.getShape(start.toId)
 	const b = end && editor.getShape(end.toId)
-	return isCard(a) && isCard(b) ? [a, b] : null
+	return isPaperCard(a) && isPaperCard(b) ? [a, b] : null
 }
 
 function pinOf(editor: Editor, card: PaperCardShape): Pt | null {
@@ -74,9 +80,14 @@ function sag(A: Pt, B: Pt) {
 
 function computeLines(editor: Editor): Line[] {
 	const open = openPaperId.get()
+	const f = filters.get()
+	const goal = currentGoal.get()
 	const hoveredId = editor.getHoveredShapeId()
 	const hovered = hoveredId ? editor.getShape(hoveredId) : undefined
-	const nh = !open && isCard(hovered) ? hovered.props.paperId : null
+	const nh = !open && isPaperCard(hovered) ? hovered.props.paperId : null
+	// the string you point at (not through a card) and the one being edited
+	const pointed = !hovered && editor.isIn('select.idle') ? hoveredLink.get() : null
+	const editing = linkEditorAt.get()?.arrowId ?? null
 	const lines: Line[] = []
 	for (const arrow of editor.getCurrentPageShapes()) {
 		if (arrow.type !== 'arrow' || arrow.meta.hiddenByHuman === true) continue
@@ -87,35 +98,44 @@ function computeLines(editor: Editor): Line[] {
 		const A = pinOf(editor, a)
 		const B = pinOf(editor, b)
 		if (!A || !B) continue
-		const meta = arrow.meta as { kind?: string; label?: string }
-		const kind: Kind = meta.kind === 'cites' || meta.kind === 'similar' ? meta.kind : 'user'
-		const label = typeof meta.label === 'string' ? meta.label : ''
+		const kind = kindOf(arrow.meta)
+		const label = typeof arrow.meta.label === 'string' ? arrow.meta.label : ''
 		const inc = (id: string | null) => !!id && (a.props.paperId === id || b.props.paperId === id)
-		const on = inc(open) || inc(nh)
+		const lit = arrow.id === pointed || arrow.id === editing
+		const on = inc(open) || inc(nh) || lit
 		const mine = kind === 'user' || !!label
-		// links between your own papers show only when you point at or open one
-		if (!on && !mine && isSaved(a) && isSaved(b)) continue
-		const faded = (!!open && !on) || (!!nh && !inc(nh))
+		const filtered = stringFadedByFilters([a.props, b.props], f, goal, open)
+		const faded = !lit && (filtered || (!!open && !on) || (!!nh && !inc(nh)))
 		const p = sag(A, B)
 		const knots = [a, b].filter((c) => !isSaved(c) && c.props.paperId !== open).map((c) => (c === a ? A : B))
-		const tag = mine || on ? (label ? (kind === 'cites' ? `${label} · cites` : label) : kind === 'user' ? 'linked' : kind) : null
+		const tag = mine || on ? linkTag(kind, label) : null
 		lines.push({
 			id: arrow.id,
 			d: p.d,
 			mid: p.mid,
-			cls: `${kind}${on ? ' on' : ''}${faded ? ' faded' : ''}${!on && !faded ? ' rest' : ''}`,
+			cls: `${kind}${on && !faded ? ' on' : ''}${faded ? ' faded' : ''}${!on && !faded ? ' rest' : ''}`,
 			knots,
 			tag,
 			mine,
 			faded,
+			drawn: on || mine || !isSaved(a) || !isSaved(b),
 		})
 	}
 	return lines
 }
 
+// a string takes the pointer only from the select tool, and not where a card or a note lies on it
+function pointable(editor: Editor, e: MouseEvent) {
+	if (e.button !== 0 || !editor.isIn('select.idle')) return false
+	const at = editor.screenToPage({ x: e.clientX, y: e.clientY })
+	return !editor.getShapeAtPoint(at, { hitInside: true, filter: (s) => s.type !== 'arrow' && s.type !== 'frame' })
+}
+
 export function Strings() {
 	const editor = useEditor()
-	const lines = useValue('pinboard strings', () => computeLines(editor), [editor])
+	const all = useValue('pinboard strings', () => computeLines(editor), [editor])
+	const lines = all.filter((l) => l.drawn)
+	const pressed = useRef<TLShapeId | null>(null)
 	return (
 		<svg className="pb-strings" aria-hidden="true">
 			{lines.map((l) => (
@@ -143,6 +163,29 @@ export function Strings() {
 					</g>
 				)
 			})}
+			{all.map((l) => (
+				<path
+					key={`h${l.id}`}
+					className="pb-hit"
+					d={l.d}
+					onPointerEnter={() => hoveredLink.set(l.id)}
+					onPointerLeave={() => hoveredLink.get() === l.id && hoveredLink.set(null)}
+					// the canvas never sees the press, so it doesn't start a selection box
+					onPointerDown={(e) => {
+						pressed.current = pointable(editor, e) ? l.id : null
+						if (pressed.current) editor.markEventAsHandled(e)
+					}}
+					onPointerUp={(e) => pressed.current === l.id && editor.markEventAsHandled(e)}
+					onClick={(e) => {
+						if (pressed.current !== l.id) return
+						pressed.current = null
+						const screen = editor.getViewportScreenBounds()
+						openLinkEditor(l.id, { x: e.clientX - screen.x, y: e.clientY - screen.y })
+					}}
+				>
+					<title>Click to name, hide or delete this link</title>
+				</path>
+			))}
 		</svg>
 	)
 }

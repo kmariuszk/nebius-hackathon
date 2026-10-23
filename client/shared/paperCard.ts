@@ -1,8 +1,13 @@
+import type { TLShape } from '@tldraw/tlschema'
+import type { PaperCardShape } from './shapes.ts'
+
 // The `paper-card` shape's props: the contract between the board model that validates them
 // (T01, validators in shapes.ts), the canvas MCP that writes them (T02) and the v5 widgets that
 // read them (T10). Changing a field here changes all three, plus a migration in shapes.ts.
 
 export const PAPER_CARD_TYPE = 'paper-card'
+
+export const isPaperCard = (shape: TLShape | undefined): shape is PaperCardShape => shape?.type === PAPER_CARD_TYPE
 
 /** Normalised by `normaliseType` (display.ts) from whatever discovery emits; raw value in `typeRaw`. */
 export type PaperType = 'article' | 'review' | 'preprint' | 'other'

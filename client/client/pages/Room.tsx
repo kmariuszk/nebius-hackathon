@@ -5,9 +5,13 @@ import { defaultBindingUtils, defaultShapeUtils, Editor, react, Tldraw, type TLC
 import { boardApi } from '../api'
 import { chatBus } from '../chat/chatBus'
 import { ChatPanel } from '../chat/ChatPanel'
+import { BoardToast } from '../editing/BoardToast'
+import { LinkEditor } from '../editing/LinkEditor'
+import { LinkHandle } from '../editing/LinkHandle'
 import { getBookmarkPreview } from '../getBookmarkPreview'
 import { getDisplayName, getMemberId } from '../identity'
 import { multiplayerAssetStore } from '../multiplayerAssetStore'
+import { Help } from '../pinboard/Help'
 import { PinboardDefs, Strings } from '../pinboard/Strings'
 import { RankedList } from '../pinboard/RankedList'
 import { PinboardToolbar } from '../pinboard/Toolbar'
@@ -26,6 +30,7 @@ const bindingUtils = [...defaultBindingUtils, ...customBindingUtils]
 // toolbar in place of tldraw's menus and panels.
 const components: TLComponents = {
 	OnTheCanvas: Strings,
+	InFrontOfTheCanvas: LinkHandle,
 	SvgDefs: PinboardDefs,
 	MenuPanel: null,
 	StylePanel: null,
@@ -141,6 +146,7 @@ export function Room() {
 		<div className="RoomWrapper">
 			<TopBar
 				roomId={roomId}
+				memberId={memberId}
 				editor={editor}
 				wall={wall}
 				onWall={changeWall}
@@ -164,7 +170,7 @@ export function Room() {
 							onMount={(editor) => {
 								// when the editor is ready, we need to register our bookmark unfurling service
 								editor.registerExternalAssetHandler('url', getBookmarkPreview)
-								const unregister = registerBoardSideEffects(editor, memberId)
+								const unregister = registerBoardSideEffects(editor, memberId, roomId)
 								setEditor(editor)
 								return () => {
 									unregister()
@@ -174,7 +180,10 @@ export function Room() {
 						/>
 						{/* outside <Tldraw>, so pointer and keyboard events in the widgets never reach the canvas */}
 						{editor && <PaperWidgets editor={editor} boardId={roomId} memberId={memberId} />}
-						{editor && <PinboardToolbar editor={editor} />}
+						{editor && <PinboardToolbar editor={editor} boardId={roomId} />}
+						{editor && <LinkEditor editor={editor} boardId={roomId} memberId={memberId} />}
+						<BoardToast />
+						<Help />
 					</div>
 					<ChatPanel boardId={roomId} memberId={memberId} editor={editor} open={chatOpen} onOpenChange={setChatOpen} />
 				</div>

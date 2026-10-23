@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { glanceIcon } from './glance.ts'
-import { newNoteOffset, noteAuthor, plainText } from './notes.ts'
+import { noteAuthor, pinOffset, plainText } from './notes.ts'
 
 test('a note’s rich text reads as plain text, one paragraph per line', () => {
 	const doc = {
@@ -24,9 +24,12 @@ test('note authors: you, the agent, or unknown', () => {
 	assert.equal(noteAuthor(undefined, 'm_me'), null)
 })
 
-test('new notes fan out to the right of the card', () => {
-	assert.deepEqual(newNoteOffset({ w: 60, h: 60 }, 0), { dx: 84, dy: -26 })
-	assert.deepEqual(newNoteOffset({ w: 60, h: 60 }, 2), { dx: 84, dy: 34 })
+test('pinned notes go 20 px right of the card, a little below its middle, each next one lower', () => {
+	// a 48 px node's drawn card has its right edge at node.x + 24 + 86 = node.x + 110
+	assert.deepEqual(pinOffset({ w: 48, h: 48 }, 0), { dx: 130, dy: 36 })
+	assert.deepEqual(pinOffset({ w: 48, h: 48 }, 2), { dx: 130, dy: 104 })
+	// the same place seedDemo.ts pins the demo note: n1.w / 2 + 106, n1.w / 2 + 12
+	assert.deepEqual(pinOffset({ w: 60, h: 60 }, 0), { dx: 60 / 2 + 106, dy: 60 / 2 + 12 })
 })
 
 test('glance steps get an icon from their label', () => {

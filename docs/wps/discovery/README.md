@@ -82,7 +82,7 @@ Fixed here so the groups can build against each other; [interfaces.md I5](../tld
 
 | # | Decision | Why |
 | --- | --- | --- |
-| DD1 | Clusters by k-means++ on the stored embeddings, in numpy, with no new dependency | The vectors exist (LanceDB, `_paper_vectors`); boards hold tens of papers, so numpy is fast enough; scikit-learn would add a large dependency for one call |
+| DD1 | Clusters by k-means++ on the stored embeddings, in numpy, with no new dependency | The vectors exist (LanceDB, `paper_vectors`); boards hold tens of papers, so numpy is fast enough; scikit-learn would add a large dependency for one call |
 | DD2 | A cluster's ID comes from its medoid paper (`c-<slug of the most central paper's ID>`) | `apply_clusters` reuses frames by `clusterId`; IDs from the medoid stay the same when a paper is added, so a second run fills the existing frames instead of making new ones |
 | DD3 | Figure images come from the PMC article page (`<figure id>` → `<img src>` on `cdn.ncbi.nlm.nih.gov`) | PMC's JATS XML names the image file but not its CDN path, which has hash folders; the article page has the full URL (checked on PMC4944528, Oct 20) |
 | DD4 | Lightning names clusters, one call per cluster in parallel | Concept's design; short JSON answers are what Lightning is good at; a failed name leaves the frame unnamed for `label_cluster` |

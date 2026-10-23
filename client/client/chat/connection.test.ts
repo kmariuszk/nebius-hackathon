@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url'
 import { handleAcpUpgrade } from '../../server/acpPipe.ts'
 import { chatReducer, initialChatState, type ToolItem } from './chatState.ts'
 import { openAgentConnection, type AgentHandlers } from './connection.ts'
+import { setSnapshotRenderer, type SnapshotRequest } from './snapshot.ts'
 import { viewerBus, type ViewerEvents } from './viewerBus.ts'
 
 // The browser's ACP client end to end through the real pipe, with Node's built-in (browser-style)
@@ -89,12 +90,27 @@ test('initialize, session/new with the canvas MCP, and a streamed prompt turn', 
 	conn.close()
 })
 
-test('_canvas/snapshot gets a "not supported yet" error', async () => {
+const said = (updates: SessionNotification[]) =>
+	updates.map((n) => (n.update.sessionUpdate === 'agent_message_chunk' && n.update.content.type === 'text' ? n.update.content.text : '')).join('')
+
+test('_canvas/snapshot answers with a PNG of the page', async (t) => {
+	const asked: SnapshotRequest[] = []
+	const png = { mimeType: 'image/png' as const, data: 'iVBORw0KGgo=', width: 1600, height: 980, caption: "The researcher's current view, with 3 cards" }
+	t.after(setSnapshotRenderer(async (request) => (asked.push(request), png)))
 	const { opening, updates } = open()
 	const conn = await opening
 	await conn.prompt([{ type: 'text', text: 'snapshot please' }])
-	const text = updates.map((n) => (n.update.sessionUpdate === 'agent_message_chunk' && n.update.content.type === 'text' ? n.update.content.text : '')).join('')
-	assert.match(text, /^snapshot: Snapshots are not supported yet\./)
+	// the fake harness asks for the viewport and reports the answer's size and caption, or its error
+	assert.ok(said(updates).startsWith("snapshot: 1600×980, The researcher's current view, with 3 cards."), said(updates))
+	assert.deepEqual(asked, [{ target: 'viewport' }])
+	conn.close()
+})
+
+test('a snapshot the browser can\'t take comes back as an error with the reason', async () => {
+	const { opening, updates } = open()
+	const conn = await opening
+	await conn.prompt([{ type: 'text', text: 'snapshot please' }])
+	assert.match(said(updates), /^snapshot: The board isn't open in the researcher's browser\./)
 	conn.close()
 })
 

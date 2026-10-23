@@ -1,16 +1,23 @@
 import { useState, type ReactNode } from 'react'
 import { useValue, type Editor } from 'tldraw'
 import { sentenceCase, shortAuthors } from '../../shared/display'
-import { boardDerived, FIT_LABEL, GOALS } from '../shapes/card'
-import { currentGoal, openPaperId, paperMoreOpen } from '../viewerState'
+import { boardDerived, FIT_COLOR, FIT_LABEL, GOALS } from '../shapes/card'
+import { currentGoal, filters, openPaperId, paperMoreOpen } from '../viewerState'
+import { activeCount, DEFAULT_FILTERS } from './filters'
 
-// The v6 ranked list: the suggestions in the agent's reading order for what you're looking for.
+// The v6 ranked list: the suggestions in the agent's reading order for what you're looking for,
+// narrowed by this viewer's filters.
 
-const FIT_COLOR = { high: '#104281', medium: '#2a78d6', low: '#86b6ef' } as const
+const clearFilters = () => filters.set(DEFAULT_FILTERS)
+
+// the byline's citation count, as on the demo board: "cited 122×", "not cited yet"; unknown says nothing
+const citedLine = (n: number | null) => (n === null ? '' : n ? `cited ${n.toLocaleString('en')}×` : 'not cited yet')
 
 export function RankedList({ editor }: { editor: Editor }) {
 	const [open, setOpen] = useState(false)
 	const ranked = useValue('ranked list', () => boardDerived(editor).ranked, [editor])
+	const total = useValue('ranked total', () => boardDerived(editor).total, [editor])
+	const filtered = useValue('filters on', () => activeCount(filters.get()) > 0, [])
 	const goal = useValue(currentGoal)
 	const sel = useValue(openPaperId)
 
@@ -33,7 +40,16 @@ export function RankedList({ editor }: { editor: Editor }) {
 			<header>
 				<div>
 					<div className="h">Ranked for {(GOALS[goal]?.label ?? goal).toLowerCase()}</div>
-					<small>{ranked.length} suggestions</small>
+					{filtered ? (
+						<small>
+							Showing {ranked.length} of {total} suggestions ·{' '}
+							<button type="button" className="clear" onClick={clearFilters}>
+								Clear
+							</button>
+						</small>
+					) : (
+						<small>{ranked.length} suggestions</small>
+					)}
 				</div>
 				<button type="button" className="xs" onClick={() => setOpen(false)} title="Hide the list">
 					×
@@ -52,6 +68,7 @@ export function RankedList({ editor }: { editor: Editor }) {
 							</span>
 						)
 					if (p.status === 'new') kick.push('New')
+					if (p.status === 'discarded') kick.push('Discarded')
 					if (p.status === 'contested') kick.push(<span key="split" className="flag">Split vote</span>)
 					if (p.type === 'preprint') kick.push(<span key="pre" className="flag">Preprint</span>)
 					if (p.type === 'review') kick.push('Review')
@@ -76,14 +93,24 @@ export function RankedList({ editor }: { editor: Editor }) {
 									))}
 								</div>
 								<div className="lt">{sentenceCase(p.title)}</div>
-								<div className="lm">{[shortAuthors(p.authors), p.venue, p.year].filter(Boolean).join(' · ')}</div>
+								<div className="lm">{[shortAuthors(p.authors), p.venue, p.year, citedLine(p.citedBy)].filter(Boolean).join(' · ')}</div>
 								{p.scores[goal]?.why && <div className="lwhy">{p.scores[goal].why}</div>}
 							</div>
 							{p.figure ? <img className="lthumb" src={p.figure.imageUrl} alt="" /> : <div className="lthumb none">no figure</div>}
 						</button>
 					)
 				})}
-				{!ranked.length && <div className="empty">No suggestions yet. Ask the agent to find papers.</div>}
+				{!ranked.length &&
+					(total ? (
+						<div className="empty">
+							No papers match your filters.{' '}
+							<button type="button" className="clear" onClick={clearFilters}>
+								Clear filters
+							</button>
+						</div>
+					) : (
+						<div className="empty">No suggestions yet. Ask the agent to find papers.</div>
+					))}
 			</div>
 		</aside>
 	)
